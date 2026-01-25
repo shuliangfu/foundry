@@ -15,6 +15,7 @@ import {
   mkdir,
   readdir,
   readStdin,
+  readTextFileSync,
   remove,
   resolve,
   stat,
@@ -97,7 +98,6 @@ coverage.json
 *.env
 
 # IDE 文件
-.vscode/
 .idea/
 .DS_Store
 
@@ -283,9 +283,30 @@ site/
 `;
 
 /**
- * deno.json 模板内容
+ * 获取当前项目的版本号
+ * @returns 版本号字符串，如果读取失败则返回 "1.0.0"
  */
-const DENO_JSON_TEMPLATE = `{
+function getCurrentVersion(): string {
+  try {
+    const denoJsonPath = join(cwd(), "deno.json");
+    if (existsSync(denoJsonPath)) {
+      const denoJsonContent = readTextFileSync(denoJsonPath);
+      const denoJson = JSON.parse(denoJsonContent);
+      return denoJson.version || "1.0.0";
+    }
+  } catch (error) {
+    logger.warn("无法读取 deno.json 版本号，使用默认版本:", error);
+  }
+  return "1.0.0";
+}
+
+/**
+ * 生成 deno.json 模板内容
+ * @param version - @dreamer/foundry 的版本号
+ * @returns deno.json 模板内容
+ */
+function getDenoJsonTemplate(version: string): string {
+  return `{
   "version": "1.0.0",
   "license": "MIT",
   "tasks": {
@@ -294,7 +315,7 @@ const DENO_JSON_TEMPLATE = `{
     "deploy": "deno run -A deploy.ts"
   },
   "imports": {
-    "@dreamer/foundry": "jsr:@dreamer/foundry@^1.0.0",
+    "@dreamer/foundry": "jsr:@dreamer/foundry@^${version}",
 		"@dreamer/test": "jsr:@dreamer/test@1.0.0-beta.23"
   },
   "nodeModulesDir": "auto",
@@ -322,6 +343,61 @@ const DENO_JSON_TEMPLATE = `{
     "strict": true,
     "noImplicitAny": false
   }
+}
+`;
+}
+
+/**
+ * VSCode settings.json 配置内容
+ */
+const VSCODE_SETTINGS = `{
+  "solidity.defaultCompiler": "remote",
+  "solidity.compileUsingRemoteVersion": "v0.8.18+commit.87f61d96",
+  "solidity.remappings": [
+    "forge-std/=lib/forge-std/src/"
+  ],
+  "solidity.formatter": "prettier",
+  "[solidity]": {
+    "editor.defaultFormatter": "JuanBlanco.solidity",
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "editor.formatOnSave": true,
+    "editor.detectIndentation": false
+  },
+  "files.associations": {
+    "*.sol": "solidity"
+  },
+  "deno.enable": true,
+  "deno.lint": true,
+  "deno.config": "./deno.json",
+  "[typescript]": {
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "denoland.vscode-deno"
+  },
+  "[javascript]": {
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "denoland.vscode-deno"
+  },
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "files.exclude": {
+    "**/node_modules": true
+  }
+}
+`;
+
+/**
+ * VSCode extensions.json 推荐扩展配置
+ */
+const VSCODE_EXTENSIONS = `{
+  "recommendations": [
+    "JuanBlanco.solidity",
+    "denoland.vscode-deno"
+  ]
 }
 `;
 
@@ -478,8 +554,8 @@ const EXAMPLE_DEPLOY_SCRIPT = `#!/usr/bin/env -S deno run -A
  *   deno run -A deploy.ts --network local
  */
 
-import type { Deployer } from "@dreamer/foundry/deploy";
-import { logger } from "@dreamer/foundry/utils";
+import type { Deployer } from "@dreamer/foundry";
+import { logger } from "@dreamer/foundry";
 
 /**
  * 部署函数
@@ -518,8 +594,7 @@ const EXAMPLE_TEST_SCRIPT = `/**
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
-import { Web3, preloadWeb3Config } from "@dreamer/foundry/utils";
-import { logger } from "@dreamer/foundry/utils";
+import { Web3, preloadWeb3Config, logger } from "@dreamer/foundry";
 
 describe("MyToken 合约测试", () => {
   let web3: Web3;
@@ -581,7 +656,6 @@ async function createDirectories(projectRoot: string): Promise<void> {
     "src",
     "script",
     "tests",
-    "utils",
     "build",
     "build/abi",
     "build/abi/local",
@@ -624,6 +698,9 @@ async function createDirectories(projectRoot: string): Promise<void> {
 async function createConfigFiles(projectRoot: string): Promise<void> {
   logger.info("创建配置文件...");
 
+  // 获取当前项目的版本号
+  const currentVersion = getCurrentVersion();
+
   const configFiles = [
     { path: "foundry.toml", content: FOUNDRY_TOML },
     { path: ".gitignore", content: GITIGNORE },
@@ -631,8 +708,10 @@ async function createConfigFiles(projectRoot: string): Promise<void> {
     { path: ".env", content: ENV_FILE },
     { path: ".prettierrc", content: PRETTIERRC },
     { path: ".cursorignore", content: CURSORIGNORE },
-    { path: "deno.json", content: DENO_JSON_TEMPLATE },
+    { path: "deno.json", content: getDenoJsonTemplate(currentVersion) },
     { path: "config/web3.ts", content: CONFIG_WEB3_TS },
+    { path: ".vscode/settings.json", content: VSCODE_SETTINGS },
+    { path: ".vscode/extensions.json", content: VSCODE_EXTENSIONS },
   ];
 
   for (const file of configFiles) {
@@ -774,7 +853,6 @@ async function createREADME(projectRoot: string): Promise<void> {
 ├── tests/           # 测试文件
 ├── config/          # 配置文件
 │   └── web3.ts      # Web3 网络配置
-├── utils/           # 工具函数
 └── build/           # 构建输出
     └── abi/         # ABI 文件
 \`\`\`
@@ -831,9 +909,7 @@ deno run -A deploy.ts
 本项目使用 \`@dreamer/foundry\` 库进行部署和验证：
 
 \`\`\`typescript
-import { deploy, verify } from "@dreamer/foundry";
-import { preloadWeb3Config } from "@dreamer/foundry/utils";
-import { Web3 } from "@dreamer/foundry/utils";
+import { deploy, verify, preloadWeb3Config, Web3 } from "@dreamer/foundry";
 
 // 预加载 Web3 配置
 await preloadWeb3Config();

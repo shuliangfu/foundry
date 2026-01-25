@@ -12,7 +12,6 @@ coverage.json
 *.env
 
 # IDE 文件
-.vscode/
 .cursor/
 .idea/
 .DS_Store
@@ -30,3 +29,6 @@ node_modules/
 
 # 测试相关
 tests/data/
+
+
+example/

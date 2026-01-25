@@ -157,19 +157,35 @@ export class Web3 {
 	/**
 	 * 创建 Web3 实例并绑定合约
 	 * @param contractName - 合约名称（必须存在于 build/abi/{network} 目录中）
-	 * @param options - 可选配置
+	 * @param options - 可选配置（如果不提供，将从 config/web3.ts 读取配置）
 	 * @param options.rpcUrl - 自定义 RPC URL（覆盖配置文件）
 	 * @param options.privateKey - 自定义私钥（覆盖配置文件）
 	 * @param options.address - 自定义地址（与 privateKey 对应，覆盖配置文件）
 	 * @param options.chainId - 自定义链 ID（覆盖配置文件）
 	 * @param options.account - 账户索引（从配置的 accounts 数组中选择，默认为 0）
+	 * 
+	 * @remarks
+	 * 配置读取流程：
+	 * 1. 如果提供了 options.privateKey 和 options.address，使用自定义账户
+	 * 2. 如果未提供 options 或只提供了部分 options，会从 config/web3.ts 读取配置
+	 * 3. 配置文件路径：从当前目录向上查找，直到找到包含 config/web3.ts 的目录
+	 * 4. 根据 WEB3_ENV 环境变量选择对应的配置（local/testnet/mainnet 等）
+	 * 5. 配置会被缓存到 web3ConfigCache，避免重复加载
+	 * 
+	 * 注意：由于构造函数是同步的，如果配置未加载，需要先调用 preloadWeb3Config()：
+	 * ```typescript
+	 * await preloadWeb3Config();
+	 * const web3 = new Web3("MyContract");
+	 * ```
 	 */
 	constructor(contractName?: string, options?: Web3Options) {
 		this.contractName = contractName;
 
 		// 检查 web3Config 是否存在（尝试同步获取缓存）
+		// 配置通过 loadWeb3Config() 函数从 config/web3.ts 加载并缓存到 web3ConfigCache
 		const web3Config = web3ConfigCache;
 
+		// 如果未提供 options，且配置已加载，使用配置文件中的配置
 		// 如果提供了自定义的 privateKey 和 address，使用自定义账户
 		if (options?.privateKey && options?.address) {
 			// 确保 privateKey 有正确的格式（添加 0x 前缀如果缺失）
@@ -248,10 +264,39 @@ export class Web3 {
 					index: accountIndex,
 				};
 			} else {
-				// 配置未加载，需要提供 options
-				throw new Error(
-					"Web3 配置未找到，请检查 WEB3_ENV 环境变量或提供 options.privateKey 和 options.address。如果使用配置文件，请确保 config/web3.ts 存在，并在使用前调用 preloadWeb3Config()",
-				);
+				// 如果未提供 options 且配置未加载，尝试检查配置文件是否存在
+				// 配置读取逻辑在 loadWeb3Config() 函数中（第67-125行）：
+				// 1. 从当前目录向上查找 config/web3.ts 文件
+				// 2. 动态导入配置模块
+				// 3. 根据 WEB3_ENV 环境变量选择对应环境的配置
+				// 4. 将配置缓存到 web3ConfigCache
+				if (!options || Object.keys(options).length === 0) {
+					// 尝试查找配置文件，给出更友好的错误提示
+					const configDir = findConfigDir(cwd());
+					const configPath = configDir ? join(configDir, "config", "web3.ts") : null;
+					
+					if (configPath && existsSync(configPath)) {
+						// 配置文件存在但未加载
+						throw new Error(
+							`Web3 配置未加载。检测到配置文件存在：${configPath}\n` +
+							`请在使用前调用 preloadWeb3Config() 来加载配置，或者提供 options 参数。\n` +
+							`示例：await preloadWeb3Config(); const web3 = new Web3('MyContract');`,
+						);
+					} else {
+						// 配置文件不存在
+						throw new Error(
+							`Web3 配置未找到。请创建 config/web3.ts 配置文件，或提供 options 参数。\n` +
+							`配置文件路径：从当前目录向上查找，直到找到包含 config/web3.ts 的目录。\n` +
+							`示例：await preloadWeb3Config(); const web3 = new Web3('MyContract');`,
+						);
+					}
+				} else {
+					// 提供了部分 options 但配置未加载，需要提供完整的 options
+					throw new Error(
+						"Web3 配置未找到。请检查 WEB3_ENV 环境变量或提供完整的 options.privateKey 和 options.address。\n" +
+						"如果使用配置文件，请确保 config/web3.ts 存在，并在使用前调用 preloadWeb3Config()",
+					);
+				}
 			}
 		}
 

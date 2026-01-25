@@ -17,8 +17,8 @@
  * ```
  */
 
-import { Command } from "jsr:@dreamer/console@^1.0.3-beta.6";
-import { existsSync, readdir, cwd, getEnv, join, readTextFileSync } from "jsr:@dreamer/runtime-adapter@^1.0.0-beta.19";
+import { Command } from "./utils/console.ts";
+import { existsSync, readdir, cwd, getEnv, join, readTextFileSync } from "./utils/runtime-adapter.ts";
 import { logger } from "./utils/logger.ts";
 import { deploy } from "./deploy.ts";
 import { verify } from "./verify.ts";
@@ -211,10 +211,10 @@ cli
   .option({
     name: "network",
     alias: "n",
-    description: "网络名称（local, testnet, mainnet 等）",
+    description: "网络名称 (local, testnet, mainnet 等)。如果不指定，将从 .env 文件中的 WEB3_ENV 读取",
     requiresValue: true,
     type: "string",
-    required: true,
+    required: false,
   })
   .option({
     name: "contract",
@@ -230,7 +230,31 @@ cli
     type: "boolean",
   })
   .action(async (_args, options) => {
-    const network = options.network as string;
+    // 如果未指定网络，尝试从 .env 文件读取 WEB3_ENV
+    let network = options.network as string | undefined;
+    if (!network) {
+      try {
+        const env = await loadEnv();
+        network = env.WEB3_ENV || getEnv("WEB3_ENV");
+        if (!network) {
+          logger.error("❌ 未指定网络");
+          logger.error("   请使用 --network 参数指定网络，或在 .env 文件中设置 WEB3_ENV");
+          logger.error("   示例: foundry deploy --network testnet");
+          logger.error("   或在 .env 文件中设置: WEB3_ENV=testnet");
+          Deno.exit(1);
+        }
+        logger.info(`从 .env 文件读取网络配置: ${network}`);
+      } catch {
+        logger.error("❌ 未指定网络且无法读取 .env 文件");
+        logger.error("   请使用 --network 参数指定网络");
+        logger.error("   示例: foundry deploy --network testnet");
+        Deno.exit(1);
+      }
+    }
+
+    // 此时 network 一定不是 undefined
+    const finalNetwork = network as string;
+
     const contracts = options.contract as string[] | undefined;
     const force = options.force as boolean || false;
     const scriptDir = join(cwd(), "script");
@@ -238,7 +262,7 @@ cli
     logger.info("------------------------------------------");
     logger.info("🚀 开始部署");
     logger.info("------------------------------------------");
-    logger.info("网络:", network);
+    logger.info("网络:", finalNetwork);
     logger.info("强制部署:", force ? "是" : "否");
     logger.info("------------------------------------------");
     logger.info("");
@@ -246,7 +270,7 @@ cli
     // 加载网络配置
     let config: NetworkConfig;
     try {
-      config = await loadNetworkConfig(network);
+      config = await loadNetworkConfig(finalNetwork);
       logger.info("RPC URL:", config.rpcUrl);
       logger.info("部署地址:", config.address);
       if (config.chainId) {
@@ -327,7 +351,7 @@ cli
     try {
       await deploy({
         scriptDir,
-        network,
+        network: finalNetwork,
         config,
         force,
         contracts: contracts,
@@ -339,8 +363,8 @@ cli
       logger.info("------------------------------------------");
       logger.info("");
       logger.info("下一步:");
-      logger.info(`  验证合约: foundry verify --network ${network} --contract <合约名>`);
-      logger.info(`  或: foundry verify --network ${network} --contract <合约名> --api-key <API_KEY>`);
+      logger.info(`  验证合约: foundry verify --network ${finalNetwork} --contract <合约名>`);
+      logger.info(`  或: foundry verify --network ${finalNetwork} --contract <合约名> --api-key <API_KEY>`);
       logger.info(`  注意: 如果设置了环境变量 ETH_API_KEY，可以省略 --api-key 参数`);
     } catch (error) {
       logger.error("❌ 部署失败:", error);
@@ -354,10 +378,10 @@ cli
   .option({
     name: "network",
     alias: "n",
-    description: "网络名称（sepolia, mainnet, testnet, bsc_testnet, bsc）",
+    description: "网络名称 (local, testnet, mainnet 等)。如果不指定，将从 .env 文件中的 WEB3_ENV 读取",
     requiresValue: true,
     type: "string",
-    required: true,
+    required: false,
   })
   .option({
     name: "contract",
@@ -399,7 +423,31 @@ cli
     type: "array",
   })
   .action(async (_args, options) => {
-    const network = options.network as string;
+    // 如果未指定网络，尝试从 .env 文件读取 WEB3_ENV
+    let network = options.network as string | undefined;
+    if (!network) {
+      try {
+        const env = await loadEnv();
+        network = env.WEB3_ENV || getEnv("WEB3_ENV");
+        if (!network) {
+          logger.error("❌ 未指定网络");
+          logger.error("   请使用 --network 参数指定网络，或在 .env 文件中设置 WEB3_ENV");
+          logger.error("   示例: foundry verify --network testnet --contract MyToken");
+          logger.error("   或在 .env 文件中设置: WEB3_ENV=testnet");
+          Deno.exit(1);
+        }
+        logger.info(`从 .env 文件读取网络配置: ${network}`);
+      } catch (_error) {
+        logger.error("❌ 未指定网络且无法读取 .env 文件");
+        logger.error("   请使用 --network 参数指定网络");
+        logger.error("   示例: foundry verify --network testnet --contract MyToken");
+        Deno.exit(1);
+      }
+    }
+
+    // 此时 network 一定不是 undefined
+    const finalNetwork = network as string;
+
     const contractName = options.contract as string;
     let apiKey = options["api-key"] as string | undefined;
     const address = options.address as string | undefined;
@@ -428,7 +476,7 @@ cli
     logger.info("------------------------------------------");
     logger.info("🔍 开始验证合约");
     logger.info("------------------------------------------");
-    logger.info("网络:", network);
+    logger.info("网络:", finalNetwork);
     logger.info("合约名称:", contractName);
     logger.info("------------------------------------------");
     logger.info("");
@@ -438,7 +486,7 @@ cli
     if (!contractAddress) {
       try {
         const { loadContract } = await import("./utils/deploy-utils.ts");
-        const contract = loadContract(contractName, network);
+        const contract = loadContract(contractName, finalNetwork);
         contractAddress = contract.address;
         logger.info("从部署记录读取合约地址:", contractAddress);
       } catch {
@@ -453,7 +501,7 @@ cli
 
     if (!finalRpcUrl || !finalChainId) {
       try {
-        const config = await loadNetworkConfig(network);
+        const config = await loadNetworkConfig(finalNetwork);
         finalRpcUrl = finalRpcUrl || config.rpcUrl;
         finalChainId = finalChainId || config.chainId;
       } catch {
@@ -484,7 +532,7 @@ cli
       await verify({
         address: contractAddress!,
         contractName,
-        network,
+        network: finalNetwork,
         apiKey: apiKey!,
         rpcUrl: finalRpcUrl!,
         chainId: finalChainId,

@@ -2,11 +2,11 @@
  * @title Foundry Deploy
  * @description Main deployment script that scans and executes deployment scripts
  * 使用 @dreamer/runtime-adapter 兼容 Deno 和 Bun
- * 
+ *
  * @example
  * ```typescript
  * import { deploy } from "@dreamer/foundry/deploy";
- * 
+ *
  * await deploy({
  *   scriptDir: "./script",
  *   network: "testnet",
@@ -18,11 +18,12 @@
  * ```
  */
 
-import { existsSync, readdir, cwd } from "@dreamer/runtime-adapter";
+import { existsSync, readdir, cwd, setEnv } from "@dreamer/runtime-adapter";
 import { join } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
-import { deploy as deployContract, loadContract } from "./utils/deploy-utils.ts";
+import { forgeDeploy, loadContract } from "./utils/deploy-utils.ts";
 import type { NetworkConfig, DeployOptions } from "./utils/deploy-utils.ts";
+import { Web3 } from "./utils/web3.ts";
 
 /**
  * 部署器接口
@@ -41,16 +42,6 @@ export interface Deployer {
 }
 
 /**
- * Web3 配置选项
- */
-export interface Web3Options {
-  /** WebSocket RPC URL（可选） */
-  wssUrl?: string;
-  /** 链 ID（可选，会从 config 中继承） */
-  chainId?: number;
-}
-
-/**
  * 部署选项
  */
 export interface DeployScriptOptions {
@@ -64,8 +55,6 @@ export interface DeployScriptOptions {
   force?: boolean;
   /** 要部署的合约列表（如果为空则部署所有） */
   contracts?: string[];
-  /** Web3 配置选项（用于创建 Web3 实例） */
-  web3?: Web3Options;
 }
 
 /**
@@ -114,15 +103,21 @@ export function createDeployer(
       constructorArgs: string[] | Record<string, any> = [],
       options?: DeployOptions,
     ) => {
-      const address = await deployContract(contractName, config, constructorArgs, options);
+      const address = await forgeDeploy(contractName, config, constructorArgs, options);
       // 返回简化的合约实例
       return { address };
     },
     web3: (contractName: string) => {
-      const contract = loadContract(contractName, network);
-      return { address: contract.address, abi: contract.abi };
+      // 设置环境变量，让 Web3 类能正确加载对应网络的合约
+      setEnv("WEB3_ENV", network);
+      
+      // 尝试不传 options，使用配置文件
+      // 如果配置已加载（通过 preloadWeb3Config），这会成功
+      // 如果配置未加载，构造函数会抛出错误，提示先调用 preloadWeb3Config
+      // 在这种情况下，用户需要在使用 deploy 前先调用 preloadWeb3Config()
+      return new Web3(contractName);
     },
-    loadContract: (contractName: string, network: string, force: boolean) => {
+    loadContract: (contractName: string, network: string, _force: boolean) => {
       return loadContract(contractName, network);
     },
   };

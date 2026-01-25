@@ -70,7 +70,7 @@ export interface ContractInfo {
  * @param options 可选参数
  * @returns 合约地址
  */
-export async function deploy(
+export async function forgeDeploy(
   contractName: string,
   config: NetworkConfig,
   constructorArgs: string[] | Record<string, any> = [],
