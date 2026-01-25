@@ -18,6 +18,7 @@ import {
   readdir,
   readStdin,
   exit,
+  basename,
 } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
 
@@ -939,8 +940,9 @@ export async function init(projectRoot?: string): Promise<void> {
     // 检查当前目录是否为空
     const isEmpty = await isDirectoryEmpty(root);
     if (!isEmpty) {
+      const dirName = basename(root);
       const confirmed = await confirm(
-        `⚠️  警告：当前目录 "${root}" 不为空，初始化可能会覆盖现有文件。\n` +
+        `⚠️  警告：当前目录 "${dirName}" 不为空，初始化可能会覆盖现有文件。\n` +
         `是否继续在当前目录初始化 Foundry 项目？`
       );
       
