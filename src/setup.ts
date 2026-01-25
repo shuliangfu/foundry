@@ -1,18 +1,20 @@
 #!/usr/bin/env -S deno run -A
 /**
- * @title Foundry CLI 全局安装脚本
- * @description 将 foundry CLI 安装到全局，可以在任何地方使用 `foundry` 命令
- * 使用 @dreamer/runtime-adapter 兼容 Deno 和 Bun
+ * @module
+ * @title Foundry CLI Global Installation Script
+ * @description Installs the Foundry CLI globally, allowing the `foundry` command to be used anywhere.
+ * 
+ * This module uses @dreamer/runtime-adapter for Deno and Bun compatibility.
  *
  * @example
  * ```bash
- * # Deno 环境安装
+ * # Install in Deno environment
  * deno run -A src/setup.ts
  *
- * # Bun 环境安装
+ * # Install in Bun environment
  * bun run src/setup.ts
  *
- * # 安装后使用
+ * # Use after installation
  * foundry deploy --network testnet
  * foundry verify --network testnet --contract MyToken
  * ```

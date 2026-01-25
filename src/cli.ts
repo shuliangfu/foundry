@@ -1,19 +1,22 @@
 #!/usr/bin/env -S deno run -A
 /**
+ * @module
  * @title Foundry CLI
- * @description Foundry 部署和验证命令行工具
- * 使用 @dreamer/console 和 @dreamer/runtime-adapter 兼容 Deno 和 Bun
+ * @description Foundry deployment and verification command-line tool.
+ * 
+ * This module provides CLI commands for deploying and verifying smart contracts.
+ * It uses @dreamer/console and @dreamer/runtime-adapter for Deno and Bun compatibility.
  *
  * @example
  * ```bash
- * # 部署所有合约到测试网
- * deno run -A cli.ts deploy --network testnet
+ * # Deploy all contracts to testnet
+ * foundry deploy --network testnet
  *
- * # 部署指定合约
- * deno run -A cli.ts deploy --network testnet --contract MyToken
+ * # Deploy specific contract
+ * foundry deploy --network testnet --contract MyToken
  *
- * # 验证合约
- * deno run -A cli.ts verify --network testnet --contract MyToken --api-key YOUR_API_KEY
+ * # Verify contract
+ * foundry verify --network testnet --contract MyToken --api-key YOUR_API_KEY
  * ```
  */
 
