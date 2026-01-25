@@ -36,7 +36,7 @@ bunx jsr add @dreamer/foundry
 
 ```bash
 # 克隆或下载项目后，运行安装脚本
-deno run -A jsr:@dreamer/foundry/setup.ts
+deno run -A jsr:@dreamer/foundry/setup
 
 # 安装后使用
 foundry deploy --network testnet
