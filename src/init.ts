@@ -13,6 +13,8 @@ import {
   stat,
   dirname,
   writeTextFile,
+  resolve,
+  isAbsolute,
 } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
 
@@ -848,9 +850,40 @@ const web3 = new Web3("MyContract");
 
 /**
  * 主函数
+ * @param projectRoot 项目根目录（可选）
+ *   - 如果不指定，则在当前目录初始化
+ *   - 如果指定，则创建该目录并在其中初始化
  */
 export async function init(projectRoot?: string): Promise<void> {
-  const root = projectRoot || cwd();
+  let root: string;
+  
+  if (projectRoot) {
+    // 如果指定了项目目录，解析为绝对路径
+    const targetPath = isAbsolute(projectRoot) 
+      ? projectRoot 
+      : resolve(cwd(), projectRoot);
+    
+    if (existsSync(targetPath)) {
+      // 目录已存在，检查是否是文件
+      const fileStat = await stat(targetPath);
+      if (fileStat.isFile) {
+        throw new Error(
+          `无法初始化项目：路径 "${projectRoot}" 已存在且是一个文件。请先删除该文件或使用其他目录名。`,
+        );
+      }
+      // 目录已存在，使用该目录
+      root = targetPath;
+      logger.info(`使用已存在的目录: ${projectRoot}`);
+    } else {
+      // 目录不存在，创建新目录
+      await mkdir(targetPath, { recursive: true });
+      root = targetPath;
+      logger.info(`创建新项目目录: ${projectRoot}`);
+    }
+  } else {
+    // 未指定目录，在当前目录初始化
+    root = cwd();
+  }
 
   logger.info("===========================================");
   logger.info("🚀 Foundry 项目初始化");

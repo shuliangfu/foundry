@@ -39,6 +39,7 @@ bunx jsr add @dreamer/foundry
 deno run -A jsr:@dreamer/foundry/setup
 
 # 安装后使用
+foundry init [项目名]
 foundry deploy --network testnet
 foundry verify --network testnet --contract MyToken
 ```

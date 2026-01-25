@@ -3,15 +3,15 @@
  * @title Foundry CLI
  * @description Foundry 部署和验证命令行工具
  * 使用 @dreamer/console 和 @dreamer/runtime-adapter 兼容 Deno 和 Bun
- * 
+ *
  * @example
  * ```bash
  * # 部署所有合约到测试网
  * deno run -A cli.ts deploy --network testnet
- * 
+ *
  * # 部署指定合约
  * deno run -A cli.ts deploy --network testnet --contract MyToken
- * 
+ *
  * # 验证合约
  * deno run -A cli.ts verify --network testnet --contract MyToken --api-key YOUR_API_KEY
  * ```
@@ -52,10 +52,10 @@ async function loadNetworkConfig(network: string): Promise<NetworkConfig> {
     if (existsSync(configPath)) {
       const configUrl = new URL(`file://${configPath}`).href;
       const configModule = await import(configUrl);
-      
+
       // 设置环境变量
       const web3Env = getEnv("WEB3_ENV") || network;
-      
+
       let networkConfig: any = null;
       if (configModule.Web3Config && configModule.Web3Config[web3Env]) {
         networkConfig = configModule.Web3Config[web3Env];
@@ -86,7 +86,7 @@ async function loadNetworkConfig(network: string): Promise<NetworkConfig> {
       address: env.ADDRESS || env.ADDRESS || "",
       chainId: env.CHAIN_ID ? parseInt(env.CHAIN_ID, 10) : undefined,
     };
-  } catch (error) {
+  } catch {
     logger.error("无法加载网络配置，请设置环境变量或创建 config/web3.ts 配置文件");
     throw new Error("网络配置加载失败");
   }
@@ -97,7 +97,7 @@ async function loadNetworkConfig(network: string): Promise<NetworkConfig> {
  */
 async function scanScripts(scriptDir: string): Promise<string[]> {
   const scripts: string[] = [];
-  
+
   if (!existsSync(scriptDir)) {
     return scripts;
   }
@@ -112,7 +112,7 @@ async function scanScripts(scriptDir: string): Promise<string[]> {
         }
       }
     }
-    
+
     // 按文件名中的数字前缀排序
     scripts.sort((a, b) => {
       const numA = parseInt(a.match(/^(\d+)-/)?.[1] || "999") || 999;
@@ -167,12 +167,12 @@ cli
   .command("init", "初始化 Foundry 项目")
   .argument({
     name: "projectRoot",
-    description: "项目根目录（可选，默认为当前目录）",
+    description: "项目目录名（可选）。不指定则在当前目录初始化；指定则创建该目录并初始化",
     required: false,
   })
   .action(async (args) => {
     const projectRoot = args.length > 0 ? args[0] : undefined;
-    
+
     try {
       await init(projectRoot);
     } catch (error) {
@@ -205,7 +205,7 @@ cli
     description: "强制重新部署，即使合约已存在",
     type: "boolean",
   })
-  .action(async (args, options) => {
+  .action(async (_args, options) => {
     const network = options.network as string;
     const contracts = options.contract as string[] | undefined;
     const force = options.force as boolean || false;
@@ -374,7 +374,7 @@ cli
     requiresValue: true,
     type: "array",
   })
-  .action(async (args, options) => {
+  .action(async (_args, options) => {
     const network = options.network as string;
     const contractName = options.contract as string;
     let apiKey = options["api-key"] as string | undefined;
@@ -417,7 +417,7 @@ cli
         const contract = loadContract(contractName, network);
         contractAddress = contract.address;
         logger.info("从部署记录读取合约地址:", contractAddress);
-      } catch (error) {
+      } catch {
         logger.error("❌ 无法读取合约地址，请使用 --address 参数指定");
         Deno.exit(1);
       }
@@ -432,7 +432,7 @@ cli
         const config = await loadNetworkConfig(network);
         finalRpcUrl = finalRpcUrl || config.rpcUrl;
         finalChainId = finalChainId || config.chainId;
-      } catch (error) {
+      } catch {
         logger.warn("无法从配置加载 RPC URL 和链 ID，请使用 --rpc-url 和 --chain-id 参数指定");
       }
     }
