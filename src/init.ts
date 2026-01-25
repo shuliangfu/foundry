@@ -5,20 +5,20 @@
  */
 
 import {
+  basename,
   cwd,
+  dirname,
   existsSync,
+  exit,
+  isAbsolute,
   join,
   mkdir,
-  remove,
-  stat,
-  dirname,
-  writeTextFile,
-  resolve,
-  isAbsolute,
   readdir,
   readStdin,
-  exit,
-  basename,
+  remove,
+  resolve,
+  stat,
+  writeTextFile,
 } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
 
@@ -881,19 +881,19 @@ async function isDirectoryEmpty(dirPath: string): Promise<boolean> {
 async function confirm(message: string): Promise<boolean> {
   logger.warn(message);
   logger.info("请输入 'yes' 或 'y' 确认，其他任何输入将取消操作：");
-  
+
   try {
     const buffer = new Uint8Array(1024);
     const bytesRead = await readStdin(buffer);
-    
+
     if (bytesRead === null) {
       return false;
     }
-    
+
     const input = new TextDecoder().decode(buffer.subarray(0, bytesRead))
       .trim()
       .toLowerCase();
-    
+
     return input === "yes" || input === "y";
   } catch {
     // 如果读取失败，返回 false（安全起见）
@@ -909,13 +909,11 @@ async function confirm(message: string): Promise<boolean> {
  */
 export async function init(projectRoot?: string): Promise<void> {
   let root: string;
-  
+
   if (projectRoot) {
     // 如果指定了项目目录，解析为绝对路径
-    const targetPath = isAbsolute(projectRoot) 
-      ? projectRoot 
-      : resolve(cwd(), projectRoot);
-    
+    const targetPath = isAbsolute(projectRoot) ? projectRoot : resolve(cwd(), projectRoot);
+
     if (existsSync(targetPath)) {
       // 目录已存在，检查是否是文件
       const fileStat = await stat(targetPath);
@@ -936,16 +934,16 @@ export async function init(projectRoot?: string): Promise<void> {
   } else {
     // 未指定目录，在当前目录初始化
     root = cwd();
-    
+
     // 检查当前目录是否为空
     const isEmpty = await isDirectoryEmpty(root);
     if (!isEmpty) {
       const dirName = basename(root);
       const confirmed = await confirm(
         `⚠️  警告：当前目录 "${dirName}" 不为空，初始化可能会覆盖现有文件。\n` +
-        `是否继续在当前目录初始化 Foundry 项目？`
+          `是否继续在当前目录初始化 Foundry 项目？`,
       );
-      
+
       if (!confirmed) {
         logger.info("操作已取消。");
         logger.info("提示：可以指定一个目录名来创建新项目，例如：foundry init my-project");
