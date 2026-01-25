@@ -18,13 +18,31 @@
  */
 
 import { Command } from "jsr:@dreamer/console@^1.0.3-beta.6";
-import { existsSync, readdir, cwd, getEnv, join } from "jsr:@dreamer/runtime-adapter@^1.0.0-beta.19";
+import { existsSync, readdir, cwd, getEnv, join, readTextFileSync } from "jsr:@dreamer/runtime-adapter@^1.0.0-beta.19";
 import { logger } from "./utils/logger.ts";
 import { deploy } from "./deploy.ts";
 import { verify } from "./verify.ts";
 import { init } from "./init.ts";
 import { loadEnv } from "./utils/env.ts";
 import type { NetworkConfig } from "./utils/deploy-utils.ts";
+
+/**
+ * 从 deno.json 读取版本号
+ * @returns 版本号字符串，如果读取失败则返回 undefined
+ */
+function getVersion(): string | undefined {
+  try {
+    const denoJsonPath = join(cwd(), "deno.json");
+    if (existsSync(denoJsonPath)) {
+      const denoJsonContent = readTextFileSync(denoJsonPath);
+      const denoJson = JSON.parse(denoJsonContent);
+      return denoJson.version;
+    }
+  } catch (error) {
+    logger.warn("无法读取 deno.json 版本号:", error);
+  }
+  return undefined;
+}
 
 /**
  * 加载网络配置
@@ -161,6 +179,12 @@ function findContractScript(contractName: string, scripts: string[]): string | n
 
 // 创建主命令
 const cli = new Command("foundry", "Foundry 部署和验证工具");
+
+// 设置版本号（从 deno.json 读取）
+const version = getVersion();
+if (version) {
+  cli.setVersion(version);
+}
 
 // 初始化命令
 cli
