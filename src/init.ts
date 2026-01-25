@@ -15,6 +15,9 @@ import {
   writeTextFile,
   resolve,
   isAbsolute,
+  readdir,
+  readStdin,
+  exit,
 } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
 
@@ -849,6 +852,55 @@ const web3 = new Web3("MyContract");
 }
 
 /**
+ * 检查目录是否为空（忽略 .git 和 .DS_Store 等隐藏文件）
+ */
+async function isDirectoryEmpty(dirPath: string): Promise<boolean> {
+  try {
+    const entries = await readdir(dirPath);
+    // 过滤掉隐藏文件和常见系统文件
+    const visibleEntries = entries.filter((entry) => {
+      const name = entry.name;
+      // 忽略所有隐藏文件（包括 .git, .DS_Store 等）
+      if (name.startsWith(".")) {
+        return false;
+      }
+      return true;
+    });
+    // 如果只有隐藏文件（如 .git），也认为目录是空的
+    return visibleEntries.length === 0;
+  } catch {
+    // 如果读取失败，假设目录不为空（安全起见）
+    return false;
+  }
+}
+
+/**
+ * 提示用户确认
+ */
+async function confirm(message: string): Promise<boolean> {
+  logger.warn(message);
+  logger.info("请输入 'yes' 或 'y' 确认，其他任何输入将取消操作：");
+  
+  try {
+    const buffer = new Uint8Array(1024);
+    const bytesRead = await readStdin(buffer);
+    
+    if (bytesRead === null) {
+      return false;
+    }
+    
+    const input = new TextDecoder().decode(buffer.subarray(0, bytesRead))
+      .trim()
+      .toLowerCase();
+    
+    return input === "yes" || input === "y";
+  } catch {
+    // 如果读取失败，返回 false（安全起见）
+    return false;
+  }
+}
+
+/**
  * 主函数
  * @param projectRoot 项目根目录（可选）
  *   - 如果不指定，则在当前目录初始化
@@ -883,6 +935,21 @@ export async function init(projectRoot?: string): Promise<void> {
   } else {
     // 未指定目录，在当前目录初始化
     root = cwd();
+    
+    // 检查当前目录是否为空
+    const isEmpty = await isDirectoryEmpty(root);
+    if (!isEmpty) {
+      const confirmed = await confirm(
+        `⚠️  警告：当前目录 "${root}" 不为空，初始化可能会覆盖现有文件。\n` +
+        `是否继续在当前目录初始化 Foundry 项目？`
+      );
+      
+      if (!confirmed) {
+        logger.info("操作已取消。");
+        logger.info("提示：可以指定一个目录名来创建新项目，例如：foundry init my-project");
+        exit(0);
+      }
+    }
   }
 
   logger.info("===========================================");
