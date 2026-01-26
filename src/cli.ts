@@ -918,11 +918,6 @@ cli
   .action(async (_args, options) => {
     const includeBeta = options.beta === true;
 
-    logger.info("===========================================");
-    logger.info("🔄 检查 Foundry CLI 更新");
-    logger.info("===========================================");
-    logger.info("");
-
     try {
       // 获取当前版本
       const currentVersion = await getVersion();
@@ -931,44 +926,29 @@ cli
         Deno.exit(1);
       }
 
-      logger.info(`当前版本: ${currentVersion}`);
-
       // 检查更新时，总是从网络获取最新版本，不使用缓存
       // 因为需要比较当前版本和最新版本，读取缓存版本号无法正确比较
-      logger.info(`正在检查最新${includeBeta ? "（包括 beta）" : "正式"}版本...`);
-      
-      // 创建 loading 进度条
       const progressBar = createLoadingProgressBar("正在检查更新...");
       const progressInterval = progressBar.start();
-      
+
       const latestVersion = await getLatestVersion(includeBeta, true); // 总是强制刷新，从网络获取
-      
+
       // 停止进度条
       progressBar.stop(progressInterval);
-      
+
       if (!latestVersion) {
         logger.error("❌ 无法获取最新版本号");
         Deno.exit(1);
       }
 
-      logger.info(`最新${includeBeta ? "（包括 beta）" : "正式"}版本: ${latestVersion}`);
-
       // 比较版本
       const comparison = compareVersions(latestVersion, currentVersion);
       if (comparison <= 0) {
-        logger.info("");
         logger.info(`✅ 当前已经是最新${includeBeta ? "（包括 beta）" : "正式"}版本，无需更新！`);
-        logger.info("");
         return;
       }
 
       // 有新版本，直接升级
-      logger.info("");
-      logger.info(`发现新版本: ${latestVersion}`);
-      logger.info(`当前版本: ${currentVersion}`);
-      logger.info("");
-      logger.info("开始升级...");
-
       // 获取包信息
       const packageInfo = parseJsrPackageFromUrl();
       const packageName = packageInfo?.packageName || "@dreamer/foundry";
@@ -991,9 +971,7 @@ cli
         stderr: "piped",
       });
 
-      logger.info("正在安装新版本...");
       const output = await cmd.output();
-      const stdoutText = new TextDecoder().decode(output.stdout);
       const stderrText = new TextDecoder().decode(output.stderr);
 
       if (output.success) {
@@ -1001,17 +979,10 @@ cli
         try {
           await setInstalledVersion(latestVersion, packageName);
         } catch {
-          logger.warn("⚠️  无法更新版本缓存，但不影响升级");
+          // 忽略缓存更新失败
         }
 
-        logger.info("");
-        logger.info("✅ Foundry CLI 升级成功！");
-        logger.info(`   从 ${currentVersion} 升级到 ${latestVersion}`);
-        logger.info("");
-
-        if (stdoutText) {
-          logger.info(stdoutText);
-        }
+        logger.info(`✅ 已升级到 ${latestVersion}`);
       } else {
         logger.error("❌ 升级失败");
         if (stderrText) {
