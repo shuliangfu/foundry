@@ -360,13 +360,6 @@ async function loadNetworkConfig(_network: string): Promise<NetworkConfig> {
     }
   } catch (error) {
     logger.warn("无法从 config/web3.json 加载配置:", error);
-    // 输出更详细的错误信息以便调试
-    if (error instanceof Error) {
-      logger.warn(`错误详情: ${error.message}`);
-      if (error.stack) {
-        logger.warn(`错误堆栈: ${error.stack}`);
-      }
-    }
   }
 
   // 如果都加载失败，尝试从 .env 文件加载
@@ -632,19 +625,14 @@ cli
     logger.info("------------------------------------------");
 
     // 获取项目配置（项目根目录和 deno.json 路径）
-    logger.info(`[部署] 📋 开始获取项目配置...`);
     const projectConfig = getProjectConfig();
     if (!projectConfig) {
       Deno.exit(1);
     }
     const { projectRoot, denoJsonPath } = projectConfig;
-    logger.info(`[部署] 📂 项目根目录: ${projectRoot}`);
-    logger.info(`[部署] 📄 deno.json 路径: ${denoJsonPath}`);
 
     // 获取 deploy.ts 脚本的路径（使用缓存）
-    logger.info(`[部署] 🔍 开始获取 deploy 脚本路径...`);
     const deployScriptPath = getScriptPath("deploy");
-    logger.info(`[部署] ✅ deploy 脚本路径: ${deployScriptPath}`);
 
     // 构建命令行参数
     const deployArgs: string[] = ["--network", finalNetwork];
@@ -658,19 +646,14 @@ cli
       deployArgs.push(...contracts);
     }
 
-    logger.info(`[部署] ⚙️  准备执行部署脚本，参数: ${deployArgs.join(" ")}`);
-
     // 执行部署脚本
     try {
-      logger.info(`[部署] 🚀 开始执行 Deno 命令...`);
       const result = await executeDenoCommand(
         deployScriptPath,
         denoJsonPath,
         projectRoot,
         deployArgs,
       );
-
-      logger.info(`[部署] ✅ Deno 命令执行完成`);
 
       // 处理执行结果
       handleCommandResult(result, "✅ 所有部署脚本执行完成！");

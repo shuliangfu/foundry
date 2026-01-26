@@ -333,30 +333,22 @@ function parseArgs(): {
  * 主函数（当作为脚本直接运行时）
  */
 async function main() {
-  logger.info(`[部署脚本] 开始执行部署脚本主函数...`);
-  
   // 解析命令行参数
   const { network: networkArg, contracts, force } = parseArgs();
-  
-  logger.info(`[部署脚本] 解析参数完成: network=${networkArg}, contracts=${contracts}, force=${force}`);
 
   // 确定网络：优先使用命令行参数，其次使用环境变量，最后使用默认值 local
   const network = await getNetworkName(networkArg, false) || "local";
-  logger.info(`[部署脚本] 确定网络: ${network}`);
 
-  // 加载网络配置（不输出信息，因为 cli.ts 已经输出了）
-  logger.info(`[部署脚本] 开始加载网络配置...`);
+  // 加载网络配置
   let config: NetworkConfig;
   try {
     config = await loadNetworkConfigUtil();
-    logger.info(`[部署脚本] 网络配置加载完成: RPC URL=${config.rpcUrl}, Address=${config.address}`);
   } catch (error) {
     logger.error("加载网络配置失败:", error);
     Deno.exit(1);
   }
 
   // 执行部署
-  logger.info(`[部署脚本] 开始执行部署...`);
   try {
     await deploy({
       scriptDir: join(cwd(), "script"),
@@ -365,7 +357,6 @@ async function main() {
       force,
       contracts,
     });
-    logger.info(`[部署脚本] 部署完成`);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error("❌ 部署失败:", errorMessage);
