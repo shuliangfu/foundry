@@ -32,6 +32,7 @@ import {
   readStdin,
   readTextFileSync,
   createCommand,
+  remove,
 } from "@dreamer/runtime-adapter";
 import { init } from "./init.ts";
 import { readCache, writeCache, getInstalledVersion, setInstalledVersion } from "./utils/cache.ts";
@@ -50,6 +51,7 @@ import { parseJsrPackageFromUrl, parseJsrVersionFromUrl } from "./utils/jsr.ts";
 import { logger } from "./utils/logger.ts";
 import { loadWeb3ConfigSync } from "./utils/web3.ts";
 import type { JsrMetaData, JsrDenoJson } from "./types/index.ts";
+import { findFoundryPath } from "./setup.ts";
 
 /**
  * 提示用户确认
@@ -1010,6 +1012,67 @@ cli
       }
     } catch (error) {
       logger.error("❌ 升级过程中发生错误:", error);
+      Deno.exit(1);
+    }
+  });
+
+// 卸载命令
+cli
+  .command("uninstall", "卸载 Foundry CLI 全局命令")
+  .action(async () => {
+    logger.info("===========================================");
+    logger.info("🗑️  卸载 Foundry CLI");
+    logger.info("===========================================");
+    logger.info("");
+
+    try {
+      // 查找 foundry 的实际安装路径
+      const foundryPath = await findFoundryPath();
+
+      if (!foundryPath) {
+        logger.warn("⚠️  Foundry CLI 未找到，可能已经卸载");
+        logger.info("");
+        logger.info("如果已安装但未找到，请手动检查以下常见路径：");
+        const homeDir = getEnv("HOME") || getEnv("USERPROFILE") || "";
+        if (homeDir) {
+          logger.info(`  ${join(homeDir, ".deno", "bin", "foundry")}`);
+          logger.info(`  ${join(homeDir, ".bun", "bin", "foundry")}`);
+        }
+        return;
+      }
+
+      // 显示找到的路径并要求用户确认
+      logger.info(`找到 Foundry CLI 安装路径: ${foundryPath}`);
+      logger.info("");
+
+      const confirmed = await confirm(
+        "⚠️  警告：此操作将删除 Foundry CLI 全局命令。\n" +
+          "是否确认卸载？",
+      );
+
+      if (!confirmed) {
+        logger.info("操作已取消。");
+        return;
+      }
+
+      try {
+        if (existsSync(foundryPath)) {
+          await remove(foundryPath);
+          logger.info("✅ Foundry CLI 已卸载");
+          logger.info(`   已删除: ${foundryPath}`);
+        } else {
+          logger.warn("⚠️  Foundry CLI 未找到，可能已经卸载");
+          logger.info(`   预期路径: ${foundryPath}`);
+        }
+      } catch (error) {
+        logger.error("❌ 卸载失败:", error);
+        logger.info("");
+        logger.info("请手动删除以下文件：");
+        logger.info(`  ${foundryPath}`);
+        Deno.exit(1);
+      }
+    } catch (error) {
+      logger.error("❌ 卸载过程中发生错误:", error);
       Deno.exit(1);
     }
   });

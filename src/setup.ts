@@ -30,6 +30,7 @@ import {
   getEnv,
   join,
   platform,
+  readStdin,
   readTextFileSync,
   remove,
 } from "@dreamer/runtime-adapter";
@@ -165,7 +166,7 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
       // 先尝试从缓存读取 meta.json
       const metaCacheKey = `meta_${packageName}`;
       let metaData: JsrMetaData | null = readCache(metaCacheKey, "latest") as JsrMetaData | null;
-      
+
       if (!metaData) {
         // 缓存未命中，从网络获取
         const metaUrl = `https://jsr.io/${packageName}/meta.json`;
@@ -177,7 +178,7 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
         // 写入缓存
         await writeCache(metaCacheKey, "latest", metaData);
       }
-      
+
       const latestVersion = metaData.latest || Object.keys(metaData.versions || {})[0];
       if (!latestVersion) {
         throw new Error("无法从 meta.json 获取最新版本");
@@ -189,11 +190,11 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
     // JSR API URL 格式: https://jsr.io/@dreamer/foundry/1.1.0-beta.10/deno.json
     // 注意：版本号前是 / 而不是 @（已验证）
     // 重要：必须设置 Accept header，不能包含 text/html，否则会返回 HTML 页面
-    
+
     // 先尝试从缓存读取 deno.json
     const denoJsonCacheKey = `deno.json_${packageName}`;
     let denoJson: JsrDenoJson | null = readCache(denoJsonCacheKey, version) as JsrDenoJson | null;
-    
+
     if (!denoJson) {
       // 缓存未命中，从网络获取
       const denoJsonUrl = `https://jsr.io/${packageName}/${version}/deno.json`;
@@ -226,7 +227,7 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
       } else {
         denoJson = await response.json() as JsrDenoJson;
       }
-      
+
       // 写入缓存
       await writeCache(denoJsonCacheKey, version, denoJson);
     }
@@ -330,10 +331,10 @@ async function install(): Promise<void> {
       try {
         const packageInfo = parseJsrPackageFromUrl() || readLocalDenoJson();
         const packageName = packageInfo?.packageName || "@dreamer/foundry";
-        
+
         // 使用专门的函数写入全局安装版本号
         await setInstalledVersion(version, packageName);
-        
+
         logger.info("");
         logger.info("✅ Foundry CLI 安装成功！");
         logger.info(`   版本: ${version}`);
@@ -379,21 +380,140 @@ async function install(): Promise<void> {
 }
 
 /**
+ * 查找 foundry 可执行文件的实际路径
+ * @returns foundry 的完整路径，如果未找到则返回 null
+ */
+export async function findFoundryPath(): Promise<string | null> {
+  const plat = platform();
+  const isWindows = plat === "windows";
+
+  try {
+    // 使用 which/where 命令查找 foundry 的实际路径
+    const command = isWindows ? "where" : "which";
+    const cmd = createCommand(command, {
+      args: ["foundry"],
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const output = await cmd.output();
+    const stdoutText = new TextDecoder().decode(output.stdout).trim();
+
+    if (output.success && stdoutText) {
+      // which/where 可能返回多行，取第一行
+      const paths = stdoutText.split("\n").map((line) => line.trim()).filter((line) => line);
+      if (paths.length > 0) {
+        return paths[0];
+      }
+    }
+
+    // 如果 which/where 找不到，尝试常见的安装路径
+    const homeDir = getEnv("HOME") || getEnv("USERPROFILE") || "";
+    if (homeDir) {
+      // Deno 安装路径
+      const denoBinDir = join(homeDir, ".deno", "bin");
+      const denoFoundryPath = join(denoBinDir, "foundry");
+      if (existsSync(denoFoundryPath)) {
+        return denoFoundryPath;
+      }
+
+      // Bun 安装路径（如果存在）
+      const bunBinDir = join(homeDir, ".bun", "bin");
+      const bunFoundryPath = join(bunBinDir, "foundry");
+      if (existsSync(bunFoundryPath)) {
+        return bunFoundryPath;
+      }
+    }
+
+    return null;
+  } catch (_error) {
+    // 如果命令执行失败，尝试常见的安装路径
+    const homeDir = getEnv("HOME") || getEnv("USERPROFILE") || "";
+    if (homeDir) {
+      const denoBinDir = join(homeDir, ".deno", "bin");
+      const denoFoundryPath = join(denoBinDir, "foundry");
+      if (existsSync(denoFoundryPath)) {
+        return denoFoundryPath;
+      }
+    }
+    return null;
+  }
+}
+
+/**
+ * 提示用户确认
+ * @param message 提示信息
+ * @returns 用户确认返回 true，否则返回 false
+ */
+async function confirm(message: string): Promise<boolean> {
+  logger.warn(message);
+  const prompt = "请输入 'yes' 或 'y' 确认，其他任何输入将取消操作：";
+  if (typeof Deno.stdout.write === "function") {
+    // Deno 环境
+    const encoder = new TextEncoder();
+    await Deno.stdout.write(encoder.encode(prompt));
+  } else {
+    // 其他环境，使用 logger.info
+    logger.info(prompt);
+  }
+
+  try {
+    const buffer = new Uint8Array(1024);
+    const bytesRead = await readStdin(buffer);
+
+    if (bytesRead === null) {
+      return false;
+    }
+
+    const input = new TextDecoder().decode(buffer.subarray(0, bytesRead))
+      .trim()
+      .toLowerCase();
+
+    return input === "yes" || input === "y";
+  } catch {
+    // 如果读取失败，返回 false（安全起见）
+    return false;
+  }
+}
+
+/**
  * 卸载 CLI
  */
-async function uninstall(): Promise<void> {
+export async function uninstall(): Promise<void> {
   logger.info("===========================================");
   logger.info("🗑️  卸载 Foundry CLI");
   logger.info("===========================================");
   logger.info("");
 
   try {
-    // 查找 deno 的 bin 目录
-    const homeDir = getEnv("HOME") || getEnv("USERPROFILE") || "";
-    const denoBinDir = join(homeDir, ".deno", "bin");
+    // 查找 foundry 的实际安装路径
+    const foundryPath = await findFoundryPath();
 
-    // 尝试删除 foundry 可执行文件
-    const foundryPath = join(denoBinDir, "foundry");
+    if (!foundryPath) {
+      logger.warn("⚠️  Foundry CLI 未找到，可能已经卸载");
+      logger.info("");
+      logger.info("如果已安装但未找到，请手动检查以下常见路径：");
+      const homeDir = getEnv("HOME") || getEnv("USERPROFILE") || "";
+      if (homeDir) {
+        logger.info(`  ${join(homeDir, ".deno", "bin", "foundry")}`);
+        logger.info(`  ${join(homeDir, ".bun", "bin", "foundry")}`);
+      }
+      return;
+    }
+
+    // 显示找到的路径并要求用户确认
+    logger.info(`找到 Foundry CLI 安装路径: ${foundryPath}`);
+    logger.info("");
+
+    const confirmed = await confirm(
+      "⚠️  警告：此操作将删除 Foundry CLI 全局命令。\n" +
+        "是否确认卸载？",
+    );
+
+    if (!confirmed) {
+      logger.info("操作已取消。");
+      return;
+    }
 
     try {
       if (existsSync(foundryPath)) {
@@ -402,6 +522,7 @@ async function uninstall(): Promise<void> {
         logger.info(`   已删除: ${foundryPath}`);
       } else {
         logger.warn("⚠️  Foundry CLI 未找到，可能已经卸载");
+        logger.info(`   预期路径: ${foundryPath}`);
       }
     } catch (error) {
       logger.error("❌ 卸载失败:", error);
