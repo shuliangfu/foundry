@@ -44,23 +44,27 @@ async function install(): Promise<void> {
 
   const { cliPath, importMapPath } = getPaths();
 
+  const args = [
+    "install",
+    "-A",
+    "--global",
+    "--force",
+    "--import-map",
+    importMapPath,
+    "--name",
+    "foundry",
+    cliPath,
+  ];
+
+  console.log(args);
+
   try {
     // 使用 deno install 命令安装到全局
     // 使用 --import-map 指定导入映射，这样全局安装后才能找到依赖
     // 使用 --force 标志允许覆盖现有安装
     // 使用 -A 或 --allow-all 授予所有权限，确保安装后的命令可以正常运行
     const cmd = createCommand("deno", {
-      args: [
-        "install",
-        "-A",
-        "--global",
-        "--force",
-        "--import-map",
-        importMapPath,
-        "--name",
-        "foundry",
-        cliPath,
-      ],
+      args: args,
       stdout: "piped",
       stderr: "piped",
     });
