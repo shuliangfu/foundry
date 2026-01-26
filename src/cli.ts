@@ -146,20 +146,22 @@ function findFrameworkRoot(): string | null {
 /**
  * 获取最新版本号（从 JSR API）
  * @param includeBeta 是否包含 beta 版本，默认为 false（只返回正式版）
+ * @param forceRefresh 是否强制刷新缓存，默认为 false
  * @returns 最新版本号字符串，如果获取失败则返回 null
  */
-async function getLatestVersion(includeBeta: boolean = false): Promise<string | null> {
+async function getLatestVersion(includeBeta: boolean = false, forceRefresh: boolean = false): Promise<string | null> {
   try {
     const packageInfo = parseJsrPackageFromUrl();
     const packageName = packageInfo?.packageName || "@dreamer/foundry";
     
-    // 尝试从缓存读取 meta.json
+    // 尝试从缓存读取 meta.json（如果不需要强制刷新）
     const cacheKey = `meta_${packageName.replace(/[^a-zA-Z0-9]/g, "_")}`;
-    let metaData: any = readCache(cacheKey, "latest");
+    let metaData: any = forceRefresh ? null : readCache(cacheKey, "latest");
 
     if (!metaData) {
-      // 缓存未命中，从网络获取
+      // 缓存未命中或强制刷新，从网络获取
       const metaUrl = `https://jsr.io/${packageName}/meta.json`;
+      logger.info("正在从 JSR 获取最新版本信息...");
       const metaResponse = await fetch(metaUrl);
       if (!metaResponse.ok) {
         throw new Error(`无法获取 meta.json: ${metaResponse.statusText}`);
@@ -169,31 +171,24 @@ async function getLatestVersion(includeBeta: boolean = false): Promise<string | 
       await writeCache(cacheKey, "latest", metaData);
     }
 
-    // 获取所有版本
-    const allVersions = metaData.versions || [];
-    if (allVersions.length === 0) {
-      throw new Error("无法从 meta.json 获取版本列表");
-    }
-
     if (includeBeta) {
-      // 如果包含 beta，返回最新版本（包括 beta）
-      return metaData.latest || allVersions[0];
-    } else {
-      // 如果不包含 beta，只返回正式版（不包含 beta、alpha 等后缀的版本）
-      const stableVersions = allVersions.filter((v: string) => {
-        const version = v.toLowerCase();
-        return !version.includes("beta") && 
-               !version.includes("alpha") && 
-               !version.includes("rc") &&
-               !version.includes("dev");
-      });
+      // 如果包含 beta，需要从所有版本中找到真正的最新版本（包括 beta）
+      // JSR meta.json 的 versions 是一个对象，格式为: { "1.0.0": { createdAt: "..." }, ... }
+      const versionsObj = metaData.versions || {};
+      const allVersions = Object.keys(versionsObj);
       
-      if (stableVersions.length > 0) {
-        return stableVersions[0]; // 返回最新的正式版
+      if (allVersions.length === 0) {
+        throw new Error("无法从 meta.json 获取版本列表");
       }
       
-      // 如果没有正式版，返回最新版本（即使包含 beta）
-      return metaData.latest || allVersions[0];
+      // 按版本号排序，找到最新的版本
+      const sortedVersions = [...allVersions].sort((a: string, b: string) => {
+        return compareVersions(b, a); // 降序排列，最新的在前
+      });
+      return sortedVersions[0];
+    } else {
+      // 如果不包含 beta，直接返回 metaData.latest（这是最新的正式版）
+      return metaData.latest || null;
     }
   } catch (error) {
     logger.error(`获取最新版本失败: ${error}`);
@@ -931,8 +926,15 @@ cli
     description: "升级到最新的 beta 版本（默认只升级到正式版）",
     type: "boolean",
   })
+  .option({
+    name: "force",
+    alias: "f",
+    description: "强制刷新版本缓存，从 JSR 重新获取最新版本",
+    type: "boolean",
+  })
   .action(async (_args, options) => {
     const includeBeta = options.beta === true;
+    const forceRefresh = options.force === true;
     
     logger.info("===========================================");
     logger.info("🔄 检查 Foundry CLI 更新");
@@ -949,9 +951,12 @@ cli
 
       logger.info(`当前版本: ${currentVersion}`);
 
-      // 获取最新版本
+      // 获取最新版本（如果 force 为 true，强制刷新缓存）
+      if (forceRefresh) {
+        logger.info("强制刷新版本缓存...");
+      }
       logger.info(`正在检查最新${includeBeta ? "（包括 beta）" : "正式"}版本...`);
-      const latestVersion = await getLatestVersion(includeBeta);
+      const latestVersion = await getLatestVersion(includeBeta, forceRefresh);
       if (!latestVersion) {
         logger.error("❌ 无法获取最新版本号");
         Deno.exit(1);
