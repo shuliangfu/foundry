@@ -23,19 +23,18 @@ import {
   cwd,
   dirname,
   existsSync,
+  getEnv,
   join,
   platform,
   readdir,
   setEnv,
-  getEnv,
   writeStdoutSync,
 } from "@dreamer/runtime-adapter";
 import type { DeployOptions, NetworkConfig } from "./utils/deploy-utils.ts";
 import { forgeDeploy, loadContract } from "./utils/deploy-utils.ts";
-import { logger } from "./utils/logger.ts";
-import { createWeb3 } from "./utils/web3.ts";
 import { loadEnv } from "./utils/env.ts";
-import { loadWeb3ConfigSync } from "./utils/web3.ts";
+import { logger } from "./utils/logger.ts";
+import { createWeb3, loadWeb3ConfigSync } from "./utils/web3.ts";
 
 /**
  * 部署器接口
@@ -328,17 +327,10 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
 
     return {
       start(): ReturnType<typeof setInterval> {
-        // 先输出一个换行符，让进度条显示在新的一行
-        try {
-          writeStdoutSync(new TextEncoder().encode("\n"));
-        } catch {
-          // 如果写入失败，忽略错误
-        }
-
         const update = () => {
           const frame = frames[currentFrame % frames.length];
           // 使用 runtime-adapter 的 writeStdoutSync 方法，兼容 Deno 和 Bun
-          // 使用 \r 回到行首，但不换行，在同一行更新进度条
+          // 使用 \r 回到行首，在同一行更新进度条
           try {
             const text = `\r${frame} 正在部署中...`;
             writeStdoutSync(new TextEncoder().encode(text));
@@ -350,17 +342,17 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
 
         // 立即显示第一帧
         update();
-        
+
         // 每 100ms 更新一次
         intervalId = setInterval(update, 100);
-        
+
         return intervalId;
       },
       stop(intervalId: ReturnType<typeof setInterval> | null) {
         if (intervalId !== null) {
           clearInterval(intervalId);
         }
-        // 清除进度条，回到行首并清除整行，然后换行
+        // 清除进度条，回到行首并清除整行
         try {
           const clearLine = "\r" + " ".repeat(50) + "\r";
           writeStdoutSync(new TextEncoder().encode(clearLine));
@@ -371,7 +363,12 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
     };
   }
 
-  for (let i = 0; i < scripts.length; i++) {
+  // 在 for 循环之前启动进度条，这样在分割线之后立即显示
+  const progressBar = createProgressBar();
+  const progressInterval = progressBar.start();
+
+  try {
+    for (let i = 0; i < scripts.length; i++) {
     const script = scripts[i];
     logger.info(`[${i + 1}/${scripts.length}] Executing: ${script}`);
 
@@ -388,20 +385,9 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
         continue;
       }
 
-      // 显示进度条（在新的一行显示）
-      const progressBar = createProgressBar();
-      const progressInterval = progressBar.start();
-
-      try {
-        await scriptModule.deploy(deployer);
-        // 停止进度条
-        progressBar.stop(progressInterval);
-        logger.info(`✅ ${script} completed successfully`);
-      } catch (error) {
-        // 停止进度条
-        progressBar.stop(progressInterval);
-        throw error;
-      }
+      // 执行部署脚本（进度条继续显示）
+      await scriptModule.deploy(deployer);
+      logger.info(`✅ ${script} completed successfully`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(`❌ Error executing ${script}: ${errorMessage}`);
@@ -409,8 +395,15 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
     }
   }
 
+  // 所有脚本执行完成后停止进度条
+  progressBar.stop(progressInterval);
   logger.info("");
   logger.info("✅ All Deployment Scripts Completed!");
+  } catch (error) {
+    // 发生错误时停止进度条
+    progressBar.stop(progressInterval);
+    throw error;
+  }
 }
 
 /**
