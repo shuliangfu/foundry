@@ -28,6 +28,7 @@ import { verify } from "./verify.ts";
 import { init } from "./init.ts";
 import { loadEnv } from "./utils/env.ts";
 import type { NetworkConfig } from "./utils/deploy-utils.ts";
+import { loadWeb3ConfigSync } from "./utils/web3.ts";
 
 /**
  * 提示用户确认
@@ -77,9 +78,9 @@ function getVersion(): string | undefined {
 
 /**
  * 加载网络配置
- * 优先从环境变量加载，如果没有则尝试从 config/web3.ts 加载
+ * 优先从环境变量加载，如果没有则尝试从 config/web3.json 加载
  */
-async function loadNetworkConfig(network: string): Promise<NetworkConfig> {
+async function loadNetworkConfig(_network: string): Promise<NetworkConfig> {
   // 尝试从环境变量加载
   const rpcUrl = getEnv("RPC_URL");
   const privateKey = getEnv("PRIVATE_KEY");
@@ -95,41 +96,20 @@ async function loadNetworkConfig(network: string): Promise<NetworkConfig> {
     };
   }
 
-  // 尝试从 config/web3.ts 加载
+  // 尝试从 config/web3.json 加载（使用 web3.ts 中的配置加载方法）
   try {
-    const configPath = join(cwd(), "config", "web3.ts");
-    if (existsSync(configPath)) {
-      // 使用与 deploy.ts 相同的方式导入
-      const projectRoot = cwd();
-      const configDir = join(projectRoot, "config");
-      // 确保路径以 / 结尾，并使用正斜杠
-      const normalizedDir = configDir.replace(/\\/g, "/") + "/";
-      const configUrl = new URL(`web3.ts`, `file://${normalizedDir}`).href;
-
-      const configModule = await import(configUrl);
-
-      // 设置环境变量
-      const web3Env = getEnv("WEB3_ENV") || network;
-
-      let networkConfig: any = null;
-      if (configModule.Web3Config && configModule.Web3Config[web3Env]) {
-        networkConfig = configModule.Web3Config[web3Env];
-      } else if (configModule.Web3Config && configModule.Web3Config.local) {
-        networkConfig = configModule.Web3Config.local;
-      }
-
-      if (networkConfig && networkConfig.accounts && networkConfig.accounts.length > 0) {
-        const account = networkConfig.accounts[0];
-        return {
-          rpcUrl: networkConfig.host || networkConfig.rpcUrl,
-          privateKey: account.privateKey,
-          address: account.address,
-          chainId: networkConfig.chainId,
-        };
-      }
+    const web3Config = loadWeb3ConfigSync();
+    if (web3Config && web3Config.accounts && web3Config.accounts.length > 0) {
+      const account = web3Config.accounts[0];
+      return {
+        rpcUrl: web3Config.host,
+        privateKey: account.privateKey,
+        address: account.address,
+        chainId: web3Config.chainId,
+      };
     }
   } catch (error) {
-    logger.warn("无法从 config/web3.ts 加载配置:", error);
+    logger.warn("无法从 config/web3.json 加载配置:", error);
     // 输出更详细的错误信息以便调试
     if (error instanceof Error) {
       logger.warn(`错误详情: ${error.message}`);
@@ -149,7 +129,7 @@ async function loadNetworkConfig(network: string): Promise<NetworkConfig> {
       chainId: env.CHAIN_ID ? parseInt(env.CHAIN_ID, 10) : undefined,
     };
   } catch {
-    logger.error("无法加载网络配置，请设置环境变量或创建 config/web3.ts 配置文件");
+    logger.error("无法加载网络配置，请设置环境变量或创建 config/web3.json 配置文件");
     throw new Error("网络配置加载失败");
   }
 }

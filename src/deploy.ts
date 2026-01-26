@@ -18,8 +18,7 @@
  * ```
  */
 
-import { existsSync, readdir, cwd, setEnv } from "@dreamer/runtime-adapter";
-import { join } from "@dreamer/runtime-adapter";
+import { existsSync, readdir, cwd, setEnv, join } from "./utils/deps.ts";
 import { logger } from "./utils/logger.ts";
 import { forgeDeploy, loadContract } from "./utils/deploy-utils.ts";
 import type { NetworkConfig, DeployOptions } from "./utils/deploy-utils.ts";

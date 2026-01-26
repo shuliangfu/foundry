@@ -20,7 +20,7 @@ import {
   resolve,
   stat,
   writeTextFile,
-} from "@dreamer/runtime-adapter";
+} from "./utils/deps.ts";
 import { logger } from "./utils/logger.ts";
 
 /**
@@ -404,65 +404,43 @@ const VSCODE_EXTENSIONS = `{
 `;
 
 /**
- * config/web3.ts 模板内容
+ * config/web3.json 模板内容
  */
-const CONFIG_WEB3_TS = `import { loadEnv } from "@dreamer/foundry";
-
-/**
- * 网络配置类型
- */
-export interface NetworkConfig {
-  chainId: number;
-  host: string;
-  wss: string;
-  accounts: Array<{
-    address: string;
-    privateKey: string;
-  }>;
-}
-
-export const Web3Config = {
-  local: {
-    chainId: 31337, // Anvil 默认 chain ID
-    host: "http://127.0.0.1:8545",
-    wss: "ws://127.0.0.1:8545",
-    accounts: [
+const CONFIG_WEB3_JSON = `{
+  "local": {
+    "chainId": 31337,
+    "host": "http://127.0.0.1:8545",
+    "wss": "ws://127.0.0.1:8545",
+    "accounts": [
       {
-        address: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-        privateKey: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-      },
-    ],
+        "address": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "privateKey": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+      }
+    ]
   },
-  testnet: {
-    chainId: 97,
-    host: "https://bsc-testnet.nodereal.io/v1/your-api-key",
-    wss: "wss://bsc-testnet.nodereal.io/ws/v1/your-api-key",
-    accounts: [
+  "testnet": {
+    "chainId": 97,
+    "host": "https://bsc-testnet.nodereal.io/v1/your-api-key",
+    "wss": "wss://bsc-testnet.nodereal.io/ws/v1/your-api-key",
+    "accounts": [
       {
         "address": "your-testnet-address-here",
-        "privateKey": "your-testnet-private-key-here",
-      },
-    ],
+        "privateKey": "your-testnet-private-key-here"
+      }
+    ]
   },
-  mainnet: {
-    chainId: 56,
-    host: "https://go.getblock.io/your-api-key",
-    wss: "wss://go.getblock.io/your-api-key",
-    accounts: [
+  "mainnet": {
+    "chainId": 56,
+    "host": "https://go.getblock.io/your-api-key",
+    "wss": "wss://go.getblock.io/your-api-key",
+    "accounts": [
       {
-        address: "your-mainnet-address-here",
-        privateKey: "your-mainnet-private-key-here",
-      },
-    ],
+        "address": "your-mainnet-address-here",
+        "privateKey": "your-mainnet-private-key-here"
+      }
+    ]
   }
-};
-
-const env = await loadEnv();
-
-const web3Env = env.WEB3_ENV || "local";
-
-export const web3Config = Web3Config[web3Env as keyof typeof Web3Config] ||
-  Web3Config.local;
+}
 `;
 
 /**
@@ -601,15 +579,15 @@ const EXAMPLE_TEST_SCRIPT = `/**
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
-import { Web3, logger } from "@dreamer/foundry";
+import { createWeb3, logger, type Web3 } from "@dreamer/foundry";
 
 describe("MyToken 合约测试", () => {
-  let web3: Awaited<ReturnType<typeof Web3>>;
+  let web3: Web3;
   let deployerAddress: string;
 
-  beforeAll(async () => {
+  beforeAll(() => {
     // 创建 Web3 实例（会自动加载配置并合并参数）
-    web3 = await Web3("MyToken");
+    web3 = createWeb3("MyToken");
 
     // 获取部署者地址（账户0，Anvil 默认账户）
     deployerAddress = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
@@ -713,7 +691,7 @@ async function createConfigFiles(projectRoot: string): Promise<void> {
     { path: ".prettierrc", content: PRETTIERRC },
     { path: ".cursorignore", content: CURSORIGNORE },
     { path: "deno.json", content: getDenoJsonTemplate(currentVersion) },
-    { path: "config/web3.ts", content: CONFIG_WEB3_TS },
+    { path: "config/web3.json", content: CONFIG_WEB3_JSON },
     { path: ".vscode/settings.json", content: VSCODE_SETTINGS },
     { path: ".vscode/extensions.json", content: VSCODE_EXTENSIONS },
   ];
@@ -966,19 +944,19 @@ deno run -A jsr:@dreamer/foundry/cli verify --network local --contract MyToken -
 本项目使用 \`@dreamer/foundry\` 库进行部署和验证：
 
 \`\`\`typescript
-import { Web3 } from "@dreamer/foundry";
+import { createWeb3 } from "@dreamer/foundry";
 
-// 使用 Web3 工厂函数，配置会自动从 config/web3.ts 加载并合并参数
-const web3 = await Web3("MyContract");
+// 使用 createWeb3 工厂函数，配置会自动从 config/web3.json 加载并合并参数
+const web3 = createWeb3("MyContract");
 
 // 也可以传入 options 来覆盖配置文件中的参数
-const web3WithOptions = await Web3("MyContract", {
+const web3WithOptions = createWeb3("MyContract", {
   rpcUrl: "http://custom-rpc:8545", // 覆盖配置文件中的 rpcUrl
   // 其他参数使用配置文件中的值
 });
 \`\`\`
 
-注意：\`Web3\` 是一个异步工厂函数，会自动加载 \`config/web3.ts\` 中的配置。如果提供了 \`options\` 参数，会与配置文件中的参数合并，\`options\` 中的值优先。
+注意：\`createWeb3\` 是一个同步工厂函数，会自动加载 \`config/web3.json\` 中的配置。如果提供了 \`options\` 参数，会与配置文件中的参数合并，\`options\` 中的值优先。
 
 ## 全局命令说明
 
@@ -1140,7 +1118,7 @@ export async function init(projectRoot?: string): Promise<void> {
     logger.info("");
     logger.info("下一步：");
     logger.info("  1. 编辑 .env 文件配置环境变量");
-    logger.info("  2. 编辑 config/web3.ts 配置网络和账户");
+    logger.info("  2. 编辑 config/web3.json 配置网络和账户");
     logger.info("  3. 安装 Deno 依赖: deno install");
     logger.info("  4. 编译合约: forge build");
     logger.info("");

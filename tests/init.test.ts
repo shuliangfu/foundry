@@ -3,8 +3,8 @@
  * @description 测试 init 项目初始化功能
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "@dreamer/test";
-import { existsSync, mkdir, readTextFile, writeTextFile, join, cwd, stat, remove } from "@dreamer/runtime-adapter";
+import { describe, it, expect, beforeAll, afterAll } from "../src/utils/deps.ts";
+import { existsSync, mkdir, readTextFile, writeTextFile, join, cwd, stat, remove } from "../src/utils/deps.ts";
 import { init } from "../src/init.ts";
 import { logger } from "../src/utils/logger.ts";
 
@@ -96,7 +96,6 @@ describe("Init 项目初始化测试", () => {
       "src",
       "script",
       "tests",
-      "utils",
       "build",
       "build/abi",
       "build/abi/local",
@@ -121,7 +120,7 @@ describe("Init 项目初始化测试", () => {
       ".prettierrc",
       ".cursorignore",
       "deno.json",
-      "config/web3.ts",
+      "config/web3.json",
     ];
 
     for (const file of expectedFiles) {
@@ -155,14 +154,20 @@ describe("Init 项目初始化测试", () => {
     expect(content).toContain('"build": "forge build"');
   });
 
-  it("config/web3.ts 应该包含网络配置", async () => {
+  it("config/web3.json 应该包含网络配置", async () => {
     // 项目已在 beforeAll 中创建，直接验证
-    const content = await readTextFile(join(testProjectRoot, "config/web3.ts"));
-    expect(content).toContain("NetworkConfig");
-    expect(content).toContain("Web3Config");
+    const content = await readTextFile(join(testProjectRoot, "config/web3.json"));
+    // 验证 JSON 格式和网络配置
     expect(content).toContain("local");
     expect(content).toContain("testnet");
     expect(content).toContain("mainnet");
+    expect(content).toContain("chainId");
+    expect(content).toContain("host");
+    // 验证是有效的 JSON 并包含必要的网络配置
+    const jsonConfig = JSON.parse(content);
+    expect(jsonConfig.local).toBeDefined();
+    expect(jsonConfig.testnet).toBeDefined();
+    expect(jsonConfig.mainnet).toBeDefined();
   });
 
   // 示例文件创建测试
@@ -183,7 +188,8 @@ describe("Init 项目初始化测试", () => {
 
     const content = await readTextFile(scriptPath);
     expect(content).toContain("Deploy MyToken Contract");
-    expect(content).toContain("@dreamer/foundry/deploy");
+    expect(content).toContain("@dreamer/foundry");
+    expect(content).toContain("Deployer");
   });
 
   it("应该能够创建示例测试脚本", async () => {
@@ -297,8 +303,8 @@ describe("Init 项目初始化测试", () => {
     // 项目已在 beforeAll 中创建，直接验证
     const content = await readTextFile(join(testProjectRoot, "script", "1-mytoken.ts"));
 
-    expect(content).toContain("@dreamer/foundry/deploy");
-    expect(content).toContain("@dreamer/foundry/utils");
+    expect(content).toContain("@dreamer/foundry");
+    expect(content).toContain("Deployer");
     expect(content).toContain("export async function deploy");
   });
 

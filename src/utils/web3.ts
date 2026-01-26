@@ -5,7 +5,7 @@
  * 从项目根目录的 config/web3.json 读取配置（项目规则，固定目录）
  */
 
-import { cwd, existsSync, getEnv, join, platform, readTextFileSync } from "@dreamer/runtime-adapter";
+import { cwd, existsSync, getEnv, join, platform, readTextFileSync } from "./deps.ts";
 import {
   addHexPrefix,
   createWeb3Client,
@@ -13,7 +13,7 @@ import {
   isAddress,
   isPrivateKey,
   toChecksumAddress,
-} from "@dreamer/web3";
+} from "./deps.ts";
 import type { ContractInfo } from "./deploy-utils.ts";
 import { loadContract } from "./deploy-utils.ts";
 
@@ -72,7 +72,7 @@ function findConfigDir(startDir: string): string | null {
  * @param projectRoot - 可选的项目根目录，如果不提供则从当前工作目录向上查找
  * @returns 配置对象或 null（如果配置文件不存在）
  */
-function loadWeb3ConfigSync(projectRoot?: string): NetworkConfig | null {
+export function loadWeb3ConfigSync(projectRoot?: string): NetworkConfig | null {
   // 如果已缓存，直接返回
   if (web3ConfigCache !== null) {
     return web3ConfigCache;
@@ -101,12 +101,23 @@ function loadWeb3ConfigSync(projectRoot?: string): NetworkConfig | null {
     const web3Env = getEnv("WEB3_ENV") || "local";
 
     // 从配置中获取对应环境的配置
+    // 优先直接使用网络名称作为 key（新格式）
+    // 保持向后兼容，支持 Web3Config 包装（旧格式）
     let config: NetworkConfig | null = null;
-    if (jsonConfig.Web3Config && jsonConfig.Web3Config[web3Env]) {
+    if (jsonConfig[web3Env]) {
+      // 新格式：直接使用网络名称作为顶级 key
+      config = jsonConfig[web3Env];
+    } else if (jsonConfig.local) {
+      // 新格式：默认使用 local
+      config = jsonConfig.local;
+    } else if (jsonConfig.Web3Config && jsonConfig.Web3Config[web3Env]) {
+      // 旧格式：支持 Web3Config 包装（向后兼容）
       config = jsonConfig.Web3Config[web3Env];
     } else if (jsonConfig.Web3Config && jsonConfig.Web3Config.local) {
+      // 旧格式：默认使用 local
       config = jsonConfig.Web3Config.local;
     } else if (jsonConfig.web3Config) {
+      // 兼容其他可能的格式
       config = jsonConfig.web3Config;
     }
 

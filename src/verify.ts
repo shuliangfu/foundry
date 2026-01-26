@@ -17,8 +17,7 @@
  * ```
  */
 
-import { existsSync, readTextFileSync, cwd } from "@dreamer/runtime-adapter";
-import { createCommand } from "@dreamer/runtime-adapter";
+import { existsSync, readTextFileSync, createCommand } from "./utils/deps.ts";
 import { logger } from "./utils/logger.ts";
 
 /**
@@ -79,7 +78,7 @@ export async function verify(options: VerifyOptions): Promise<void> {
     throw new Error(`Unsupported network: ${options.network}`);
   }
 
-  // 读取 foundry.toml 配置
+  // 读取 foundry.toml 配置，获取编译器版本和优化次数
   const foundryConfig = readFoundryConfig();
   
   // 读取合约源码路径
@@ -96,6 +95,10 @@ export async function verify(options: VerifyOptions): Promise<void> {
     options.apiKey,
     "--rpc-url",
     options.rpcUrl,
+    "--compiler-version",
+    foundryConfig.compilerVersion,
+    "--num-of-optimizations",
+    String(foundryConfig.optimizerRuns),
   ];
 
   if (options.constructorArgs && options.constructorArgs.length > 0) {
@@ -119,11 +122,16 @@ export async function verify(options: VerifyOptions): Promise<void> {
     throw new Error(`Verification failed: ${stderrText}`);
   }
 
+  // 输出成功信息（stdout 可能包含验证成功的详细信息）
+  if (stdoutText.trim()) {
+    logger.info(stdoutText.trim());
+  }
   logger.info(`✅ Contract verified: ${networkConfig.explorerUrl}/${options.address}`);
 }
 
 /**
  * 从 foundry.toml 读取配置
+ * 用于获取编译器版本和优化次数，确保验证时使用与编译时相同的设置
  */
 function readFoundryConfig(): {
   compilerVersion: string;
@@ -155,7 +163,7 @@ function readFoundryConfig(): {
 /**
  * 验证合约（简化版本）
  */
-export async function verifyContract(
+export function verifyContract(
   address: string,
   contractName: string,
   network: string,

@@ -15,10 +15,7 @@
  * ```
  */
 
-import { existsSync, readTextFileSync, writeTextFileSync, mkdir, cwd, remove, readdir } from "@dreamer/runtime-adapter";
-import { join } from "@dreamer/runtime-adapter";
-import { createCommand } from "@dreamer/runtime-adapter";
-import { writeStdoutSync } from "@dreamer/runtime-adapter";
+import { existsSync, readTextFileSync, writeTextFileSync, mkdir, cwd, remove, readdir, join, createCommand, writeStdoutSync } from "./deps.ts";
 import { logger } from "./logger.ts";
 
 /**
@@ -192,6 +189,23 @@ function checkContractExists(
   } catch {
     return null;
   }
+}
+
+/**
+ * 部署合约（forgeDeploy 的别名，提供更友好的 API）
+ * @param contractName 合约名称
+ * @param config 网络配置
+ * @param constructorArgs 构造函数参数（可以是数组或对象）
+ * @param options 可选参数
+ * @returns 合约地址
+ */
+export async function deployContract(
+  contractName: string,
+  config: NetworkConfig,
+  constructorArgs: string[] | Record<string, any> = [],
+  options: DeployOptions = {},
+): Promise<string> {
+  return forgeDeploy(contractName, config, constructorArgs, options);
 }
 
 /**

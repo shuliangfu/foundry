@@ -4,8 +4,7 @@
  * 使用 @dreamer/runtime-adapter 兼容 Deno 和 Bun
  */
 
-import { existsSync, readdirSync, readTextFileSync, cwd } from "@dreamer/runtime-adapter";
-import { join } from "@dreamer/runtime-adapter";
+import { existsSync, readdirSync, readTextFileSync, cwd, join } from "./deps.ts";
 
 /**
  * 合约接口

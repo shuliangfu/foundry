@@ -4,7 +4,7 @@
  * 使用 @dreamer/runtime-adapter 兼容 Deno 和 Bun
  */
 
-import { createCommand, platform } from "@dreamer/runtime-adapter";
+import { createCommand, platform } from "./deps.ts";
 import { logger } from "./logger.ts";
 
 /**
