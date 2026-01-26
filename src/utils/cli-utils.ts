@@ -72,9 +72,11 @@ export function getScriptPath(scriptName: "deploy" | "verify"): string {
   const cacheKey = `${scriptName}ScriptPath_${currentFileUrl}`;
   
   if (globalCache[cacheKey]) {
+    logger.info(`[缓存] ✅ 从缓存读取 ${scriptName} 脚本路径: ${globalCache[cacheKey]}`);
     return globalCache[cacheKey];
   }
 
+  logger.info(`[缓存] ⚠️  缓存未命中，解析 ${scriptName} 脚本路径...`);
   let scriptPath: string;
   
   // 如果是从 JSR 包运行的，使用 JSR URL；否则使用文件路径
@@ -83,20 +85,24 @@ export function getScriptPath(scriptName: "deploy" | "verify"): string {
     const packageInfo = parseJsrPackageFromUrl();
     if (packageInfo) {
       scriptPath = `jsr:${packageInfo.packageName}@${packageInfo.version}/${scriptName}`;
+      logger.info(`[缓存] 📦 解析 JSR 包路径: ${scriptPath}`);
     } else {
       // 如果无法解析，尝试使用相对路径
       const currentDir = dirname(currentFileUrl.replace(/^file:\/\//, ""));
       scriptPath = join(currentDir, `${scriptName}.ts`);
+      logger.info(`[缓存] 📁 使用相对路径: ${scriptPath}`);
     }
   } else {
     // 本地运行，使用文件路径
     const currentDir = dirname(currentFileUrl.replace(/^file:\/\//, ""));
     scriptPath = join(currentDir, `${scriptName}.ts`);
+    logger.info(`[缓存] 📁 使用本地文件路径: ${scriptPath}`);
   }
   
   // 缓存结果（基于当前文件 URL，因为它在运行时是固定的）
   globalCache[cacheKey] = scriptPath;
   (globalThis as any).__foundryCache = globalCache;
+  logger.info(`[缓存] 💾 已缓存 ${scriptName} 脚本路径: ${scriptPath}`);
   
   return scriptPath;
 }
@@ -115,6 +121,12 @@ export async function executeDenoCommand(
   projectRoot: string,
   args: string[],
 ): Promise<{ stdout: string; stderr: string; success: boolean }> {
+  logger.info(`[执行] 🚀 准备执行 Deno 命令`);
+  logger.info(`[执行] 📝 脚本路径: ${scriptPath}`);
+  logger.info(`[执行] 📄 deno.json 路径: ${denoJsonPath}`);
+  logger.info(`[执行] 📂 项目根目录: ${projectRoot}`);
+  logger.info(`[执行] ⚙️  命令行参数: ${args.join(" ")}`);
+  
   const cmdArgs = [
     "run",
     "-A",
@@ -124,6 +136,10 @@ export async function executeDenoCommand(
     ...args,
   ];
 
+  logger.info(`[执行] 🔧 完整命令: deno ${cmdArgs.join(" ")}`);
+  logger.info(`[执行] ⏳ 开始执行命令...`);
+
+  const startTime = Date.now();
   const cmd = new Deno.Command("deno", {
     args: cmdArgs,
     stdout: "piped",
@@ -132,8 +148,17 @@ export async function executeDenoCommand(
   });
 
   const output = await cmd.output();
+  const endTime = Date.now();
+  const duration = endTime - startTime;
+  
+  logger.info(`[执行] ✅ 命令执行完成，耗时: ${duration}ms`);
+  
   const stdoutText = new TextDecoder().decode(output.stdout);
   const stderrText = new TextDecoder().decode(output.stderr);
+
+  if (!output.success) {
+    logger.info(`[执行] ❌ 命令执行失败，stderr: ${stderrText.substring(0, 200)}`);
+  }
 
   return {
     stdout: stdoutText,
