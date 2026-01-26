@@ -112,10 +112,12 @@ export function createDeployer(
       constructorArgs: string[] | Record<string, any> = [],
       options?: DeployOptions,
     ) => {
-      // 合并 force 参数到 options
-      const deployOptions = {
+      // 合并 force 参数到 options，并设置 abiDir 为当前网络的目录
+      const deployOptions: DeployOptions = {
         ...options,
         force: options?.force ?? force,
+        // 如果没有提供 abiDir，根据网络名称构建 abiDir
+        abiDir: options?.abiDir || join(cwd(), "build", "abi", network),
       };
       const address = await forgeDeploy(contractName, config, constructorArgs, deployOptions);
       // 返回简化的合约实例

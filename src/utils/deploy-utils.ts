@@ -199,7 +199,7 @@ function checkContractExists(
  * @param options 可选参数
  * @returns 合约地址
  */
-export async function deployContract(
+export function deployContract(
   contractName: string,
   config: NetworkConfig,
   constructorArgs: string[] | Record<string, any> = [],
@@ -222,8 +222,23 @@ export async function forgeDeploy(
   constructorArgs: string[] | Record<string, any> = [],
   options: DeployOptions = {},
 ): Promise<string> {
+  // 从 abiDir 中提取网络名称，如果没有提供 abiDir，则使用默认值 "local"
+  // abiDir 格式通常是: build/abi/{network} 或完整路径
+  // 提取网络名称的辅助函数
+  function extractNetworkFromAbiDir(abiDir?: string): string {
+    if (!abiDir) return "local";
+    const parts = abiDir.split(/[/\\]/);
+    const networkIndex = parts.indexOf("abi");
+    if (networkIndex >= 0 && networkIndex < parts.length - 1) {
+      return parts[networkIndex + 1];
+    }
+    // 如果没有找到 "abi" 目录，使用路径的最后一个部分
+    return parts[parts.length - 1] || "local";
+  }
+  
+  const network = extractNetworkFromAbiDir(options.abiDir);
+  
   // 检查合约是否已存在
-  const network = options.abiDir?.split("/").pop() || "local";
   const existingAddress = checkContractExists(contractName, network, options.abiDir);
 
   if (existingAddress && !options.force) {
@@ -304,7 +319,12 @@ export async function forgeDeploy(
   if (!output.success) {
     // 如果是 "transaction already imported" 错误且 force 为 true，清理后重试
     if (isTransactionAlreadyImported && options.force) {
-      const network = options.abiDir?.split("/").pop() || "local";
+      // 从 abiDir 中提取网络名称
+      const parts = options.abiDir?.split(/[/\\]/) || [];
+      const networkIndex = parts.indexOf("abi");
+      const network = (networkIndex >= 0 && networkIndex < parts.length - 1)
+        ? parts[networkIndex + 1]
+        : (parts[parts.length - 1] || "local");
       const maxRetries = 3; // 最多重试 3 次
       let lastError: string | null = null;
 
@@ -389,7 +409,12 @@ export async function forgeDeploy(
 
       // 尝试从已存在的合约信息中获取地址
       try {
-        const network = options.abiDir?.split("/").pop() || "local";
+        // 从 abiDir 中提取网络名称
+        const parts = options.abiDir?.split(/[/\\]/) || [];
+        const networkIndex = parts.indexOf("abi");
+        const network = (networkIndex >= 0 && networkIndex < parts.length - 1)
+          ? parts[networkIndex + 1]
+          : (parts[parts.length - 1] || "local");
         const existingAddress = checkContractExists(contractName, network, options.abiDir);
         if (existingAddress) {
           logger.info(`   当前合约地址: ${existingAddress}`);
@@ -490,7 +515,12 @@ async function extractAddressFromOutput(
   }
 
   // 保存合约信息
-  const network = options.abiDir?.split("/").pop() || "local";
+  // 从 abiDir 中提取网络名称
+  const parts = options.abiDir?.split(/[/\\]/) || [];
+  const networkIndex = parts.indexOf("abi");
+  const network = (networkIndex >= 0 && networkIndex < parts.length - 1)
+    ? parts[networkIndex + 1]
+    : (parts[parts.length - 1] || "local");
   await saveContract(contractName, address, network, constructorArgs, options.abiDir, options.force);
 
   if (txHash) {
