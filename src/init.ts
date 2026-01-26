@@ -419,7 +419,7 @@ function getDenoJsonTemplate(version: string): string {
   "allowScripts": {
     "allow": [],
     "deny": ["npm:esbuild@0.27.2", "npm:puppeteer@24.36.0"]
-  },
+  }
 }
 `;
 }

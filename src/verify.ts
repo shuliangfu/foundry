@@ -79,16 +79,17 @@ export async function verify(options: VerifyOptions): Promise<void> {
   // 构建 forge verify-contract 命令
   // 注意：forge verify-contract 的格式是: verify-contract <地址> <合约名>
   // 合约名应该是 Solidity 文件中的合约名称，而不是文件路径
+  // 参考参考脚本，参数顺序：verify-contract <地址> <合约名> --chain-id <id> --rpc-url <url> --etherscan-api-key <key> ...
   const args = [
     "verify-contract",
     options.address,
     options.contractName, // 使用合约名称，而不是完整路径
     "--chain-id",
     String(options.chainId || 1),
-    "--etherscan-api-key",
-    options.apiKey,
     "--rpc-url",
     options.rpcUrl,
+    "--etherscan-api-key",
+    options.apiKey,
     "--compiler-version",
     foundryConfig.compilerVersion,
     "--num-of-optimizations",
@@ -110,6 +111,46 @@ export async function verify(options: VerifyOptions): Promise<void> {
     }
   }
 
+  // 在验证之前，先检查合约是否在链上
+  logger.info("🔍 检查合约是否已部署到链上...");
+  const checkCmd = createCommand("cast", {
+    args: ["code", options.address, "--rpc-url", options.rpcUrl],
+    stdout: "piped",
+    stderr: "piped",
+  });
+  
+  const checkOutput = await checkCmd.output();
+  const contractCode = new TextDecoder().decode(checkOutput.stdout).trim();
+  
+  if (!checkOutput.success || !contractCode || contractCode === "0x" || contractCode.length <= 2) {
+    logger.error("❌ 错误：链上未找到合约");
+    logger.error(`   地址: ${options.address}`);
+    logger.error(`   网络: ${options.network} (Chain ID: ${options.chainId || 1})`);
+    logger.error("");
+    logger.error("可能的原因：");
+    logger.error("  1. 合约尚未部署到此地址");
+    logger.error("  2. 合约部署失败");
+    logger.error("  3. 网络或地址错误");
+    logger.error("");
+    logger.error("请检查：");
+    if (options.network === "testnet") {
+      logger.error(`  - 在 BSCScan 上查看地址: https://testnet.bscscan.com/address/${options.address}`);
+    } else if (options.network === "mainnet") {
+      logger.error(`  - 在 BSCScan 上查看地址: https://bscscan.com/address/${options.address}`);
+    } else if (options.network === "sepolia") {
+      logger.error(`  - 在 Etherscan 上查看地址: https://sepolia.etherscan.io/address/${options.address}`);
+    }
+    logger.error("  - 确保合约已成功部署");
+    logger.error("  - 如果刚刚部署，请等待几个区块确认");
+    throw new Error(`Contract not found on chain at address ${options.address}`);
+  }
+  
+  logger.info("✅ 链上找到合约代码，开始验证...");
+  logger.info("");
+
+  // 添加 --watch 参数，等待验证完成
+  args.push("--watch");
+
   const cmd = createCommand("forge", {
     args,
     stdout: "piped",
@@ -123,6 +164,18 @@ export async function verify(options: VerifyOptions): Promise<void> {
   if (!output.success) {
     logger.error("Verification failed:");
     logger.error(stderrText);
+    
+    // 检查是否是 API Key 相关的错误
+    if (stderrText.includes("Invalid API Key") || stderrText.includes("API key")) {
+      logger.error("");
+      logger.error("💡 提示：");
+      logger.error("   1. 请检查 API Key 是否正确设置");
+      logger.error("   2. 对于 BSC 测试网，请使用 BSCScan 的 API Key");
+      logger.error("   3. 对于 Ethereum 网络，请使用 Etherscan 的 API Key");
+      logger.error("   4. 可以在 .env 文件中设置: ETH_API_KEY=your-api-key");
+      logger.error("   5. 或使用命令行参数: --api-key your-api-key");
+    }
+    
     throw new Error(`Verification failed: ${stderrText}`);
   }
 
