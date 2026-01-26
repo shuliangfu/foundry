@@ -609,21 +609,33 @@ cli
           logger.info(`[${i + 1}/${contractsToVerify.length}] 验证合约: ${contractName}`);
 
           try {
-            // 读取已部署的合约信息
-            const contractInfo = loadContract(contractName, finalNetwork);
+            // 导入 findContractFileName 函数（从 verify.ts 导出）
+            const { findContractFileName } = await import("./verify.ts");
+            
+            // 查找实际的合约文件名（大小写不敏感）
+            const actualFileName = findContractFileName(contractName, finalNetwork);
+            const actualContractName = actualFileName ? actualFileName.replace(/\.json$/, "") : contractName;
+            
+            // 如果实际文件名与输入不同，提示用户
+            if (actualFileName && actualFileName !== `${contractName}.json`) {
+              logger.info(`ℹ️  合约名称已自动匹配为: ${actualContractName}`);
+            }
+            
+            // 读取已部署的合约信息（使用实际的合约名称）
+            const contractInfo = loadContract(actualContractName, finalNetwork);
 
             if (!contractInfo || !contractInfo.address) {
-              logger.warn(`⚠️  合约 ${contractName} 未找到部署信息，跳过验证`);
+              logger.warn(`⚠️  合约 ${actualContractName} 未找到部署信息，跳过验证`);
               continue;
             }
 
             // 导入验证函数
             const { verify } = await import("./verify.ts");
 
-            // 调用验证函数
+            // 调用验证函数（使用实际的合约名称）
             await verify({
               address: contractInfo.address,
-              contractName: contractName,
+              contractName: actualContractName, // 使用实际的合约名称（保持原始大小写）
               network: finalNetwork,
               apiKey: finalApiKey,
               rpcUrl: config.rpcUrl,
@@ -631,7 +643,7 @@ cli
               chainId: config.chainId,
             });
 
-            logger.info(`✅ ${contractName} 验证成功`);
+            logger.info(`✅ ${actualContractName} 验证成功`);
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             logger.error(`❌ ${contractName} 验证失败: ${errorMessage}`);

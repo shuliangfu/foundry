@@ -192,7 +192,7 @@ export async function verify(options: VerifyOptions): Promise<void> {
  * @param network 网络名称
  * @returns 实际的文件名（保持原始大小写），如果不存在则返回 null
  */
-function findContractFileName(contractName: string, network: string): string | null {
+export function findContractFileName(contractName: string, network: string): string | null {
   const abiDir = join(cwd(), "build", "abi", network);
   
   if (!existsSync(abiDir)) {

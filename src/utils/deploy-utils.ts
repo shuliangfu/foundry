@@ -15,7 +15,7 @@
  * ```
  */
 
-import { existsSync, readTextFileSync, writeTextFileSync, mkdir, cwd, remove, readdir, join, createCommand, writeStdoutSync } from "@dreamer/runtime-adapter";
+import { existsSync, readTextFileSync, writeTextFileSync, mkdir, cwd, remove, readdir, readdirSync, join, createCommand, writeStdoutSync } from "@dreamer/runtime-adapter";
 import { logger } from "./logger.ts";
 
 /**
@@ -600,6 +600,10 @@ async function saveContract(
 
 /**
  * 读取已部署的合约信息
+ * @param contractName 合约名称（支持大小写不敏感查找）
+ * @param network 网络名称
+ * @param abiDir ABI 目录（可选）
+ * @returns 合约信息
  */
 export function loadContract(
   contractName: string,
@@ -607,11 +611,32 @@ export function loadContract(
   abiDir?: string,
 ): ContractInfo {
   const buildDir = abiDir || join(cwd(), "build", "abi", network);
-  const abiPath = join(buildDir, `${contractName}.json`);
+  
+  // 首先尝试直接使用提供的合约名称
+  let abiPath = join(buildDir, `${contractName}.json`);
+  
+  // 如果文件不存在，尝试大小写不敏感的查找
+  if (!existsSync(abiPath)) {
+    try {
+      const contractNameLower = contractName.toLowerCase();
+      const entries = readdirSync(buildDir);
+      for (const entry of entries) {
+        if (entry.isFile && entry.name.endsWith(".json")) {
+          const fileNameWithoutExt = entry.name.replace(/\.json$/, "");
+          if (fileNameWithoutExt.toLowerCase() === contractNameLower) {
+            abiPath = join(buildDir, entry.name);
+            break;
+          }
+        }
+      }
+    } catch {
+      // 如果查找失败，继续使用原始路径
+    }
+  }
 
   if (!existsSync(abiPath)) {
     throw new Error(
-      `${contractName} address not found. Please deploy or configure ${contractName} first. Expected file: ${abiPath}`,
+      `${contractName} address not found. Please deploy or configure ${contractName} first. Expected file: ${join(buildDir, `${contractName}.json`)}`,
     );
   }
 
