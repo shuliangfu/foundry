@@ -970,30 +970,43 @@ cli
         cliUrl,
       ];
 
-      const cmd = createCommand("deno", {
-        args: args,
-        stdout: "piped",
-        stderr: "piped",
-      });
+      // 显示升级安装的 loading 提示
+      const installProgressBar = createLoadingProgressBar("升级安装中...");
+      const installProgressInterval = installProgressBar.start();
 
-      const output = await cmd.output();
-      const stderrText = new TextDecoder().decode(output.stderr);
+      try {
+        const cmd = createCommand("deno", {
+          args: args,
+          stdout: "piped",
+          stderr: "piped",
+        });
 
-      if (output.success) {
-        // 安装成功后，更新版本缓存
-        try {
-          await setInstalledVersion(latestVersion, packageName);
-        } catch {
-          // 忽略缓存更新失败
+        const output = await cmd.output();
+        const stderrText = new TextDecoder().decode(output.stderr);
+
+        // 停止进度条
+        installProgressBar.stop(installProgressInterval);
+
+        if (output.success) {
+          // 安装成功后，更新版本缓存
+          try {
+            await setInstalledVersion(latestVersion, packageName);
+          } catch {
+            // 忽略缓存更新失败
+          }
+
+          logger.info(`✅ 已升级到 ${latestVersion}`);
+        } else {
+          logger.error("❌ 升级失败");
+          if (stderrText) {
+            logger.error(stderrText);
+          }
+          Deno.exit(1);
         }
-
-        logger.info(`✅ 已升级到 ${latestVersion}`);
-      } else {
-        logger.error("❌ 升级失败");
-        if (stderrText) {
-          logger.error(stderrText);
-        }
-        Deno.exit(1);
+      } catch (error) {
+        // 发生错误时停止进度条
+        installProgressBar.stop(installProgressInterval);
+        throw error;
       }
     } catch (error) {
       logger.error("❌ 升级过程中发生错误:", error);
