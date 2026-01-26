@@ -19,18 +19,12 @@
  * ```
  */
 
-import {
-  cwd,
-  existsSync,
-  join,
-  readdir,
-  setEnv,
-} from "@dreamer/runtime-adapter";
-import type { DeployOptions, NetworkConfig, ContractInfo } from "./utils/deploy-utils.ts";
+import { cwd, existsSync, join, readdir, setEnv } from "@dreamer/runtime-adapter";
+import type { ContractInfo, DeployOptions, NetworkConfig } from "./utils/deploy-utils.ts";
 import { createLoadingProgressBar } from "./utils/cli-utils.ts";
 import { forgeDeploy, loadContract } from "./utils/deploy-utils.ts";
 import { logger } from "./utils/logger.ts";
-import { createWeb3 } from "./utils/web3.ts";
+import { createWeb3, type Web3, type Web3Options } from "./utils/web3.ts";
 import { getNetworkName, loadNetworkConfig as loadNetworkConfigUtil } from "./utils/cli-utils.ts";
 
 /**
@@ -44,8 +38,8 @@ export interface Deployer {
     contractName: string,
     constructorArgs?: string[] | Record<string, unknown>,
     options?: DeployOptions,
-  ) => Promise<string>;
-  web3: (contractName?: string) => unknown;
+  ) => Promise<Web3>;
+  web3: (contractName?: string) => Web3;
   loadContract: (contractName: string, network: string, force: boolean) => ContractInfo | null;
 }
 
@@ -64,7 +58,6 @@ export interface DeployScriptOptions {
   /** 要部署的合约列表（如果为空则部署所有） */
   contracts?: string[];
 }
-
 
 /**
  * 扫描部署脚本
@@ -119,25 +112,19 @@ export function createDeployer(
         // 如果没有提供 abiDir，根据网络名称构建 abiDir
         abiDir: options?.abiDir || join(cwd(), "build", "abi", network),
       };
-      const address = await forgeDeploy(contractName, config, constructorArgs, deployOptions);
-      // 返回合约地址字符串
-      return address;
-    },
-    web3: (contractName?: string) => {
+      await forgeDeploy(contractName, config, constructorArgs, deployOptions);
+
       // 设置环境变量，让 Web3 能正确加载对应网络的合约
       setEnv("WEB3_ENV", network);
 
-      // 使用 createWeb3 同步创建 Web3 实例
-      // 配置会自动从 config/web3.json 加载并合并 config 中的参数
-      // contractName 是可选的，如果提供则会绑定到指定的合约
-      const web3Options: any = {};
-      if (config.rpcUrl) web3Options.rpcUrl = config.rpcUrl;
-      if (config.chainId) web3Options.chainId = config.chainId;
-      if (config.privateKey) web3Options.privateKey = config.privateKey;
-      if (config.address) web3Options.address = config.address;
-
+      // 创建 Web3 实例并绑定到已部署的合约地址
+      return createWeb3(contractName);
+    },
+    web3: (contractName?: string, options?: Web3Options): Web3 => {
+      // 设置环境变量，让 Web3 能正确加载对应网络的合约
+      setEnv("WEB3_ENV", network);
       // 同步调用工厂函数，会自动合并配置文件和 options
-      return createWeb3(contractName, web3Options);
+      return createWeb3(contractName, options);
     },
     loadContract: (contractName: string, network: string, _force: boolean) => {
       return loadContract(contractName, network);
@@ -182,7 +169,6 @@ function findContractScript(contractName: string, scripts: string[]): string | n
 
   return null;
 }
-
 
 /**
  * 执行部署
@@ -245,36 +231,36 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
 
   try {
     for (let i = 0; i < scripts.length; i++) {
-    const script = scripts[i];
-    logger.info(`[${i + 1}/${scripts.length}] Executing: ${script}`);
+      const script = scripts[i];
+      logger.info(`[${i + 1}/${scripts.length}] Executing: ${script}`);
 
-    try {
-      const scriptPath = join(scriptDir, script);
+      try {
+        const scriptPath = join(scriptDir, script);
 
-      // 使用动态导入，Deno 会从脚本所在目录向上查找 deno.json
-      // 使用绝对路径，Deno 会自动从脚本所在目录向上查找 deno.json
-      const scriptUrl = new URL(`file://${scriptPath}`).href;
-      const scriptModule = await import(scriptUrl);
+        // 使用动态导入，Deno 会从脚本所在目录向上查找 deno.json
+        // 使用绝对路径，Deno 会自动从脚本所在目录向上查找 deno.json
+        const scriptUrl = new URL(`file://${scriptPath}`).href;
+        const scriptModule = await import(scriptUrl);
 
-      if (!scriptModule.deploy || typeof scriptModule.deploy !== "function") {
-        logger.error(`❌ Error: ${script} does not export a deploy function`);
-        continue;
+        if (!scriptModule.deploy || typeof scriptModule.deploy !== "function") {
+          logger.error(`❌ Error: ${script} does not export a deploy function`);
+          continue;
+        }
+
+        // 执行部署脚本（进度条继续显示）
+        await scriptModule.deploy(deployer);
+        logger.info(`✅ ${script} completed successfully`);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error(`❌ Error executing ${script}: ${errorMessage}`);
+        throw error;
       }
-
-      // 执行部署脚本（进度条继续显示）
-      await scriptModule.deploy(deployer);
-      logger.info(`✅ ${script} completed successfully`);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(`❌ Error executing ${script}: ${errorMessage}`);
-      throw error;
     }
-  }
 
-  // 所有脚本执行完成后停止进度条
-  progressBar.stop(progressInterval);
-  logger.info("");
-  logger.info("✅ All Deployment Scripts Completed!");
+    // 所有脚本执行完成后停止进度条
+    progressBar.stop(progressInterval);
+    logger.info("");
+    logger.info("✅ All Deployment Scripts Completed!");
   } catch (error) {
     // 发生错误时停止进度条
     progressBar.stop(progressInterval);
