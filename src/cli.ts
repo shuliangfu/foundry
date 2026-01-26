@@ -27,6 +27,7 @@ import { init } from "./init.ts";
 import { loadEnv } from "./utils/env.ts";
 import type { NetworkConfig } from "./utils/deploy-utils.ts";
 import { loadWeb3ConfigSync } from "./utils/web3.ts";
+import { parseJsrPackageFromUrl, parseJsrVersionFromUrl } from "./utils/jsr.ts";
 
 /**
  * 查找项目根目录（包含 deno.json 或 package.json 的目录）
@@ -153,24 +154,64 @@ function findFrameworkRoot(): string | null {
 }
 
 /**
- * 从框架的 deno.json 读取版本号
+ * 从 JSR 服务器获取版本号
+ * 优先从 import.meta.url 解析，如果无法解析则从 JSR API 获取
  * @returns 版本号字符串，如果读取失败则返回 undefined
  */
-function getVersion(): string | undefined {
+async function getVersion(): Promise<string | undefined> {
   try {
-    const frameworkRoot = findFrameworkRoot();
-    if (!frameworkRoot) {
-      return undefined;
+    // 首先尝试从 import.meta.url 解析 JSR 版本号
+    const parsedVersion = parseJsrVersionFromUrl();
+    if (parsedVersion) {
+      return parsedVersion;
     }
 
-    const denoJsonPath = join(frameworkRoot, "deno.json");
-    if (existsSync(denoJsonPath)) {
-      const denoJsonContent = readTextFileSync(denoJsonPath);
-      const denoJson = JSON.parse(denoJsonContent);
-      return denoJson.version;
+    // 如果无法从 URL 解析，尝试从 JSR API 获取最新版本
+    const packageInfo = parseJsrPackageFromUrl();
+    const packageName = packageInfo?.packageName || "@dreamer/foundry";
+
+    // 获取包的 meta.json 以获取最新版本
+    const metaUrl = `https://jsr.io/${packageName}/meta.json`;
+    const metaResponse = await fetch(metaUrl);
+    if (!metaResponse.ok) {
+      throw new Error(`无法获取 meta.json: ${metaResponse.statusText}`);
     }
-  } catch (error) {
-    logger.warn("无法读取框架 deno.json 版本号:", error);
+    const metaData = await metaResponse.json();
+    const latestVersion = metaData.latest || metaData.versions?.[0];
+    if (!latestVersion) {
+      throw new Error("无法从 meta.json 获取最新版本");
+    }
+
+    // 从 JSR API 获取 deno.json 并读取版本号
+    const denoJsonUrl = `https://jsr.io/${packageName}/${latestVersion}/deno.json`;
+    const response = await fetch(denoJsonUrl, {
+      headers: {
+        "Accept": "application/json, */*",
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`无法获取 deno.json: ${response.statusText} (${response.status})`);
+    }
+
+    const denoJson = await response.json();
+    return denoJson.version || latestVersion;
+  } catch {
+    // 如果从 JSR 获取失败，尝试从本地框架的 deno.json 读取（作为后备方案）
+    try {
+      const frameworkRoot = findFrameworkRoot();
+      if (!frameworkRoot) {
+        return undefined;
+      }
+
+      const denoJsonPath = join(frameworkRoot, "deno.json");
+      if (existsSync(denoJsonPath)) {
+        const denoJsonContent = readTextFileSync(denoJsonPath);
+        const denoJson = JSON.parse(denoJsonContent);
+        return denoJson.version;
+      }
+    } catch {
+      // 忽略本地读取错误
+    }
   }
   return undefined;
 }
@@ -302,12 +343,6 @@ function findContractScript(contractName: string, scripts: string[]): string | n
 
 // 创建主命令
 const cli = new Command("foundry", "Foundry 部署和验证工具");
-
-// 设置版本号（从 deno.json 读取）
-const version = getVersion();
-if (version) {
-  cli.setVersion(version);
-}
 
 // 初始化命令
 cli
@@ -492,7 +527,7 @@ cli
 
     logger.info("");
     logger.info("------------------------------------------");
-    
+
     // 查找项目根目录（包含 deno.json 的目录）
     const projectRoot = findProjectRoot(cwd());
     if (!projectRoot) {
@@ -511,10 +546,10 @@ cli
     // 如果是从 JSR 包运行的，使用 JSR URL；否则使用文件路径
     let deployScriptPath: string;
     const currentFileUrl = import.meta.url;
-    
+
     if (currentFileUrl.startsWith("https://jsr.io/") || currentFileUrl.startsWith("jsr:")) {
       // 从 JSR URL 解析包名和版本
-      const jsrMatch = currentFileUrl.match(/jsr:([^@]+)@([^/]+)\//) || 
+      const jsrMatch = currentFileUrl.match(/jsr:([^@]+)@([^/]+)\//) ||
                        currentFileUrl.match(/https:\/\/jsr\.io\/([^@]+)@([^/]+)\//);
       if (jsrMatch) {
         const [, packageName, version] = jsrMatch;
@@ -646,7 +681,7 @@ cli
 
             // 导入验证函数
             const { verify } = await import("./verify.ts");
-            
+
             // 调用验证函数
             await verify({
               address: contractInfo.address,
@@ -796,10 +831,10 @@ cli
     // 如果是从 JSR 包运行的，使用 JSR URL；否则使用文件路径
     let verifyScriptPath: string;
     const currentFileUrl = import.meta.url;
-    
+
     if (currentFileUrl.startsWith("https://jsr.io/") || currentFileUrl.startsWith("jsr:")) {
       // 从 JSR URL 解析包名和版本
-      const jsrMatch = currentFileUrl.match(/jsr:([^@]+)@([^/]+)\//) || 
+      const jsrMatch = currentFileUrl.match(/jsr:([^@]+)@([^/]+)\//) ||
                        currentFileUrl.match(/https:\/\/jsr\.io\/([^@]+)@([^/]+)\//);
       if (jsrMatch) {
         const [, packageName, version] = jsrMatch;
@@ -884,5 +919,15 @@ cli
 
 // 执行 CLI
 if (import.meta.main) {
+  // 在 CLI 执行前等待版本号设置完成
+  try {
+    const version = await getVersion();
+    if (version) {
+      cli.setVersion(version);
+    }
+  } catch {
+    // 如果获取版本号失败，忽略错误（版本号是可选的）
+  }
+
   await cli.execute();
 }

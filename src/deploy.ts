@@ -328,9 +328,17 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
 
     return {
       start(): ReturnType<typeof setInterval> {
+        // 先输出一个换行符，让进度条显示在新的一行
+        try {
+          writeStdoutSync(new TextEncoder().encode("\n"));
+        } catch {
+          // 如果写入失败，忽略错误
+        }
+
         const update = () => {
           const frame = frames[currentFrame % frames.length];
           // 使用 runtime-adapter 的 writeStdoutSync 方法，兼容 Deno 和 Bun
+          // 使用 \r 回到行首，但不换行，在同一行更新进度条
           try {
             const text = `\r${frame} 正在部署中...`;
             writeStdoutSync(new TextEncoder().encode(text));
@@ -352,7 +360,7 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
         if (intervalId !== null) {
           clearInterval(intervalId);
         }
-        // 清除进度条，回到行首并清除整行
+        // 清除进度条，回到行首并清除整行，然后换行
         try {
           const clearLine = "\r" + " ".repeat(50) + "\r";
           writeStdoutSync(new TextEncoder().encode(clearLine));
@@ -380,7 +388,7 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
         continue;
       }
 
-      // 显示进度条
+      // 显示进度条（在新的一行显示）
       const progressBar = createProgressBar();
       const progressInterval = progressBar.start();
 

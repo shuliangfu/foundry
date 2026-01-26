@@ -304,43 +304,82 @@ export async function forgeDeploy(
   if (!output.success) {
     // 如果是 "transaction already imported" 错误且 force 为 true，清理后重试
     if (isTransactionAlreadyImported && options.force) {
-      logger.warn("检测到交易已存在，正在清理后重试...");
       const network = options.abiDir?.split("/").pop() || "local";
-      await cleanBroadcastDir(network);
+      const maxRetries = 3; // 最多重试 3 次
+      let lastError: string | null = null;
 
-      // 等待一段时间，让 RPC 节点清除交易缓存
-      logger.info("等待 RPC 节点清除交易缓存...");
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      for (let retryCount = 1; retryCount <= maxRetries; retryCount++) {
+        logger.warn(`检测到交易已存在，正在清理后重试 (${retryCount}/${maxRetries})...`);
+        
+        // 每次重试前都清理 broadcast 目录
+        await cleanBroadcastDir(network);
 
-      // 重试部署，显示进度条
-      const retryProgressBar = createProgressBar();
-      const retryProgressInterval = retryProgressBar.start();
+        // 等待一段时间，让 RPC 节点清除交易缓存（每次重试等待时间递增）
+        const waitTime = 2000 * retryCount; // 2秒、4秒、6秒
+        logger.info(`等待 RPC 节点清除交易缓存 (${waitTime / 1000}秒)...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
 
-      const retryCmd = createCommand("forge", {
-        args: forgeArgs,
-        stdout: "piped",
-        stderr: "piped",
-        cwd: cwd(),
-      });
+        // 重试部署，显示进度条
+        const retryProgressBar = createProgressBar();
+        const retryProgressInterval = retryProgressBar.start();
 
-      const retryOutput = await retryCmd.output();
-      
-      // 停止重试进度条
-      retryProgressBar.stop(retryProgressInterval);
-      
-      const retryStdoutText = new TextDecoder().decode(retryOutput.stdout);
-      const retryStderrText = new TextDecoder().decode(retryOutput.stderr);
+        try {
+          const retryCmd = createCommand("forge", {
+            args: forgeArgs,
+            stdout: "piped",
+            stderr: "piped",
+            cwd: cwd(),
+          });
 
-      if (!retryOutput.success) {
-        // 如果重试仍然失败，可能是 RPC 节点缓存了交易
-        logger.error("重试部署失败，可能是 RPC 节点缓存了交易:");
-        logger.error(retryStderrText);
-        logger.error("\n提示：如果使用的是本地 Anvil 节点，请重启节点以清除交易缓存。");
-        throw new Error(`Deployment failed: ${retryStderrText}`);
+          const retryOutput = await retryCmd.output();
+          
+          // 停止重试进度条
+          retryProgressBar.stop(retryProgressInterval);
+          
+          const retryStdoutText = new TextDecoder().decode(retryOutput.stdout);
+          const retryStderrText = new TextDecoder().decode(retryOutput.stderr);
+
+          if (retryOutput.success) {
+            // 重试成功，使用重试的输出
+            return await extractAddressFromOutput(retryStdoutText, retryStderrText, contractName, options, constructorArgs as string[]);
+          }
+
+          // 检查是否仍然是 "transaction already imported" 错误
+          const isStillTransactionError = retryStderrText.includes("transaction already imported") ||
+            retryStderrText.includes("error code -32003");
+
+          if (!isStillTransactionError) {
+            // 如果不是交易已存在的错误，直接抛出错误
+            logger.error("重试部署失败:");
+            logger.error(retryStderrText);
+            throw new Error(`Deployment failed: ${retryStderrText}`);
+          }
+
+          // 如果还是交易已存在的错误，保存错误信息并继续下一次重试
+          lastError = retryStderrText;
+          
+          if (retryCount < maxRetries) {
+            logger.warn(`重试 ${retryCount} 失败，继续重试...`);
+          }
+        } catch (error) {
+          // 停止进度条
+          retryProgressBar.stop(retryProgressInterval);
+          // 如果不是交易已存在的错误，直接抛出
+          if (!(error instanceof Error && error.message.includes("transaction already imported"))) {
+            throw error;
+          }
+          lastError = error instanceof Error ? error.message : String(error);
+        }
       }
 
-      // 使用重试的输出
-      return await extractAddressFromOutput(retryStdoutText, retryStderrText, contractName, options, constructorArgs as string[]);
+      // 所有重试都失败了
+      logger.error(`重试 ${maxRetries} 次后仍然失败，可能是 RPC 节点缓存了交易:`);
+      logger.error(lastError || stderrText);
+      logger.error("\n提示：");
+      logger.error("  1. 如果使用的是本地 Anvil 节点，请重启节点以清除交易缓存");
+      logger.error("  2. 或者等待更长时间后再次尝试部署");
+      logger.error("  3. 或者使用不同的 nonce 或账户进行部署");
+      throw new Error(`Deployment failed after ${maxRetries} retries: ${lastError || stderrText}`);
     }
 
     // 如果是 "transaction already imported" 错误但未使用 force，给出提示并尝试获取已存在的地址
