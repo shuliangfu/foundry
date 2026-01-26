@@ -21,13 +21,23 @@
  */
 
 import { Command } from "@dreamer/console";
-import { existsSync, readdir, cwd, getEnv, join, readTextFileSync, readStdin, dirname, platform } from "@dreamer/runtime-adapter";
-import { logger } from "./utils/logger.ts";
+import {
+  cwd,
+  dirname,
+  existsSync,
+  getEnv,
+  join,
+  platform,
+  readdir,
+  readStdin,
+  readTextFileSync,
+} from "@dreamer/runtime-adapter";
 import { init } from "./init.ts";
-import { loadEnv } from "./utils/env.ts";
 import type { NetworkConfig } from "./utils/deploy-utils.ts";
-import { loadWeb3ConfigSync } from "./utils/web3.ts";
+import { loadEnv } from "./utils/env.ts";
 import { parseJsrPackageFromUrl, parseJsrVersionFromUrl } from "./utils/jsr.ts";
+import { logger } from "./utils/logger.ts";
+import { loadWeb3ConfigSync } from "./utils/web3.ts";
 
 /**
  * 查找项目根目录（包含 deno.json 或 package.json 的目录）
@@ -369,7 +379,8 @@ cli
   .option({
     name: "network",
     alias: "n",
-    description: "网络名称 (local, testnet, mainnet 等)。如果不指定，将从 .env 文件中的 WEB3_ENV 读取",
+    description:
+      "网络名称 (local, testnet, mainnet 等)。如果不指定，将从 .env 文件中的 WEB3_ENV 读取",
     requiresValue: true,
     type: "string",
     required: false,
@@ -377,7 +388,8 @@ cli
   .option({
     name: "contract",
     alias: "c",
-    description: "要部署的合约名称（可选，支持多个，例如: -c contract1 contract2。如果不指定则部署所有合约）",
+    description:
+      "要部署的合约名称（可选，支持多个，例如: -c contract1 contract2。如果不指定则部署所有合约）",
     requiresValue: true,
     type: "array",
   })
@@ -434,7 +446,7 @@ cli
     if (force) {
       const confirmed = await confirm(
         "⚠️  警告：强制部署模式将重新部署所有合约，即使合约已存在。\n" +
-        "是否继续执行强制部署？"
+          "是否继续执行强制部署？",
       );
 
       if (!confirmed) {
@@ -550,7 +562,7 @@ cli
     if (currentFileUrl.startsWith("https://jsr.io/") || currentFileUrl.startsWith("jsr:")) {
       // 从 JSR URL 解析包名和版本
       const jsrMatch = currentFileUrl.match(/jsr:([^@]+)@([^/]+)\//) ||
-                       currentFileUrl.match(/https:\/\/jsr\.io\/([^@]+)@([^/]+)\//);
+        currentFileUrl.match(/https:\/\/jsr\.io\/([^@]+)@([^/]+)\//);
       if (jsrMatch) {
         const [, packageName, version] = jsrMatch;
         deployScriptPath = `jsr:${packageName}@${version}/deploy`;
@@ -717,7 +729,8 @@ cli
   .option({
     name: "network",
     alias: "n",
-    description: "网络名称 (local, testnet, mainnet 等)。如果不指定，将从 .env 文件中的 WEB3_ENV 读取",
+    description:
+      "网络名称 (local, testnet, mainnet 等)。如果不指定，将从 .env 文件中的 WEB3_ENV 读取",
     requiresValue: true,
     type: "string",
     required: false,
@@ -835,7 +848,7 @@ cli
     if (currentFileUrl.startsWith("https://jsr.io/") || currentFileUrl.startsWith("jsr:")) {
       // 从 JSR URL 解析包名和版本
       const jsrMatch = currentFileUrl.match(/jsr:([^@]+)@([^/]+)\//) ||
-                       currentFileUrl.match(/https:\/\/jsr\.io\/([^@]+)@([^/]+)\//);
+        currentFileUrl.match(/https:\/\/jsr\.io\/([^@]+)@([^/]+)\//);
       if (jsrMatch) {
         const [, packageName, version] = jsrMatch;
         verifyScriptPath = `jsr:${packageName}@${version}/verify`;
@@ -923,7 +936,12 @@ if (import.meta.main) {
   try {
     const version = await getVersion();
     if (version) {
-      cli.setVersion(version);
+      const versionStr = `\n\x1b[36mFoundry CLI\x1b[0m
+\x1b[1m\x1b[36mVersion:\x1b[0m \x1b[33m${version}\x1b[0m
+
+\x1b[90mFoundry + Deno 打造的智能合约部署和验证工具\x1b[0m
+\x1b[90m用于创建项目、智能合约的部署和验证\x1b[0m \n`;
+      cli.setVersion(versionStr);
     }
   } catch {
     // 如果获取版本号失败，忽略错误（版本号是可选的）
