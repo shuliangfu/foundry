@@ -21,13 +21,41 @@
  */
 
 import { Command } from "./utils/console.ts";
-import { existsSync, readdir, cwd, getEnv, join, readTextFileSync } from "./utils/runtime-adapter.ts";
+import { existsSync, readdir, cwd, getEnv, join, readTextFileSync, readStdin } from "./utils/runtime-adapter.ts";
 import { logger } from "./utils/logger.ts";
 import { deploy } from "./deploy.ts";
 import { verify } from "./verify.ts";
 import { init } from "./init.ts";
 import { loadEnv } from "./utils/env.ts";
 import type { NetworkConfig } from "./utils/deploy-utils.ts";
+
+/**
+ * 提示用户确认
+ * @param message 提示信息
+ * @returns 用户确认返回 true，否则返回 false
+ */
+async function confirm(message: string): Promise<boolean> {
+  console.warn(message);
+  console.log("请输入 'yes' 或 'y' 确认，其他任何输入将取消操作：");
+
+  try {
+    const buffer = new Uint8Array(1024);
+    const bytesRead = await readStdin(buffer);
+
+    if (bytesRead === null) {
+      return false;
+    }
+
+    const input = new TextDecoder().decode(buffer.subarray(0, bytesRead))
+      .trim()
+      .toLowerCase();
+
+    return input === "yes" || input === "y";
+  } catch {
+    // 如果读取失败，返回 false（安全起见）
+    return false;
+  }
+}
 
 /**
  * 从 deno.json 读取版本号
@@ -262,11 +290,23 @@ cli
     const force = options.force as boolean || false;
     const scriptDir = join(cwd(), "script");
 
+    // 如果使用强制部署，需要用户确认
+    if (force) {
+      const confirmed = await confirm(
+        "⚠️  警告：强制部署模式将重新部署所有合约，即使合约已存在。\n" +
+        "是否继续执行强制部署？"
+      );
+
+      if (!confirmed) {
+        logger.info("操作已取消。");
+        Deno.exit(0);
+      }
+    }
+
     logger.info("------------------------------------------");
     logger.info("🚀 开始部署");
     logger.info("------------------------------------------");
     logger.info("网络:", finalNetwork);
-    logger.info("强制部署:", force ? "是" : "否");
     logger.info("------------------------------------------");
     logger.info("");
 

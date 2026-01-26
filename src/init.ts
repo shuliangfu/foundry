@@ -353,10 +353,12 @@ function getDenoJsonTemplate(version: string): string {
 const VSCODE_SETTINGS = `{
   "solidity.defaultCompiler": "remote",
   "solidity.compileUsingRemoteVersion": "v0.8.18+commit.87f61d96",
+  "solidity.packageDefaultDependenciesContractsDirectory": "src",
+  "solidity.packageDefaultDependenciesDirectory": "lib",
   "solidity.remappings": [
     "forge-std/=lib/forge-std/src/"
   ],
-  "solidity.formatter": "prettier",
+  "solidity.formatter": "forge",
   "[solidity]": {
     "editor.defaultFormatter": "JuanBlanco.solidity",
     "editor.tabSize": 2,
@@ -404,7 +406,7 @@ const VSCODE_EXTENSIONS = `{
 /**
  * config/web3.ts 模板内容
  */
-const CONFIG_WEB3_TS = `import { loadEnv } from "../utils/env.ts";
+const CONFIG_WEB3_TS = `import { loadEnv } from "@dreamer/foundry";
 
 /**
  * 网络配置类型

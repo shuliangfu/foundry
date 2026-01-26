@@ -3,7 +3,7 @@
  * @module
  * @title Foundry CLI Global Installation Script
  * @description Installs the Foundry CLI globally, allowing the `foundry` command to be used anywhere.
- * 
+ *
  * This module uses @dreamer/runtime-adapter for Deno and Bun compatibility.
  *
  * @example
@@ -84,6 +84,7 @@ async function install(): Promise<void> {
       logger.info("  foundry init --help");
       logger.info("  foundry deploy --help");
       logger.info("  foundry verify --help");
+      logger.info("");
 
       if (stdoutText) {
         logger.info("");
