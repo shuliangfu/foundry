@@ -18,10 +18,10 @@
  * ```
  */
 
-import { existsSync, readdir, cwd, setEnv, join, platform, dirname } from "./utils/deps.ts";
-import { logger } from "./utils/logger.ts";
+import type { DeployOptions, NetworkConfig } from "./utils/deploy-utils.ts";
 import { forgeDeploy, loadContract } from "./utils/deploy-utils.ts";
-import type { NetworkConfig, DeployOptions } from "./utils/deploy-utils.ts";
+import { cwd, dirname, existsSync, join, platform, readdir, setEnv } from "@dreamer/runtime-adapter";
+import { logger } from "./utils/logger.ts";
 import { createWeb3 } from "./utils/web3.ts";
 
 /**
@@ -70,7 +70,7 @@ function findProjectRoot(startDir: string): string | null {
     // 同时检查 deno.json（Deno）和 package.json（Bun）
     const denoJsonPath = join(currentDir, "deno.json");
     const packageJsonPath = join(currentDir, "package.json");
-    
+
     if (existsSync(denoJsonPath) || existsSync(packageJsonPath)) {
       return currentDir;
     }
@@ -260,12 +260,10 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
 
     try {
       const scriptPath = join(scriptDir, script);
+
+      // 使用动态导入，Deno 会从脚本所在目录向上查找 deno.json
+      // 使用绝对路径，Deno 会自动从脚本所在目录向上查找 deno.json
       const scriptUrl = new URL(`file://${scriptPath}`).href;
-      
-      // 在执行动态导入之前，设置环境变量让 Deno 知道项目根目录
-      // 注意：Deno 的动态导入不会自动查找 deno.json
-      // 但 Deno 会从脚本所在目录向上查找 deno.json
-      // 如果脚本在项目根目录的子目录中，应该能够找到 deno.json
       const scriptModule = await import(scriptUrl);
 
       if (!scriptModule.deploy || typeof scriptModule.deploy !== "function") {

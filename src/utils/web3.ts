@@ -5,7 +5,7 @@
  * 从项目根目录的 config/web3.json 读取配置（项目规则，固定目录）
  */
 
-import { cwd, existsSync, getEnv, join, platform, readTextFileSync } from "./deps.ts";
+import { cwd, existsSync, getEnv, join, platform, readTextFileSync } from "@dreamer/runtime-adapter";
 import {
   addHexPrefix,
   createWeb3Client,
@@ -13,7 +13,7 @@ import {
   isAddress,
   isPrivateKey,
   toChecksumAddress,
-} from "./deps.ts";
+} from "@dreamer/web3";
 import type { ContractInfo } from "./deploy-utils.ts";
 import { loadContract } from "./deploy-utils.ts";
 

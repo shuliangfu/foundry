@@ -3,7 +3,7 @@
  * @description 使用 @dreamer/test 编写的测试文件
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "../src/utils/deps.ts";
+import { describe, it, expect, beforeAll, afterAll } from "@dreamer/test";
 import { deploy, createDeployer } from "../src/deploy.ts";
 import { verify } from "../src/verify.ts";
 import { logger, loadEnv, deployContract, loadContract } from "../src/utils/mod.ts";

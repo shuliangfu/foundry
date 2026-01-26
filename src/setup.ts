@@ -20,7 +20,7 @@
  * ```
  */
 
-import { cwd, join, getEnv, exit, createCommand, existsSync, remove, args } from "./utils/runtime-adapter.ts";
+import { cwd, join, getEnv, exit, createCommand, existsSync, remove, args } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
 
 /**

@@ -4,7 +4,7 @@
  */
 
 import type { NetworkConfig } from "../src/utils/deploy-utils.ts";
-import { describe, expect, it } from "../src/utils/deps.ts";
+import { describe, expect, it } from "@dreamer/test";
 import { createWeb3, loadContract, loadContracts, loadEnv, logger } from "../src/utils/mod.ts";
 
 describe("Logger 工具测试", () => {

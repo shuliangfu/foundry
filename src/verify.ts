@@ -17,7 +17,7 @@
  * ```
  */
 
-import { existsSync, readTextFileSync, createCommand } from "./utils/deps.ts";
+import { existsSync, readTextFileSync, createCommand } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
 
 /**

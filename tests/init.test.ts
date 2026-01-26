@@ -3,8 +3,8 @@
  * @description 测试 init 项目初始化功能
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "../src/utils/deps.ts";
-import { existsSync, mkdir, readTextFile, writeTextFile, join, cwd, stat, remove } from "../src/utils/deps.ts";
+import { describe, it, expect, beforeAll, afterAll } from "@dreamer/test";
+import { existsSync, mkdir, readTextFile, writeTextFile, join, cwd, stat, remove } from "@dreamer/runtime-adapter";
 import { init } from "../src/init.ts";
 import { logger } from "../src/utils/logger.ts";
 

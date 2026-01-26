@@ -1,6 +1,6 @@
 # @dreamer/foundry
 
-> 一个 Foundry 智能合约部署和验证工具，支持 Deno 和 Bun 运行时，提供完整的项目初始化和自动化部署能力
+> 一个 Foundry 智能合约部署和验证工具，基于 Deno 运行时，提供完整的项目初始化和自动化部署能力
 
 [![JSR](https://jsr.io/badges/@dreamer/foundry)](https://jsr.io/@dreamer/foundry)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -10,7 +10,7 @@
 
 ## 🎯 功能
 
-`@dreamer/foundry` 是一个专为 Foundry 项目设计的现代化智能合约部署和验证工具库。它提供了完整的项目初始化、自动化部署、合约验证等功能，完美支持 Deno 和 Bun 运行时，让智能合约开发更加高效便捷。
+`@dreamer/foundry` 是一个专为 Foundry 项目设计的现代化智能合约部署和验证工具库。它提供了完整的项目初始化、自动化部署、合约验证等功能，基于 Deno 运行时，让智能合约开发更加高效便捷。
 
 ---
 
@@ -42,8 +42,7 @@ deno run -A jsr:@dreamer/foundry/setup --uninstall
 | 环境 | 版本要求 | 状态 |
 |------|---------|------|
 | **Deno** | 2.5.0+ | ✅ 完全支持 |
-| **Bun** | 1.3.0+ | ✅ 完全支持 |
-| **服务端** | - | ✅ 支持（兼容 Deno 和 Bun 运行时） |
+| **服务端** | - | ✅ 支持（基于 Deno 运行时） |
 
 ---
 
@@ -59,9 +58,9 @@ deno run -A jsr:@dreamer/foundry/setup --uninstall
   - 合约加载和管理
   - Web3 客户端封装
   - 时间同步控制
-- **跨运行时支持**：
-  - 使用 `@dreamer/runtime-adapter` 兼容 Deno 和 Bun
-  - 统一的 API 接口，无需关心运行时差异
+- **Deno 原生支持**：
+  - 基于 Deno 运行时，充分利用 Deno 的特性
+  - 统一的 API 接口，简洁高效
 - **项目初始化**：
   - 自动创建项目目录结构
   - 生成配置文件和模板
@@ -264,9 +263,9 @@ await init("/path/to/project");
 - **通过**: 29 ✅
 - **失败**: 0
 - **通过率**: 100% ✅
-- **测试执行时间**: ~0.89秒（Deno 环境），~0.75秒（Bun 环境）
+- **测试执行时间**: ~0.89秒
 - **测试覆盖**: 所有公共 API、边界情况、错误处理
-- **测试环境**: Deno 2.6.6, Bun 1.3.5
+- **测试环境**: Deno 2.6.6
 
 **测试类型**：
 - ✅ 单元测试（29 个）
@@ -276,7 +275,7 @@ await init("/path/to/project");
 **测试亮点**：
 - ✅ 所有功能、边界情况、错误处理都有完整的测试覆盖
 - ✅ 集成测试验证了端到端的完整流程
-- ✅ 跨运行时兼容性测试通过（Deno 和 Bun）
+- ✅ 基于 Deno 运行时，稳定可靠
 
 查看完整测试报告：[TEST_REPORT.md](./TEST_REPORT.md)
 
@@ -288,7 +287,7 @@ await init("/path/to/project");
 - **环境变量**：建议复制 `.env.example` 到 `.env` 并配置必要的环境变量
 - **私钥安全**：不要在代码中硬编码私钥，使用环境变量或配置文件
 - **合约验证**：验证合约需要提供 Etherscan/BSCScan API Key
-- **跨运行时**：所有代码使用 `@dreamer/runtime-adapter`，确保 Deno 和 Bun 兼容性
+- **Deno 原生**：基于 Deno 运行时，充分利用 Deno 的特性
 
 ---
 

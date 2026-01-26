@@ -20,7 +20,7 @@ import {
   resolve,
   stat,
   writeTextFile,
-} from "./utils/deps.ts";
+} from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
 
 /**

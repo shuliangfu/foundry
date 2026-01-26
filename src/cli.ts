@@ -20,8 +20,8 @@
  * ```
  */
 
-import { Command } from "./utils/console.ts";
-import { existsSync, readdir, cwd, getEnv, join, readTextFileSync, readStdin } from "./utils/runtime-adapter.ts";
+import { Command } from "@dreamer/console";
+import { existsSync, readdir, cwd, getEnv, join, readTextFileSync, readStdin, dirname, platform } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
 import { deploy } from "./deploy.ts";
 import { verify } from "./verify.ts";
@@ -59,19 +59,81 @@ async function confirm(message: string): Promise<boolean> {
 }
 
 /**
- * 从 deno.json 读取版本号
+ * 查找框架根目录（包含框架的 deno.json 的目录）
+ * @returns 框架根目录路径，如果未找到则返回 null
+ */
+function findFrameworkRoot(): string | null {
+  // 使用 import.meta.url 获取当前文件的路径
+  // cli.ts 在 src/cli.ts，所以框架根目录应该是 src 的父目录
+  let currentFileUrl: string;
+  try {
+    // 在 Deno 中，import.meta.url 是 file:// URL
+    // 在 Bun 中，也可能是 file:// URL
+    currentFileUrl = import.meta.url;
+  } catch {
+    // 如果无法获取 import.meta.url，回退到使用 cwd()
+    return null;
+  }
+
+  // 将 URL 转换为文件路径
+  let currentDir: string;
+  if (currentFileUrl.startsWith("file://")) {
+    // Deno/Bun: file:///path/to/file -> /path/to/file
+    currentDir = currentFileUrl.replace(/^file:\/\//, "");
+    // Windows: file:///C:/path -> C:/path
+    if (currentDir.startsWith("/") && /^[A-Z]:/.test(currentDir.substring(1))) {
+      currentDir = currentDir.substring(1);
+    }
+  } else {
+    currentDir = currentFileUrl;
+  }
+
+  // 获取 cli.ts 所在的目录（src 目录）
+  const srcDir = dirname(currentDir);
+  // 框架根目录是 src 的父目录
+  const frameworkRoot = dirname(srcDir);
+
+  const plat = platform();
+  const root = plat === "windows" ? /^[A-Z]:\\$/ : /^\/$/;
+
+  // 向上查找，找到包含 deno.json 的目录
+  let currentPath = frameworkRoot;
+  while (true) {
+    const denoJsonPath = join(currentPath, "deno.json");
+    if (existsSync(denoJsonPath)) {
+      return currentPath;
+    }
+
+    // 检查是否到达根目录
+    const parentDir = dirname(currentPath);
+    if (parentDir === currentPath || currentPath.match(root)) {
+      break;
+    }
+    currentPath = parentDir;
+  }
+
+  return null;
+}
+
+/**
+ * 从框架的 deno.json 读取版本号
  * @returns 版本号字符串，如果读取失败则返回 undefined
  */
 function getVersion(): string | undefined {
   try {
-    const denoJsonPath = join(cwd(), "deno.json");
+    const frameworkRoot = findFrameworkRoot();
+    if (!frameworkRoot) {
+      return undefined;
+    }
+
+    const denoJsonPath = join(frameworkRoot, "deno.json");
     if (existsSync(denoJsonPath)) {
       const denoJsonContent = readTextFileSync(denoJsonPath);
       const denoJson = JSON.parse(denoJsonContent);
       return denoJson.version;
     }
   } catch (error) {
-    logger.warn("无法读取 deno.json 版本号:", error);
+    logger.warn("无法读取框架 deno.json 版本号:", error);
   }
   return undefined;
 }

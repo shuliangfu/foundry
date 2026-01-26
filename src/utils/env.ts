@@ -4,7 +4,7 @@
  * 使用 @dreamer/runtime-adapter 兼容 Deno 和 Bun
  */
 
-import { existsSync, readTextFileSync, join, cwd, getEnv, setEnv, exit } from "./deps.ts";
+import { existsSync, readTextFileSync, join, cwd, getEnv, setEnv, exit } from "@dreamer/runtime-adapter";
 import { logger } from "./logger.ts";
 
 /**
