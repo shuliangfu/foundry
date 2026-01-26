@@ -26,7 +26,7 @@ import {
   readdir,
   setEnv,
 } from "@dreamer/runtime-adapter";
-import type { DeployOptions, NetworkConfig } from "./utils/deploy-utils.ts";
+import type { DeployOptions, NetworkConfig, ContractInfo } from "./utils/deploy-utils.ts";
 import { createLoadingProgressBar } from "./utils/cli-utils.ts";
 import { forgeDeploy, loadContract } from "./utils/deploy-utils.ts";
 import { logger } from "./utils/logger.ts";
@@ -42,11 +42,11 @@ export interface Deployer {
   force: boolean;
   deploy: (
     contractName: string,
-    constructorArgs?: string[] | Record<string, any>,
+    constructorArgs?: string[] | Record<string, unknown>,
     options?: DeployOptions,
-  ) => Promise<any>;
-  web3: (contractName?: string) => any;
-  loadContract: (contractName: string, network: string, force: boolean) => any;
+  ) => Promise<string>;
+  web3: (contractName?: string) => unknown;
+  loadContract: (contractName: string, network: string, force: boolean) => ContractInfo | null;
 }
 
 /**
@@ -109,7 +109,7 @@ export function createDeployer(
     force,
     deploy: async (
       contractName: string,
-      constructorArgs: string[] | Record<string, any> = [],
+      constructorArgs: string[] | Record<string, unknown> = [],
       options?: DeployOptions,
     ) => {
       // 合并 force 参数到 options，并设置 abiDir 为当前网络的目录
@@ -120,8 +120,8 @@ export function createDeployer(
         abiDir: options?.abiDir || join(cwd(), "build", "abi", network),
       };
       const address = await forgeDeploy(contractName, config, constructorArgs, deployOptions);
-      // 返回简化的合约实例
-      return { address };
+      // 返回合约地址字符串
+      return address;
     },
     web3: (contractName?: string) => {
       // 设置环境变量，让 Web3 能正确加载对应网络的合约
@@ -337,7 +337,7 @@ async function main() {
   const { network: networkArg, contracts, force } = parseArgs();
 
   // 确定网络：优先使用命令行参数，其次使用环境变量，最后使用默认值 local
-  const network = await getNetworkName(networkArg, false) || "local";
+  const network = getNetworkName(networkArg, false) || "local";
 
   // 加载网络配置
   let config: NetworkConfig;

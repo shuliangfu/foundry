@@ -7,6 +7,8 @@ import { cwd, dirname, existsSync, join, getEnv, platform, writeStdoutSync } fro
 import { logger } from "./logger.ts";
 import { parseJsrPackageFromUrl } from "./jsr.ts";
 import { loadEnv } from "./env.ts";
+import type { GlobalCache, CommandStatus } from "../types/index.ts";
+import { PROGRESS_BAR_INTERVAL, PROGRESS_BAR_CLEAR_LENGTH } from "../constants/index.ts";
 
 /**
  * 获取项目根目录和 deno.json 路径
@@ -68,11 +70,11 @@ export function getScriptPath(scriptName: "deploy" | "verify"): string {
   const currentFileUrl = import.meta.url;
   
   // 使用全局缓存对象（如果存在）
-  const globalCache = (globalThis as any).__foundryCache || {};
+  const globalCache = ((globalThis as { __foundryCache?: GlobalCache }).__foundryCache || {}) as GlobalCache;
   const cacheKey = `${scriptName}ScriptPath_${currentFileUrl}`;
   
   if (globalCache[cacheKey]) {
-    return globalCache[cacheKey];
+    return globalCache[cacheKey] as string;
   }
 
   let scriptPath: string;
@@ -96,7 +98,7 @@ export function getScriptPath(scriptName: "deploy" | "verify"): string {
   
   // 缓存结果（基于当前文件 URL，因为它在运行时是固定的）
   globalCache[cacheKey] = scriptPath;
-  (globalThis as any).__foundryCache = globalCache;
+  (globalThis as { __foundryCache?: GlobalCache }).__foundryCache = globalCache;
   
   return scriptPath;
 }
@@ -111,7 +113,7 @@ export async function executeCommandWithStream(
   child: { 
     stdout: ReadableStream<Uint8Array> | null; 
     stderr: ReadableStream<Uint8Array> | null; 
-    status: any; // 兼容 Deno.Command 和 runtime-adapter 的 createCommand 返回的不同类型
+    status: Promise<CommandStatus> | (() => Promise<CommandStatus>);
   },
 ): Promise<{ stdout: string; stderr: string; success: boolean }> {
   // 检查 stdout 和 stderr 是否存在
@@ -119,8 +121,6 @@ export async function executeCommandWithStream(
     throw new Error("Command stdout or stderr is null");
   }
   
-  // 处理 status 可能是函数的情况
-  const statusPromise = typeof child.status === "function" ? child.status() : child.status;
   // 收集输出的缓冲区
   const stdoutChunks: Uint8Array[] = [];
   const stderrChunks: Uint8Array[] = [];
@@ -172,7 +172,9 @@ export async function executeCommandWithStream(
   await Promise.all([readStdout(), readStderr()]);
   
   // 等待进程完成
-  const statusResult = await statusPromise;
+  const statusResult = typeof child.status === "function" 
+    ? await child.status() 
+    : await child.status;
   
   // 合并所有输出块
   const decoder = new TextDecoder();
@@ -257,7 +259,7 @@ export async function executeDenoCommand(
  * @param apiKeyFromOption - 命令行参数中的 API Key
  * @returns API Key，如果未找到则返回 null
  */
-export async function getApiKey(apiKeyFromOption?: string): Promise<string | null> {
+export function getApiKey(apiKeyFromOption?: string): string | null {
   // 如果命令行提供了 API Key，直接使用
   if (apiKeyFromOption) {
     return apiKeyFromOption;
@@ -265,7 +267,7 @@ export async function getApiKey(apiKeyFromOption?: string): Promise<string | nul
 
   // 尝试从环境变量读取
   try {
-    const env = await loadEnv();
+    const env = loadEnv();
     return env.ETH_API_KEY || getEnv("ETH_API_KEY") || null;
   } catch {
     // 如果加载 .env 失败，尝试直接从环境变量读取
@@ -318,7 +320,7 @@ export async function loadNetworkConfig(_network?: string): Promise<{
 
   // 如果都加载失败，尝试从 .env 文件加载
   try {
-    const env = await loadEnv();
+    const env = loadEnv();
     return {
       rpcUrl: env.RPC_URL || "",
       privateKey: env.PRIVATE_KEY || "",
@@ -337,10 +339,10 @@ export async function loadNetworkConfig(_network?: string): Promise<{
  * @param requireNetwork - 是否要求必须指定网络（默认 false，允许使用默认值）
  * @returns 网络名称，如果 requireNetwork 为 true 且未找到则返回 null
  */
-export async function getNetworkName(
+export function getNetworkName(
   networkFromOption?: string,
   requireNetwork: boolean = false,
-): Promise<string | null> {
+): string | null {
   // 如果命令行提供了网络名称，直接使用
   if (networkFromOption) {
     return networkFromOption;
@@ -349,7 +351,7 @@ export async function getNetworkName(
   // 尝试从环境变量读取
   let network: string | null = null;
   try {
-    const env = await loadEnv();
+    const env = loadEnv();
     network = env.WEB3_ENV || getEnv("WEB3_ENV") || null;
   } catch {
     // 如果加载 .env 失败，尝试直接从环境变量读取
@@ -429,7 +431,7 @@ export function createLoadingProgressBar(message: string): {
       update();
 
       // 每 100ms 更新一次
-      intervalId = setInterval(update, 100);
+      intervalId = setInterval(update, PROGRESS_BAR_INTERVAL);
 
       return intervalId;
     },
@@ -443,7 +445,7 @@ export function createLoadingProgressBar(message: string): {
       }
       // 清除进度条，回到行首并清除整行
       try {
-        const clearLine = "\r" + " ".repeat(50) + "\r";
+        const clearLine = "\r" + " ".repeat(PROGRESS_BAR_CLEAR_LENGTH) + "\r";
         writeStdoutSync(new TextEncoder().encode(clearLine));
       } catch {
         // 如果写入失败，忽略错误

@@ -5,7 +5,14 @@
  * 从项目根目录的 config/web3.json 读取配置（项目规则，固定目录）
  */
 
-import { cwd, existsSync, getEnv, join, platform, readTextFileSync } from "@dreamer/runtime-adapter";
+import {
+  cwd,
+  existsSync,
+  getEnv,
+  join,
+  platform,
+  readTextFileSync,
+} from "@dreamer/runtime-adapter";
 import {
   addHexPrefix,
   createWeb3Client,
@@ -16,6 +23,34 @@ import {
 } from "@dreamer/web3";
 import type { ContractInfo } from "./deploy-utils.ts";
 import { loadContract } from "./deploy-utils.ts";
+import type { AbiItem } from "../types/index.ts";
+
+export {
+  addHexPrefix,
+  bytesToHex,
+  checkAddressChecksum,
+  computeContractAddress,
+  encodeFunctionCall,
+  formatAddress,
+  fromWei,
+  generateWallet,
+  getCode,
+  getFunctionSelector,
+  hexToBytes,
+  hexToNumber,
+  isAddress,
+  isPrivateKey,
+  isTxHash,
+  keccak256,
+  numberToHex,
+  padLeft,
+  padRight,
+  shortenAddress,
+  solidityKeccak256,
+  stripHexPrefix,
+  toChecksumAddress,
+  toWei,
+} from "@dreamer/web3";
 
 /**
  * 网络配置类型
@@ -68,7 +103,7 @@ function findConfigDir(startDir: string): string | null {
 
 /**
  * 同步加载 Web3 配置（JSON 格式）
- * 
+ *
  * @param projectRoot - 可选的项目根目录，如果不提供则从当前工作目录向上查找
  * @returns 配置对象或 null（如果配置文件不存在）
  */
@@ -104,7 +139,7 @@ export function loadWeb3ConfigSync(projectRoot?: string): NetworkConfig | null {
     // 新格式：支持 chain + network 结构
     // 格式：{ "chain": "bsc", "network": { "local": {...}, "testnet": {...}, "mainnet": {...} } }
     let config: NetworkConfig | null = null;
-    
+
     if (jsonConfig.chain && jsonConfig.network) {
       // 新格式：chain + network 结构
       if (jsonConfig.network[web3Env]) {
@@ -144,7 +179,7 @@ export function loadWeb3ConfigSync(projectRoot?: string): NetworkConfig | null {
 /**
  * 同步获取 Web3 配置
  * 如果配置未加载，会尝试同步加载
- * 
+ *
  * @param projectRoot - 可选的项目根目录
  * @returns 配置对象，如果未加载则返回 null
  */
@@ -409,14 +444,14 @@ export class Web3 {
   /**
    * 读取合约数据
    */
-  async read(methodName: string, args: any[] = []): Promise<any> {
+  async read(methodName: string, args: unknown[] = []): Promise<unknown> {
     if (!this.contract) {
       throw new Error("Contract not initialized");
     }
 
     return await this.client.readContract({
       address: this.contract.address,
-      abi: this.contract.abi as string[],
+      abi: this.contract.abi as unknown as Record<string, unknown>[],
       functionName: methodName,
       args,
     });
@@ -427,7 +462,7 @@ export class Web3 {
    */
   async call(
     methodName: string,
-    args: any[] = [],
+    args: unknown[] = [],
     options?: {
       value?: string;
       gasLimit?: string;
@@ -439,7 +474,7 @@ export class Web3 {
 
     const result = await this.client.callContract({
       address: this.contract.address,
-      abi: this.contract.abi as string[],
+      abi: this.contract.abi as unknown as Record<string, unknown>[],
       functionName: methodName,
       args,
       value: options?.value || "0",
@@ -510,7 +545,7 @@ export class Web3 {
   /**
    * 获取合约 ABI
    */
-  get abi(): any[] {
+  get abi(): AbiItem[] {
     return this.contract?.abi || [];
   }
 }

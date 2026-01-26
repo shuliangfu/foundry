@@ -30,6 +30,9 @@ import { logger } from "./utils/logger.ts";
 import { loadContract } from "./utils/deploy-utils.ts";
 import { getApiKey, getNetworkName, loadNetworkConfig, executeCommandWithStream, createLoadingProgressBar } from "./utils/cli-utils.ts";
 import { loadWeb3ConfigSync } from "./utils/web3.ts";
+import type { ContractInfo } from "./types/index.ts";
+import { VerificationError, NetworkError, ConfigurationError } from "./errors/index.ts";
+import type { AbiItem, AbiConstructor } from "./types/index.ts";
 
 
 /**
@@ -246,8 +249,9 @@ export async function verify(options: VerifyOptions): Promise<void> {
   }
 
   if (!networkConfig) {
-    throw new Error(
-      `Unsupported network: ${options.network}${chain ? ` (chain: ${chain})` : ""}. Please check your config/web3.json file.`,
+    throw new ConfigurationError(
+      `不支持的网络: ${options.network}${chain ? ` (chain: ${chain})` : ""}。请检查 config/web3.json 文件。`,
+      { network: options.network, chain }
     );
   }
 
@@ -328,7 +332,14 @@ export async function verify(options: VerifyOptions): Promise<void> {
     }
     logger.error("  - 确保合约已成功部署");
     logger.error("  - 如果刚刚部署，请等待几个区块确认");
-    throw new Error(`Contract not found on chain at address ${options.address}`);
+    throw new NetworkError(
+      `链上未找到合约，地址: ${options.address}`,
+      { 
+        address: options.address, 
+        network: options.network, 
+        chainId: options.chainId 
+      }
+    );
   }
 
   logger.info("✅ 链上找到合约代码，开始验证...");
@@ -374,7 +385,17 @@ export async function verify(options: VerifyOptions): Promise<void> {
       logger.error("   5. 或使用命令行参数: --api-key your-api-key");
     }
 
-    throw new Error(`Verification failed: ${stderrText}`);
+    const isApiKeyError = stderrText.includes("Invalid API Key") || stderrText.includes("API key");
+    throw new VerificationError(
+      `验证失败: ${stderrText}`,
+      { 
+        address: options.address, 
+        contractName: options.contractName, 
+        network: options.network,
+        isApiKeyError,
+        stderrText 
+      }
+    );
   }
 
   // 过滤并处理输出信息
@@ -490,7 +511,7 @@ async function encodeConstructorArgs(
     const abiData = JSON.parse(readTextFileSync(abiPath));
 
     // 优先使用提供的构造函数参数，否则从 ABI 文件读取
-    let argsArray: any[] | null = null;
+    let argsArray: unknown[] | null = null;
     if (constructorArgs && constructorArgs.length > 0) {
       argsArray = constructorArgs;
     } else if (abiData.args && Array.isArray(abiData.args)) {
@@ -502,8 +523,8 @@ async function encodeConstructorArgs(
     }
 
     // 从 ABI 中获取构造函数定义
-    const abi = abiData.abi || [];
-    const constructor = abi.find((item: any) => item.type === "constructor");
+    const abi = (abiData.abi || []) as AbiItem[];
+    const constructor = abi.find((item): item is AbiConstructor => item.type === "constructor");
 
     if (!constructor || !constructor.inputs) {
       return null;
@@ -511,14 +532,14 @@ async function encodeConstructorArgs(
 
     // 构建构造函数签名用于 cast abi-encode
     // cast abi-encode 需要 "constructor(type1,type2,...)" 格式
-    const inputTypes = constructor.inputs.map((input: any) => input.type);
+    const inputTypes = constructor.inputs.map((input) => input.type);
     const signature = `constructor(${inputTypes.join(",")})`;
 
     // 使用 cast abi-encode 编码参数
     const castArgs = [
       "abi-encode",
       signature,
-      ...argsArray.map((arg: any) => {
+      ...argsArray.map((arg) => {
         // 处理数组类型参数（如 address[], uint256[]）
         if (Array.isArray(arg)) {
           return `[${arg.join(",")}]`;
@@ -693,7 +714,7 @@ async function main() {
   } = parseArgs();
 
   // 确定网络：优先使用命令行参数，其次使用环境变量
-  const network = await getNetworkName(networkArg, false) || "local";
+  const network = getNetworkName(networkArg, false) || "local";
 
   if (!contractName) {
     logger.error("❌ 未指定合约名称");
@@ -702,7 +723,7 @@ async function main() {
   }
 
   // 获取 API Key（从命令行参数或环境变量）
-  const finalApiKey = await getApiKey(apiKey);
+  const finalApiKey = getApiKey(apiKey);
   if (!finalApiKey) {
     logger.error("❌ 未指定 API Key");
     logger.error("   请使用 --api-key 参数或设置环境变量 ETH_API_KEY");
@@ -711,7 +732,7 @@ async function main() {
 
   // 确定合约地址
   let contractAddress = address;
-  let contractInfo: any = null;
+  let contractInfo: ContractInfo | null = null;
   if (!contractAddress) {
     try {
       contractInfo = loadContract(contractName, network);
@@ -732,7 +753,8 @@ async function main() {
   // 如果没有提供构造函数参数，尝试从合约信息中读取
   let finalConstructorArgs: string[] | undefined = constructorArgs;
   if (!finalConstructorArgs && contractInfo && contractInfo.args) {
-    finalConstructorArgs = contractInfo.args;
+    // 将 unknown[] 转换为 string[]
+    finalConstructorArgs = contractInfo.args.map(String);
   }
 
   // 确定 RPC URL 和链 ID

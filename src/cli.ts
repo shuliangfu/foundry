@@ -49,6 +49,7 @@ import { loadEnv } from "./utils/env.ts";
 import { parseJsrPackageFromUrl, parseJsrVersionFromUrl } from "./utils/jsr.ts";
 import { logger } from "./utils/logger.ts";
 import { loadWeb3ConfigSync } from "./utils/web3.ts";
+import type { JsrMetaData, JsrDenoJson } from "./types/index.ts";
 
 /**
  * 提示用户确认
@@ -157,7 +158,7 @@ async function getLatestVersion(includeBeta: boolean = false, forceRefresh: bool
 
     // 尝试从缓存读取 meta.json（如果不需要强制刷新）
     const cacheKey = `meta_${packageName.replace(/[^a-zA-Z0-9]/g, "_")}`;
-    let metaData: any = forceRefresh ? null : readCache(cacheKey, "latest");
+    let metaData: JsrMetaData | null = forceRefresh ? null : (readCache(cacheKey, "latest") as JsrMetaData | null);
 
     if (!metaData) {
       // 缓存未命中或强制刷新，从网络获取
@@ -169,6 +170,10 @@ async function getLatestVersion(includeBeta: boolean = false, forceRefresh: bool
       metaData = await metaResponse.json();
       // 写入缓存（使用 "latest" 作为版本标识）
       await writeCache(cacheKey, "latest", metaData);
+    }
+
+    if (!metaData) {
+      throw new Error("无法获取 meta.json 数据");
     }
 
     if (includeBeta) {
@@ -286,7 +291,7 @@ async function getVersion(): Promise<string | undefined> {
 
     // 尝试从缓存读取 deno.json
     const denoJsonCacheKey = `deno_json_${packageName.replace(/[^a-zA-Z0-9]/g, "_")}`;
-    let denoJson: any = readCache(denoJsonCacheKey, latestVersion);
+    let denoJson: JsrDenoJson | null = readCache(denoJsonCacheKey, latestVersion) as JsrDenoJson | null;
 
     if (!denoJson) {
       // 缓存未命中，从网络获取
@@ -299,7 +304,7 @@ async function getVersion(): Promise<string | undefined> {
       if (!response.ok) {
         throw new Error(`无法获取 deno.json: ${response.statusText} (${response.status})`);
       }
-      denoJson = await response.json();
+      denoJson = await response.json() as JsrDenoJson;
       // 写入缓存（使用版本号作为标识）
       await writeCache(denoJsonCacheKey, latestVersion, denoJson);
     }
@@ -330,7 +335,7 @@ async function getVersion(): Promise<string | undefined> {
  * 加载网络配置
  * 优先从环境变量加载，如果没有则尝试从 config/web3.json 加载
  */
-async function loadNetworkConfig(_network: string): Promise<NetworkConfig> {
+function loadNetworkConfig(_network: string): NetworkConfig {
   // 尝试从环境变量加载
   const rpcUrl = getEnv("RPC_URL");
   const privateKey = getEnv("PRIVATE_KEY");
@@ -364,7 +369,7 @@ async function loadNetworkConfig(_network: string): Promise<NetworkConfig> {
 
   // 如果都加载失败，尝试从 .env 文件加载
   try {
-    const env = await loadEnv();
+    const env = loadEnv();
     return {
       rpcUrl: env.RPC_URL || env.RPC_URL || "",
       privateKey: env.PRIVATE_KEY || env.PRIVATE_KEY || "",
@@ -505,7 +510,7 @@ cli
   })
   .action(async (_args, options) => {
     // 获取网络名称（从命令行参数或环境变量）
-    const network = await getNetworkName(options.network as string | undefined, false);
+    const network = getNetworkName(options.network as string | undefined, false);
     if (!network) {
       logger.error("❌ 未指定网络");
       logger.error("   请使用 --network 参数指定网络，或在 .env 文件中设置 WEB3_ENV");
@@ -547,7 +552,7 @@ cli
     // 加载网络配置
     let config: NetworkConfig;
     try {
-      config = await loadNetworkConfig(finalNetwork);
+      config = loadNetworkConfig(finalNetwork);
       logger.info("RPC URL:", config.rpcUrl);
       logger.info("部署地址:", config.address);
       if (config.chainId) {
@@ -666,7 +671,7 @@ cli
         logger.info("------------------------------------------");
 
         // 获取 API Key（从命令行参数或环境变量）
-        const finalApiKey = await getApiKey(apiKey);
+        const finalApiKey = getApiKey(apiKey);
         if (!finalApiKey) {
           logger.error("❌ 未指定 API Key");
           logger.error("   请使用 --api-key 参数提供 API Key，或在 .env 文件中设置 ETH_API_KEY");
@@ -736,7 +741,7 @@ cli
               network: finalNetwork,
               apiKey: finalApiKey,
               rpcUrl: config.rpcUrl,
-              constructorArgs: contractInfo.args,
+              constructorArgs: contractInfo.args ? contractInfo.args.map(String) : undefined,
               chainId: config.chainId,
             });
 
@@ -805,7 +810,7 @@ cli
   })
   .action(async (_args, options) => {
     // 获取网络名称（从命令行参数或环境变量）
-    const network = await getNetworkName(options.network as string | undefined, false);
+    const network = getNetworkName(options.network as string | undefined, false);
     if (!network) {
       logger.error("❌ 未指定网络");
       logger.error("   请使用 --network 参数指定网络，或在 .env 文件中设置 WEB3_ENV");
@@ -827,7 +832,7 @@ cli
     const chainId = options["chain-id"] as number | undefined;
 
     // 获取 API Key（从命令行参数或环境变量）
-    const apiKey = await getApiKey(options["api-key"] as string | undefined);
+    const apiKey = getApiKey(options["api-key"] as string | undefined);
     if (!apiKey) {
       logger.error("❌ 未指定 API Key");
       logger.error("   请使用 --api-key 参数或设置环境变量 ETH_API_KEY");

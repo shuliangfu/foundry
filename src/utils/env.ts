@@ -4,7 +4,7 @@
  * 使用 @dreamer/runtime-adapter 兼容 Deno 和 Bun
  */
 
-import { existsSync, readTextFileSync, join, cwd, getEnv, setEnv, exit } from "@dreamer/runtime-adapter";
+import { existsSync, readTextFileSync, join, cwd, setEnv, exit } from "@dreamer/runtime-adapter";
 import { logger } from "./logger.ts";
 
 /**
@@ -12,7 +12,7 @@ import { logger } from "./logger.ts";
  * @param envPath 环境变量文件路径，默认为当前目录下的 .env
  * @returns 环境变量对象
  */
-export async function loadEnv(envPath?: string): Promise<Record<string, string>> {
+export function loadEnv(envPath?: string): Record<string, string> {
   const targetPath = envPath || join(cwd(), ".env");
   if (!existsSync(targetPath)) {
     logger.error("❌ Error: .env file not found");

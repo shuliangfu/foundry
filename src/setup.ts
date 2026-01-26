@@ -36,6 +36,7 @@ import {
 import { logger } from "./utils/logger.ts";
 import { parseJsrPackageFromUrl } from "./utils/jsr.ts";
 import { readCache, writeCache, setInstalledVersion } from "./utils/cache.ts";
+import type { JsrMetaData, JsrDenoJson } from "./types/index.ts";
 
 /**
  * 查找本地项目根目录（包含 deno.json 的目录）
@@ -163,7 +164,7 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
       // 获取最新版本（只有在本地运行或无法解析版本时才执行）
       // 先尝试从缓存读取 meta.json
       const metaCacheKey = `meta_${packageName}`;
-      let metaData: any = readCache(metaCacheKey, "latest");
+      let metaData: JsrMetaData | null = readCache(metaCacheKey, "latest") as JsrMetaData | null;
       
       if (!metaData) {
         // 缓存未命中，从网络获取
@@ -172,12 +173,12 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
         if (!metaResponse.ok) {
           throw new Error(`无法获取 meta.json: ${metaResponse.statusText}`);
         }
-        metaData = await metaResponse.json();
+        metaData = await metaResponse.json() as JsrMetaData;
         // 写入缓存
         await writeCache(metaCacheKey, "latest", metaData);
       }
       
-      const latestVersion = metaData.latest || metaData.versions?.[0];
+      const latestVersion = metaData.latest || Object.keys(metaData.versions || {})[0];
       if (!latestVersion) {
         throw new Error("无法从 meta.json 获取最新版本");
       }
@@ -191,7 +192,7 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
     
     // 先尝试从缓存读取 deno.json
     const denoJsonCacheKey = `deno.json_${packageName}`;
-    let denoJson: any = readCache(denoJsonCacheKey, version);
+    let denoJson: JsrDenoJson | null = readCache(denoJsonCacheKey, version) as JsrDenoJson | null;
     
     if (!denoJson) {
       // 缓存未命中，从网络获取
@@ -215,7 +216,7 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
         const jsonMatch = text.match(/<pre[^>]*>([\s\S]*?)<\/pre>/);
         if (jsonMatch) {
           try {
-            denoJson = JSON.parse(jsonMatch[1]);
+            denoJson = JSON.parse(jsonMatch[1]) as JsrDenoJson;
           } catch {
             throw new Error("无法解析 HTML 中的 JSON 内容");
           }
@@ -223,7 +224,7 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
           throw new Error(`返回的内容不是 JSON，Content-Type: ${contentType}`);
         }
       } else {
-        denoJson = await response.json();
+        denoJson = await response.json() as JsrDenoJson;
       }
       
       // 写入缓存

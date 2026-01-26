@@ -15,6 +15,7 @@ import {
   remove,
   cwd,
 } from "@dreamer/runtime-adapter";
+import { CACHE_TTL } from "../constants/index.ts";
 
 /**
  * 获取缓存目录路径
@@ -77,6 +78,21 @@ function getCacheFilePath(key: string, version: string): string {
 }
 
 /**
+ * 获取缓存的 TTL（根据 key 类型）
+ */
+function getCacheTTL(key: string): number {
+  if (key.startsWith("meta_")) {
+    return CACHE_TTL.META;
+  } else if (key.startsWith("deno_json_") || key.startsWith("deno.json_")) {
+    return CACHE_TTL.DENO_JSON;
+  } else if (key.startsWith("installed_version_")) {
+    return CACHE_TTL.CONTRACT; // 永久缓存
+  }
+  // 默认使用 meta 的 TTL
+  return CACHE_TTL.META;
+}
+
+/**
  * 读取缓存
  * @param key - 缓存键
  * @param version - 版本标识（必须与写入时使用的版本标识一致）
@@ -98,6 +114,21 @@ export function readCache<T>(key: string, version: string): T | null {
 
     const cacheContent = readTextFileSync(cachePath);
     const cache = JSON.parse(cacheContent);
+    
+    // 检查缓存是否过期
+    const ttl = getCacheTTL(key);
+    if (ttl !== Infinity && cache.timestamp) {
+      const age = Date.now() - cache.timestamp;
+      if (age > ttl) {
+        // 缓存已过期，删除文件
+        try {
+          removeSync(cachePath);
+        } catch {
+          // 忽略删除错误
+        }
+        return null;
+      }
+    }
 
     // 检查缓存是否过期（24小时）
     const now = Date.now();

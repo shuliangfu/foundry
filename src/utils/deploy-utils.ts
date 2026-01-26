@@ -29,6 +29,9 @@ import {
 } from "@dreamer/runtime-adapter";
 import { logger } from "./logger.ts";
 import { createLoadingProgressBar } from "./cli-utils.ts";
+import type { ContractInfo, AbiItem } from "../types/index.ts";
+import { DeploymentError } from "../errors/index.ts";
+import { DEFAULT_RETRY_ATTEMPTS, DEFAULT_RETRY_DELAY } from "../constants/index.ts";
 
 
 /**
@@ -64,14 +67,9 @@ export interface DeployOptions {
 }
 
 /**
- * 合约信息类型
+ * 合约信息类型（重新导出，保持向后兼容）
  */
-export interface ContractInfo {
-  contractName: string;
-  address: string;
-  abi: any[];
-  args?: any[];
-}
+export type { ContractInfo } from "../types/index.ts";
 
 /**
  * 清理 Foundry broadcast 目录中的交易记录
@@ -186,7 +184,7 @@ export function deployContract(
 export async function forgeDeploy(
   contractName: string,
   config: NetworkConfig,
-  constructorArgs: string[] | Record<string, any> = [],
+  constructorArgs: string[] | Record<string, unknown> = [],
   options: DeployOptions = {},
 ): Promise<string> {
   // 从 abiDir 中提取网络名称，如果没有提供 abiDir，则使用默认值 "local"
@@ -224,7 +222,7 @@ export async function forgeDeploy(
     typeof constructorArgs === "object" && constructorArgs !== null &&
     !Array.isArray(constructorArgs)
   ) {
-    constructorArgs = Object.values(constructorArgs);
+    constructorArgs = Object.values(constructorArgs) as string[];
   }
 
   const argsArray = (constructorArgs as string[]).map((arg) => {
@@ -300,7 +298,10 @@ export async function forgeDeploy(
       logger.error("  2. 使用不同的账户地址进行部署");
       logger.error("  3. 如果使用本地节点，请重启节点清除交易缓存");
       logger.error("");
-      throw new Error(`Deployment failed: 交易已在 mempool 中 (already known)。请等待更长时间或更换部署地址。`);
+      throw new DeploymentError(
+        "交易已在 mempool 中 (already known)。请等待更长时间或更换部署地址。",
+        { contractName, network, rpcUrl: config.rpcUrl }
+      );
     }
     // 如果是 "transaction already imported" 错误且 force 为 true，清理后重试
     if (isTransactionAlreadyImported && options.force) {
@@ -310,7 +311,7 @@ export async function forgeDeploy(
       const network = (networkIndex >= 0 && networkIndex < parts.length - 1)
         ? parts[networkIndex + 1]
         : (parts[parts.length - 1] || "local");
-      const maxRetries = 3; // 最多重试 3 次
+      const maxRetries = DEFAULT_RETRY_ATTEMPTS;
       let lastError: string | null = null;
 
       for (let retryCount = 1; retryCount <= maxRetries; retryCount++) {
@@ -318,7 +319,7 @@ export async function forgeDeploy(
         await cleanBroadcastDir(network);
 
         // 等待一段时间，让 RPC 节点清除交易缓存（每次重试等待时间递增）
-        const waitTime = 2000 * retryCount; // 2秒、4秒、6秒
+        const waitTime = DEFAULT_RETRY_DELAY * retryCount;
         await new Promise((resolve) => setTimeout(resolve, waitTime));
 
         // 重试部署，显示进度条
@@ -361,7 +362,10 @@ export async function forgeDeploy(
             // 如果不是交易已存在的错误，直接抛出错误
             logger.error("重试部署失败:");
             logger.error(retryStderrText);
-            throw new Error(`Deployment failed: ${retryStderrText}`);
+            throw new DeploymentError(
+              `重试部署失败: ${retryStderrText}`,
+              { contractName, network, retryCount, rpcUrl: config.rpcUrl }
+            );
           }
 
           // 如果还是交易已存在的错误，保存错误信息并继续下一次重试
@@ -384,7 +388,16 @@ export async function forgeDeploy(
       logger.error("  1. 如果使用的是本地 Anvil 节点，请重启节点以清除交易缓存");
       logger.error("  2. 或者等待更长时间后再次尝试部署");
       logger.error("  3. 或者使用不同的 nonce 或账户进行部署");
-      throw new Error(`Deployment failed after ${maxRetries} retries: ${lastError || stderrText}`);
+      throw new DeploymentError(
+        `重试 ${maxRetries} 次后仍然失败，可能是 RPC 节点缓存了交易`,
+        { 
+          contractName, 
+          network, 
+          maxRetries, 
+          lastError: lastError || stderrText,
+          rpcUrl: config.rpcUrl 
+        }
+      );
     }
 
     // 如果是 "transaction already imported" 错误但未使用 force，给出提示并尝试获取已存在的地址
@@ -429,7 +442,10 @@ export async function forgeDeploy(
 
     logger.error("Deployment failed:");
     logger.error(stderrText);
-    throw new Error(`Deployment failed: ${stderrText}`);
+    throw new DeploymentError(
+      `部署失败: ${stderrText}`,
+      { contractName, network, rpcUrl: config.rpcUrl, stderrText }
+    );
   }
 
   return await extractAddressFromOutput(
@@ -504,7 +520,10 @@ async function extractAddressFromOutput(
     logger.error("无法从部署输出中提取合约地址");
     logger.error("输出:", stdoutText);
     logger.error("错误:", stderrText);
-    throw new Error("无法提取合约地址");
+    throw new DeploymentError(
+      "无法提取合约地址",
+      { contractName, stdoutText, stderrText }
+    );
   }
 
   // 保存合约信息
@@ -582,7 +601,7 @@ async function saveContract(
   }
 
   const artifact = JSON.parse(readTextFileSync(artifactPath));
-  const _abi = (artifact.abi || []).map((item: any) => {
+  const _abi = (artifact.abi || []).map((item: AbiItem & { signature?: string }) => {
     const { signature: _signature, ...rest } = item;
     return rest;
   });
