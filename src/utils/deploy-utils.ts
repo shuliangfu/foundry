@@ -314,14 +314,11 @@ export async function forgeDeploy(
       let lastError: string | null = null;
 
       for (let retryCount = 1; retryCount <= maxRetries; retryCount++) {
-        logger.warn(`检测到交易已存在，正在清理后重试 (${retryCount}/${maxRetries})...`);
-
         // 每次重试前都清理 broadcast 目录
         await cleanBroadcastDir(network);
 
         // 等待一段时间，让 RPC 节点清除交易缓存（每次重试等待时间递增）
         const waitTime = 2000 * retryCount; // 2秒、4秒、6秒
-        logger.info(`等待 RPC 节点清除交易缓存 (${waitTime / 1000}秒)...`);
         await new Promise((resolve) => setTimeout(resolve, waitTime));
 
         // 重试部署，显示进度条
@@ -369,10 +366,6 @@ export async function forgeDeploy(
 
           // 如果还是交易已存在的错误，保存错误信息并继续下一次重试
           lastError = retryStderrText;
-
-          if (retryCount < maxRetries) {
-            logger.warn(`重试 ${retryCount} 失败，继续重试...`);
-          }
         } catch (error) {
           // 停止进度条
           retryProgressBar.stop(retryProgressInterval);
