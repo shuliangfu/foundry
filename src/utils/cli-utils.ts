@@ -424,7 +424,10 @@ export function handleCommandResult(
  * @param message 显示的消息文本，例如 "正在检查更新..."
  * @returns 进度条对象，包含 start 和 stop 方法
  */
-export function createLoadingProgressBar(message: string) {
+export function createLoadingProgressBar(message: string): {
+  start(): ReturnType<typeof setInterval>;
+  stop(intervalId: ReturnType<typeof setInterval> | null): void;
+} {
   const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
   let currentFrame = 0;
   let intervalId: ReturnType<typeof setInterval> | null = null;
