@@ -35,7 +35,7 @@ import {
 } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
 import { parseJsrPackageFromUrl } from "./utils/jsr.ts";
-import { readCache, writeCache } from "./utils/cache.ts";
+import { readCache, writeCache, setInstalledVersion } from "./utils/cache.ts";
 
 /**
  * 查找本地项目根目录（包含 deno.json 的目录）
@@ -281,7 +281,7 @@ async function getPaths() {
   // 不再创建临时 import map
   // 使用 JSR URL 安装时，Deno 会自动解析 JSR 依赖
   // CLI 脚本中的相对路径导入会在运行时从 JSR 包中解析
-  return { cliUrl };
+  return { cliUrl, version };
 }
 
 /**
@@ -293,7 +293,7 @@ async function install(): Promise<void> {
   logger.info("===========================================");
   logger.info("");
 
-  const { cliUrl } = await getPaths();
+  const { cliUrl, version } = await getPaths();
 
   // 不使用 --import-map，因为临时文件会在安装后删除
   // 使用 JSR URL 安装时，Deno 会自动解析 JSR 依赖
@@ -325,9 +325,26 @@ async function install(): Promise<void> {
     const stderrText = new TextDecoder().decode(output.stderr);
 
     if (output.success) {
-      logger.info("");
-      logger.info("✅ Foundry CLI 安装成功！");
-      logger.info("");
+      // 安装成功后，将版本号写入全局缓存（这是全局版本号的标准来源）
+      try {
+        const packageInfo = parseJsrPackageFromUrl() || readLocalDenoJson();
+        const packageName = packageInfo?.packageName || "@dreamer/foundry";
+        
+        // 使用专门的函数写入全局安装版本号
+        await setInstalledVersion(version, packageName);
+        
+        logger.info("");
+        logger.info("✅ Foundry CLI 安装成功！");
+        logger.info(`   版本: ${version}`);
+        logger.info("");
+      } catch {
+        // 缓存写入失败不影响安装，只记录警告
+        logger.warn("⚠️  无法写入版本缓存，但不影响安装");
+        logger.info("");
+        logger.info("✅ Foundry CLI 安装成功！");
+        logger.info("");
+      }
+
       logger.info("现在可以在任何地方使用以下命令：");
       logger.info("  foundry init [项目名]");
       logger.info("  foundry deploy --network <网络>");

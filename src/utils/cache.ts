@@ -26,10 +26,47 @@ function getCacheDir(): string {
 }
 
 /**
+ * 获取全局安装的版本号（从安装时的缓存读取）
+ * 这是全局版本号的标准来源，安装时会写入，其他地方应该优先读取这个
+ * @param packageName - 包名（可选，默认为 "@dreamer/foundry"）
+ * @returns 版本号字符串，如果不存在则返回 null
+ */
+export function getInstalledVersion(packageName: string = "@dreamer/foundry"): string | null {
+  try {
+    const versionCacheKey = `installed_version_${packageName.replace(/[^a-zA-Z0-9]/g, "_")}`;
+    const installedVersionCache = readCache<{ version: string }>(versionCacheKey, "installed");
+    
+    if (installedVersionCache && installedVersionCache.version) {
+      return installedVersionCache.version;
+    }
+    
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 写入全局安装的版本号（安装时调用）
+ * @param version - 版本号
+ * @param packageName - 包名（可选，默认为 "@dreamer/foundry"）
+ */
+export async function setInstalledVersion(version: string, packageName: string = "@dreamer/foundry"): Promise<void> {
+  const versionCacheKey = `installed_version_${packageName.replace(/[^a-zA-Z0-9]/g, "_")}`;
+  await writeCache(versionCacheKey, "installed", { version });
+}
+
+/**
  * 获取缓存文件路径
- * @param key - 缓存键（例如：meta.json, deno.json）
- * @param version - 版本号（用于区分不同版本的缓存）
+ * @param key - 缓存键（例如：meta.json, deno.json, installed_version）
+ * @param version - 版本标识（用于区分不同版本的缓存文件）
  * @returns 缓存文件路径
+ * @remarks
+ * version 参数的作用：
+ * - 用于生成唯一的缓存文件路径，例如：`key_version.json`
+ * - "installed" - 用于存储当前安装的版本号（每次安装会覆盖）
+ * - "latest" - 用于存储最新版本信息（会定期更新）
+ * - 实际版本号（如 "1.1.0-beta.32"）- 用于存储特定版本的缓存（不会互相覆盖）
  */
 function getCacheFilePath(key: string, version: string): string {
   const cacheDir = getCacheDir();
@@ -42,8 +79,15 @@ function getCacheFilePath(key: string, version: string): string {
 /**
  * 读取缓存
  * @param key - 缓存键
- * @param version - 版本号
+ * @param version - 版本标识（必须与写入时使用的版本标识一致）
  * @returns 缓存的数据，如果不存在或已过期则返回 null
+ * @remarks
+ * 版本标识的说明：
+ * - "installed" - 读取安装时缓存的版本号
+ * - "latest" - 读取最新版本信息
+ * - 实际版本号（如 "1.1.0-beta.32"）- 读取特定版本的缓存
+ * 
+ * 重要：读取时使用的 version 必须与写入时使用的 version 一致，否则无法读取到缓存
  */
 export function readCache<T>(key: string, version: string): T | null {
   try {
@@ -79,8 +123,14 @@ export function readCache<T>(key: string, version: string): T | null {
 /**
  * 写入缓存
  * @param key - 缓存键
- * @param version - 版本号
+ * @param version - 版本标识（用于区分不同版本的缓存文件，例如："installed", "latest", "1.1.0-beta.32"）
  * @param data - 要缓存的数据
+ * @remarks
+ * version 参数的作用：
+ * - 用于生成唯一的缓存文件路径，例如：`key_version.json`
+ * - 不同版本的缓存会存储在不同的文件中，互不干扰
+ * - 对于 "installed" 这种特殊标识，每次写入会覆盖之前的缓存（这是预期的行为）
+ * - 对于实际版本号（如 "1.1.0-beta.32"），不同版本的缓存会分别存储
  */
 export async function writeCache<T>(key: string, version: string, data: T): Promise<void> {
   try {
@@ -91,7 +141,8 @@ export async function writeCache<T>(key: string, version: string, data: T): Prom
     const cachePath = getCacheFilePath(key, version);
     const cache = {
       timestamp: Date.now(),
-      version,
+      // 注意：这里的 version 是用于文件路径的版本标识，不是缓存数据中的版本号
+      // 如果需要存储数据中的版本号，应该在 data 中单独存储
       data,
     };
 

@@ -33,7 +33,7 @@ import {
   readTextFileSync,
 } from "@dreamer/runtime-adapter";
 import { init } from "./init.ts";
-import { readCache, writeCache } from "./utils/cache.ts";
+import { readCache, writeCache, getInstalledVersion } from "./utils/cache.ts";
 import {
   executeDenoCommand,
   getApiKey,
@@ -144,21 +144,27 @@ function findFrameworkRoot(): string | null {
 
 /**
  * 从 JSR 服务器获取版本号
- * 优先从 import.meta.url 解析，如果无法解析则从 JSR API 获取（使用文件缓存）
+ * 优先从全局安装缓存读取（这是标准来源），其次从 import.meta.url 解析，最后从 JSR API 获取
  * @returns 版本号字符串，如果读取失败则返回 undefined
  */
 async function getVersion(): Promise<string | undefined> {
   try {
-    // 首先尝试从 import.meta.url 解析 JSR 版本号
+    // 首先尝试从全局安装缓存读取版本号（这是标准来源）
+    const packageInfo = parseJsrPackageFromUrl();
+    const packageName = packageInfo?.packageName || "@dreamer/foundry";
+    const installedVersion = getInstalledVersion(packageName);
+    
+    if (installedVersion) {
+      return installedVersion;
+    }
+
+    // 如果全局缓存中没有，尝试从 import.meta.url 解析 JSR 版本号
     const parsedVersion = parseJsrVersionFromUrl();
     if (parsedVersion) {
       return parsedVersion;
     }
 
     // 如果无法从 URL 解析，尝试从 JSR API 获取最新版本（使用缓存）
-    const packageInfo = parseJsrPackageFromUrl();
-    const packageName = packageInfo?.packageName || "@dreamer/foundry";
-
     // 尝试从缓存读取 meta.json
     const cacheKey = `meta_${packageName.replace(/[^a-zA-Z0-9]/g, "_")}`;
     let metaData: any = readCache(cacheKey, "latest");
