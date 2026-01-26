@@ -20,17 +20,247 @@
  * ```
  */
 
-import { cwd, join, getEnv, exit, createCommand, existsSync, remove, args } from "@dreamer/runtime-adapter";
+import { exit, createCommand, existsSync, remove, args, makeTempFile, getEnv, join, writeTextFile, readTextFileSync, cwd, dirname, platform } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
 
 /**
- * 获取 CLI 脚本路径和导入映射路径（使用绝对路径）
+ * 从 import.meta.url 解析 JSR 包信息
+ * @returns 包名和版本，如果解析失败则返回 null
  */
-function getPaths() {
-  const projectRoot = cwd();
-  const cliPath = join(projectRoot, "src", "cli.ts");
-  const importMapPath = join(projectRoot, "import_map.json");
-  return { cliPath, importMapPath };
+function parseJsrPackageFromUrl(): { packageName: string; version: string } | null {
+  try {
+    // import.meta.url 格式: https://jsr.io/@dreamer/foundry@1.1.0-beta.6/setup.ts
+    const url = new URL(import.meta.url);
+
+    // 检查是否是 JSR URL
+    if (url.hostname !== "jsr.io") {
+      return null;
+    }
+
+    // 路径格式: /@dreamer/foundry@1.1.0-beta.6/setup.ts
+    const pathMatch = url.pathname.match(/^\/@([^/@]+)\/([^/@]+)@([^/]+)\//);
+    if (!pathMatch) {
+      return null;
+    }
+
+    const [, scope, name, version] = pathMatch;
+    const packageName = `@${scope}/${name}`;
+
+    return { packageName, version };
+  } catch {
+    // 如果是本地运行，返回 null，后续会读取本地项目的配置
+    return null;
+  }
+}
+
+/**
+ * 查找本地项目根目录（包含 deno.json 的目录）
+ * @param startDir - 起始目录，默认为当前工作目录
+ * @returns 项目根目录，如果未找到则返回 null
+ */
+function findLocalProjectRoot(startDir: string): string | null {
+  let currentDir = startDir;
+  const plat = platform();
+  const root = plat === "windows" ? /^[A-Z]:\\$/ : /^\/$/;
+
+  while (true) {
+    const denoJsonPath = join(currentDir, "deno.json");
+    if (existsSync(denoJsonPath)) {
+      return currentDir;
+    }
+
+    // 检查是否到达根目录
+    const parentDir = dirname(currentDir);
+    if (parentDir === currentDir || currentDir.match(root)) {
+      break;
+    }
+    currentDir = parentDir;
+  }
+
+  return null;
+}
+
+/**
+ * 从本地项目读取 deno.json 配置
+ * @returns 包名和版本，如果读取失败则返回 null
+ */
+function readLocalDenoJson(): { packageName: string; version: string } | null {
+  try {
+    const projectRoot = findLocalProjectRoot(cwd());
+    if (!projectRoot) {
+      return null;
+    }
+
+    const denoJsonPath = join(projectRoot, "deno.json");
+    if (!existsSync(denoJsonPath)) {
+      return null;
+    }
+
+    const denoJsonContent = readTextFileSync(denoJsonPath);
+    const denoJson = JSON.parse(denoJsonContent);
+
+    // 从 deno.json 中获取包名和版本
+    const packageName = denoJson.name || "@dreamer/foundry";
+    const version = denoJson.version || "latest";
+
+    return { packageName, version };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 从本地项目读取完整的 deno.json
+ */
+function readLocalDenoJsonFull(): { version: string; imports: Record<string, string> } | null {
+  try {
+    const projectRoot = findLocalProjectRoot(cwd());
+    if (!projectRoot) {
+      return null;
+    }
+
+    const denoJsonPath = join(projectRoot, "deno.json");
+    if (!existsSync(denoJsonPath)) {
+      return null;
+    }
+
+    const denoJsonContent = readTextFileSync(denoJsonPath);
+    const denoJson = JSON.parse(denoJsonContent);
+
+    return {
+      version: denoJson.version || "latest",
+      imports: denoJson.imports || {},
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 从 JSR 远程获取包的 deno.json 信息
+ */
+async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<string, string> }> {
+  // 首先尝试从 import.meta.url 解析包信息（远程 JSR URL）
+  let packageInfo = parseJsrPackageFromUrl();
+  let isLocal = false;
+
+  // 如果是本地运行（packageInfo 为 null），尝试读取本地项目的 deno.json
+  if (!packageInfo) {
+    logger.info("📦 检测到本地运行，尝试读取本地项目配置...");
+    isLocal = true;
+    packageInfo = readLocalDenoJson();
+    if (packageInfo) {
+      logger.info(`📦 从本地项目读取: ${packageInfo.packageName}@${packageInfo.version}`);
+    }
+  }
+
+  // 如果是本地运行，直接使用本地项目的 deno.json
+  if (isLocal && packageInfo) {
+    const localDenoJson = readLocalDenoJsonFull();
+    if (localDenoJson) {
+      logger.info("📦 使用本地项目的 deno.json 配置");
+      return localDenoJson;
+    }
+  }
+
+  let packageName = "@dreamer/foundry";
+  let parsedVersion: string | null = null;
+
+  if (packageInfo) {
+    packageName = packageInfo.packageName;
+    parsedVersion = packageInfo.version;
+    logger.info(`📦 使用包: ${packageName}@${parsedVersion}`);
+  } else {
+    logger.warn("⚠️  无法从 import.meta.url 或本地项目解析包信息，使用默认值");
+  }
+
+  try {
+    // 总是先获取 meta.json 来获取最新版本
+    const metaUrl = `https://jsr.io/${packageName}/meta.json`;
+    const metaResponse = await fetch(metaUrl);
+    if (!metaResponse.ok) {
+      throw new Error(`无法获取 meta.json: ${metaResponse.statusText}`);
+    }
+    const metaData = await metaResponse.json();
+    const latestVersion = metaData.latest || metaData.versions?.[0];
+    if (!latestVersion) {
+      throw new Error("无法从 meta.json 获取最新版本");
+    }
+
+    // 使用最新版本获取 deno.json
+    const version = latestVersion;
+    const denoJsonUrl = `https://jsr.io/${packageName}@${version}/deno.json`;
+
+    const response = await fetch(denoJsonUrl);
+    if (!response.ok) {
+      throw new Error(`无法获取 deno.json: ${response.statusText}`);
+    }
+
+    const denoJson = await response.json();
+    return {
+      version: denoJson.version || version,
+      imports: denoJson.imports || {},
+    };
+  } catch (error) {
+    logger.error("❌ 获取 deno.json 信息失败:", error);
+    exit(1);
+  }
+}
+
+/**
+ * 获取 CLI 远程 URL 和创建临时 import map（使用远程 JSR URL）
+ */
+async function getPaths() {
+  // 首先尝试从 import.meta.url 解析包信息（远程 JSR URL）
+  let packageInfo = parseJsrPackageFromUrl();
+  let isLocal = false;
+
+  // 如果是本地运行（packageInfo 为 null），尝试读取本地项目的 deno.json
+  if (!packageInfo) {
+    isLocal = true;
+    packageInfo = readLocalDenoJson();
+  }
+
+  const packageName = packageInfo?.packageName || "@dreamer/foundry";
+
+  // 从 JSR 远程获取包信息（本地运行时会直接使用本地配置）
+  const { version, imports } = await fetchJsrDenoJson();
+
+  // 如果是本地运行，使用本地文件路径；否则使用远程 JSR URL
+  let cliUrl: string;
+  if (isLocal && packageInfo) {
+    // 本地运行：使用本地文件路径
+    const projectRoot = findLocalProjectRoot(cwd());
+    if (projectRoot) {
+      cliUrl = join(projectRoot, "src", "cli.ts");
+    } else {
+      // 如果找不到项目根目录，回退到远程 URL
+      cliUrl = `jsr:${packageName}@${version}/cli`;
+    }
+  } else {
+    // 远程运行：使用远程 JSR URL
+    cliUrl = `jsr:${packageName}@${version}/cli`;
+  }
+
+  // 创建临时 import map，使用远程 JSR URL
+  const importMap = {
+    imports: {
+      ...imports,
+      // 确保主包使用远程 URL
+      [packageName]: `jsr:${packageName}@${version}`,
+    },
+  };
+
+  // 使用 makeTempFile 创建临时文件
+  const tempImportMapPath = await makeTempFile({
+    prefix: "foundry-temp-import-map-",
+    suffix: ".json",
+  });
+
+  // 写入 import map 内容
+  await writeTextFile(tempImportMapPath, JSON.stringify(importMap, null, 2));
+
+  return { cliUrl, importMapPath: tempImportMapPath };
 }
 
 /**
@@ -42,7 +272,7 @@ async function install(): Promise<void> {
   logger.info("===========================================");
   logger.info("");
 
-  const { cliPath, importMapPath } = getPaths();
+  const { cliUrl, importMapPath } = await getPaths();
 
   const args = [
     "install",
@@ -53,7 +283,7 @@ async function install(): Promise<void> {
     importMapPath,
     "--name",
     "foundry",
-    cliPath,
+    cliUrl,
   ];
 
   console.log(args);
@@ -105,6 +335,15 @@ async function install(): Promise<void> {
   } catch (error) {
     logger.error("❌ 安装过程中发生错误:", error);
     exit(1);
+  } finally {
+    // 清理临时 import map 文件
+    try {
+      if (existsSync(importMapPath)) {
+        await remove(importMapPath);
+      }
+    } catch {
+      // 忽略清理错误
+    }
   }
 }
 
