@@ -15,7 +15,19 @@
  * ```
  */
 
-import { existsSync, readTextFileSync, writeTextFileSync, mkdir, cwd, remove, readdir, readdirSync, join, createCommand, writeStdoutSync } from "@dreamer/runtime-adapter";
+import {
+  createCommand,
+  cwd,
+  existsSync,
+  join,
+  mkdir,
+  readdir,
+  readdirSync,
+  readTextFileSync,
+  remove,
+  writeStdoutSync,
+  writeTextFileSync,
+} from "@dreamer/runtime-adapter";
 import { logger } from "./logger.ts";
 
 /**
@@ -43,10 +55,10 @@ function createProgressBar() {
 
       // 立即显示第一帧
       update();
-      
+
       // 每 100ms 更新一次
       intervalId = setInterval(update, 100);
-      
+
       return intervalId;
     },
     stop(intervalId: ReturnType<typeof setInterval> | null) {
@@ -235,9 +247,9 @@ export async function forgeDeploy(
     // 如果没有找到 "abi" 目录，使用路径的最后一个部分
     return parts[parts.length - 1] || "local";
   }
-  
+
   const network = extractNetworkFromAbiDir(options.abiDir);
-  
+
   // 检查合约是否已存在
   const existingAddress = checkContractExists(contractName, network, options.abiDir);
 
@@ -253,7 +265,10 @@ export async function forgeDeploy(
   }
 
   // 转换构造函数参数为数组
-  if (typeof constructorArgs === "object" && constructorArgs !== null && !Array.isArray(constructorArgs)) {
+  if (
+    typeof constructorArgs === "object" && constructorArgs !== null &&
+    !Array.isArray(constructorArgs)
+  ) {
     constructorArgs = Object.values(constructorArgs);
   }
 
@@ -292,7 +307,7 @@ export async function forgeDeploy(
 
   logger.info(`正在部署合约 ${contractName}...`);
   logger.info(`RPC URL: ${config.rpcUrl}`);
-  
+
   // 显示进度条
   const progressBar = createProgressBar();
   const progressInterval = progressBar.start();
@@ -305,18 +320,33 @@ export async function forgeDeploy(
   });
 
   const output = await cmd.output();
-  
+
   // 停止进度条
   progressBar.stop(progressInterval);
-  
+
   const stdoutText = new TextDecoder().decode(output.stdout);
   const stderrText = new TextDecoder().decode(output.stderr);
 
   // 检查是否是 "transaction already imported" 错误
   const isTransactionAlreadyImported = stderrText.includes("transaction already imported") ||
     stderrText.includes("error code -32003");
+  
+  // 检查是否是 "already known" 错误（交易已在 mempool 中）
+  const isAlreadyKnown = stderrText.includes("error code -32000") ||
+    stderrText.toLowerCase().includes("already known");
 
   if (!output.success) {
+    // 如果是 "already known" 错误，给出提示
+    if (isAlreadyKnown) {
+      logger.error("❌ 部署失败：交易已在 mempool 中");
+      logger.error("");
+      logger.error("💡 解决方案：");
+      logger.error("  1. 等待更长时间后再部署（建议等待 5-10 分钟）");
+      logger.error("  2. 使用不同的账户地址进行部署");
+      logger.error("  3. 如果使用本地节点，请重启节点清除交易缓存");
+      logger.error("");
+      throw new Error(`Deployment failed: 交易已在 mempool 中 (already known)。请等待更长时间或更换部署地址。`);
+    }
     // 如果是 "transaction already imported" 错误且 force 为 true，清理后重试
     if (isTransactionAlreadyImported && options.force) {
       // 从 abiDir 中提取网络名称
@@ -330,14 +360,14 @@ export async function forgeDeploy(
 
       for (let retryCount = 1; retryCount <= maxRetries; retryCount++) {
         logger.warn(`检测到交易已存在，正在清理后重试 (${retryCount}/${maxRetries})...`);
-        
+
         // 每次重试前都清理 broadcast 目录
         await cleanBroadcastDir(network);
 
         // 等待一段时间，让 RPC 节点清除交易缓存（每次重试等待时间递增）
         const waitTime = 2000 * retryCount; // 2秒、4秒、6秒
         logger.info(`等待 RPC 节点清除交易缓存 (${waitTime / 1000}秒)...`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
 
         // 重试部署，显示进度条
         const retryProgressBar = createProgressBar();
@@ -352,20 +382,27 @@ export async function forgeDeploy(
           });
 
           const retryOutput = await retryCmd.output();
-          
+
           // 停止重试进度条
           retryProgressBar.stop(retryProgressInterval);
-          
+
           const retryStdoutText = new TextDecoder().decode(retryOutput.stdout);
           const retryStderrText = new TextDecoder().decode(retryOutput.stderr);
 
           if (retryOutput.success) {
             // 重试成功，使用重试的输出
-            return await extractAddressFromOutput(retryStdoutText, retryStderrText, contractName, options, constructorArgs as string[]);
+            return await extractAddressFromOutput(
+              retryStdoutText,
+              retryStderrText,
+              contractName,
+              options,
+              constructorArgs as string[],
+            );
           }
 
           // 检查是否仍然是 "transaction already imported" 错误
-          const isStillTransactionError = retryStderrText.includes("transaction already imported") ||
+          const isStillTransactionError =
+            retryStderrText.includes("transaction already imported") ||
             retryStderrText.includes("error code -32003");
 
           if (!isStillTransactionError) {
@@ -377,7 +414,7 @@ export async function forgeDeploy(
 
           // 如果还是交易已存在的错误，保存错误信息并继续下一次重试
           lastError = retryStderrText;
-          
+
           if (retryCount < maxRetries) {
             logger.warn(`重试 ${retryCount} 失败，继续重试...`);
           }
@@ -429,7 +466,9 @@ export async function forgeDeploy(
             return extractedAddress;
           }
 
-          logger.warn(`   无法获取已存在的合约地址，请检查 build/abi/${network}/${contractName}.json 文件。`);
+          logger.warn(
+            `   无法获取已存在的合约地址，请检查 build/abi/${network}/${contractName}.json 文件。`,
+          );
           // 即使找不到地址，也不抛出错误，返回空字符串让调用者处理
           return "";
         }
@@ -445,7 +484,13 @@ export async function forgeDeploy(
     throw new Error(`Deployment failed: ${stderrText}`);
   }
 
-  return await extractAddressFromOutput(stdoutText, stderrText, contractName, options, constructorArgs as string[]);
+  return await extractAddressFromOutput(
+    stdoutText,
+    stderrText,
+    contractName,
+    options,
+    constructorArgs as string[],
+  );
 }
 
 /**
@@ -521,7 +566,14 @@ async function extractAddressFromOutput(
   const network = (networkIndex >= 0 && networkIndex < parts.length - 1)
     ? parts[networkIndex + 1]
     : (parts[parts.length - 1] || "local");
-  await saveContract(contractName, address, network, constructorArgs, options.abiDir, options.force);
+  await saveContract(
+    contractName,
+    address,
+    network,
+    constructorArgs,
+    options.abiDir,
+    options.force,
+  );
 
   if (txHash) {
     logger.info(`✅ 交易哈希: ${txHash}`);
@@ -611,10 +663,10 @@ export function loadContract(
   abiDir?: string,
 ): ContractInfo {
   const buildDir = abiDir || join(cwd(), "build", "abi", network);
-  
+
   // 首先尝试直接使用提供的合约名称
   let abiPath = join(buildDir, `${contractName}.json`);
-  
+
   // 如果文件不存在，尝试大小写不敏感的查找
   if (!existsSync(abiPath)) {
     try {
@@ -636,7 +688,9 @@ export function loadContract(
 
   if (!existsSync(abiPath)) {
     throw new Error(
-      `${contractName} address not found. Please deploy or configure ${contractName} first. Expected file: ${join(buildDir, `${contractName}.json`)}`,
+      `${contractName} address not found. Please deploy or configure ${contractName} first. Expected file: ${
+        join(buildDir, `${contractName}.json`)
+      }`,
     );
   }
 

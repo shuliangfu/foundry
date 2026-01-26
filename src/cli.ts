@@ -31,9 +31,10 @@ import {
   readdir,
   readStdin,
   readTextFileSync,
+  createCommand,
 } from "@dreamer/runtime-adapter";
 import { init } from "./init.ts";
-import { readCache, writeCache, getInstalledVersion } from "./utils/cache.ts";
+import { readCache, writeCache, getInstalledVersion, setInstalledVersion } from "./utils/cache.ts";
 import {
   executeDenoCommand,
   getApiKey,
@@ -143,6 +144,108 @@ function findFrameworkRoot(): string | null {
 }
 
 /**
+ * 获取最新版本号（从 JSR API）
+ * @param includeBeta 是否包含 beta 版本，默认为 false（只返回正式版）
+ * @returns 最新版本号字符串，如果获取失败则返回 null
+ */
+async function getLatestVersion(includeBeta: boolean = false): Promise<string | null> {
+  try {
+    const packageInfo = parseJsrPackageFromUrl();
+    const packageName = packageInfo?.packageName || "@dreamer/foundry";
+    
+    // 尝试从缓存读取 meta.json
+    const cacheKey = `meta_${packageName.replace(/[^a-zA-Z0-9]/g, "_")}`;
+    let metaData: any = readCache(cacheKey, "latest");
+
+    if (!metaData) {
+      // 缓存未命中，从网络获取
+      const metaUrl = `https://jsr.io/${packageName}/meta.json`;
+      const metaResponse = await fetch(metaUrl);
+      if (!metaResponse.ok) {
+        throw new Error(`无法获取 meta.json: ${metaResponse.statusText}`);
+      }
+      metaData = await metaResponse.json();
+      // 写入缓存（使用 "latest" 作为版本标识）
+      await writeCache(cacheKey, "latest", metaData);
+    }
+
+    // 获取所有版本
+    const allVersions = metaData.versions || [];
+    if (allVersions.length === 0) {
+      throw new Error("无法从 meta.json 获取版本列表");
+    }
+
+    if (includeBeta) {
+      // 如果包含 beta，返回最新版本（包括 beta）
+      return metaData.latest || allVersions[0];
+    } else {
+      // 如果不包含 beta，只返回正式版（不包含 beta、alpha 等后缀的版本）
+      const stableVersions = allVersions.filter((v: string) => {
+        const version = v.toLowerCase();
+        return !version.includes("beta") && 
+               !version.includes("alpha") && 
+               !version.includes("rc") &&
+               !version.includes("dev");
+      });
+      
+      if (stableVersions.length > 0) {
+        return stableVersions[0]; // 返回最新的正式版
+      }
+      
+      // 如果没有正式版，返回最新版本（即使包含 beta）
+      return metaData.latest || allVersions[0];
+    }
+  } catch (error) {
+    logger.error(`获取最新版本失败: ${error}`);
+    return null;
+  }
+}
+
+/**
+ * 比较两个版本号
+ * @param version1 版本号1
+ * @param version2 版本号2
+ * @returns 如果 version1 > version2 返回 1，version1 < version2 返回 -1，相等返回 0
+ */
+function compareVersions(version1: string, version2: string): number {
+  // 移除可能的 'v' 前缀
+  const v1 = version1.replace(/^v/, "");
+  const v2 = version2.replace(/^v/, "");
+
+  // 分割版本号（支持 beta、alpha 等后缀）
+  const parts1 = v1.split(/[.-]/);
+  const parts2 = v2.split(/[.-]/);
+
+  const maxLength = Math.max(parts1.length, parts2.length);
+
+  for (let i = 0; i < maxLength; i++) {
+    const part1 = parts1[i] || "0";
+    const part2 = parts2[i] || "0";
+
+    // 尝试解析为数字
+    const num1 = parseInt(part1, 10);
+    const num2 = parseInt(part2, 10);
+
+    // 如果都是数字，直接比较
+    if (!isNaN(num1) && !isNaN(num2)) {
+      if (num1 > num2) return 1;
+      if (num1 < num2) return -1;
+      continue;
+    }
+
+    // 如果一个是数字，一个是字符串，数字更大
+    if (!isNaN(num1) && isNaN(num2)) return 1;
+    if (isNaN(num1) && !isNaN(num2)) return -1;
+
+    // 都是字符串，按字典序比较
+    if (part1 > part2) return 1;
+    if (part1 < part2) return -1;
+  }
+
+  return 0;
+}
+
+/**
  * 从 JSR 服务器获取版本号
  * 优先从全局安装缓存读取（这是标准来源），其次从 import.meta.url 解析，最后从 JSR API 获取
  * @returns 版本号字符串，如果读取失败则返回 undefined
@@ -153,7 +256,7 @@ async function getVersion(): Promise<string | undefined> {
     const packageInfo = parseJsrPackageFromUrl();
     const packageName = packageInfo?.packageName || "@dreamer/foundry";
     const installedVersion = getInstalledVersion(packageName);
-    
+
     if (installedVersion) {
       return installedVersion;
     }
@@ -627,16 +730,16 @@ cli
           try {
             // 导入 findContractFileName 函数（从 verify.ts 导出）
             const { findContractFileName } = await import("./verify.ts");
-            
+
             // 查找实际的合约文件名（大小写不敏感）
             const actualFileName = findContractFileName(contractName, finalNetwork);
             const actualContractName = actualFileName ? actualFileName.replace(/\.json$/, "") : contractName;
-            
+
             // 如果实际文件名与输入不同，提示用户
             if (actualFileName && actualFileName !== `${contractName}.json`) {
               logger.info(`ℹ️  合约名称已自动匹配为: ${actualContractName}`);
             }
-            
+
             // 读取已部署的合约信息（使用实际的合约名称）
             const contractInfo = loadContract(actualContractName, finalNetwork);
 
@@ -816,6 +919,122 @@ cli
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error("❌ 验证失败:", errorMessage);
+      Deno.exit(1);
+    }
+  });
+
+// 升级命令
+cli
+  .command("upgrade", "升级 Foundry CLI 到最新版本")
+  .option({
+    name: "beta",
+    description: "升级到最新的 beta 版本（默认只升级到正式版）",
+    type: "boolean",
+  })
+  .action(async (_args, options) => {
+    const includeBeta = options.beta === true;
+    
+    logger.info("===========================================");
+    logger.info("🔄 检查 Foundry CLI 更新");
+    logger.info("===========================================");
+    logger.info("");
+
+    try {
+      // 获取当前版本
+      const currentVersion = await getVersion();
+      if (!currentVersion) {
+        logger.error("❌ 无法获取当前版本号");
+        Deno.exit(1);
+      }
+
+      logger.info(`当前版本: ${currentVersion}`);
+
+      // 获取最新版本
+      logger.info(`正在检查最新${includeBeta ? "（包括 beta）" : "正式"}版本...`);
+      const latestVersion = await getLatestVersion(includeBeta);
+      if (!latestVersion) {
+        logger.error("❌ 无法获取最新版本号");
+        Deno.exit(1);
+      }
+
+      logger.info(`最新${includeBeta ? "（包括 beta）" : "正式"}版本: ${latestVersion}`);
+
+      // 比较版本
+      const comparison = compareVersions(latestVersion, currentVersion);
+      if (comparison <= 0) {
+        logger.info("");
+        logger.info(`✅ 您已经安装了最新${includeBeta ? "（包括 beta）" : "正式"}版本！`);
+        logger.info("");
+        return;
+      }
+
+      // 有新版本，询问是否升级
+      logger.info("");
+      logger.info(`发现新版本: ${latestVersion}`);
+      logger.info(`当前版本: ${currentVersion}`);
+      logger.info("");
+
+      const shouldUpgrade = await confirm("是否升级到最新版本？");
+      if (!shouldUpgrade) {
+        logger.info("已取消升级");
+        return;
+      }
+
+      logger.info("");
+      logger.info("开始升级...");
+
+      // 获取包信息
+      const packageInfo = parseJsrPackageFromUrl();
+      const packageName = packageInfo?.packageName || "@dreamer/foundry";
+
+      // 构建升级命令（使用最新版本）
+      const cliUrl = `jsr:${packageName}@${latestVersion}/cli`;
+      const args = [
+        "install",
+        "-A",
+        "--global",
+        "--force",
+        "--name",
+        "foundry",
+        cliUrl,
+      ];
+
+      const cmd = createCommand("deno", {
+        args: args,
+        stdout: "piped",
+        stderr: "piped",
+      });
+
+      logger.info("正在安装新版本...");
+      const output = await cmd.output();
+      const stdoutText = new TextDecoder().decode(output.stdout);
+      const stderrText = new TextDecoder().decode(output.stderr);
+
+      if (output.success) {
+        // 安装成功后，更新版本缓存
+        try {
+          await setInstalledVersion(latestVersion, packageName);
+        } catch {
+          logger.warn("⚠️  无法更新版本缓存，但不影响升级");
+        }
+
+        logger.info("");
+        logger.info("✅ Foundry CLI 升级成功！");
+        logger.info(`   从 ${currentVersion} 升级到 ${latestVersion}`);
+        logger.info("");
+
+        if (stdoutText) {
+          logger.info(stdoutText);
+        }
+      } else {
+        logger.error("❌ 升级失败");
+        if (stderrText) {
+          logger.error(stderrText);
+        }
+        Deno.exit(1);
+      }
+    } catch (error) {
+      logger.error("❌ 升级过程中发生错误:", error);
       Deno.exit(1);
     }
   });
