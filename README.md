@@ -16,21 +16,7 @@
 
 ## 📦 安装
 
-### 方式一：作为库使用（推荐用于项目）
-
-#### Deno
-
-```bash
-deno add jsr:@dreamer/foundry
-```
-
-#### Bun
-
-```bash
-bunx jsr add @dreamer/foundry
-```
-
-### 方式二：全局安装 CLI（推荐用于命令行工具）
+### 全局安装 CLI
 
 安装后可以在任何地方使用 `foundry` 命令：
 
@@ -46,7 +32,7 @@ foundry verify --network testnet --contract MyToken
 
 **卸载全局 CLI**：
 ```bash
-deno run -A setup.ts --uninstall
+deno run -A jsr:@dreamer/foundry/setup --uninstall
 ```
 
 ---

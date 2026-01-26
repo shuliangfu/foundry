@@ -578,6 +578,13 @@ export async function deploy(deployer: Deployer) {
   const myToken = await deployer.deploy("MyToken", args);
 
   logger.info(\`✅ MyToken deployed at: \${myToken.address}\`);
+
+  // 如果需要与已部署的合约交互，可以使用 deployer.web3
+  // 注意：deployer.web3 是异步方法，需要使用 await
+  // const web3 = await deployer.web3("MyToken");
+  // const name = await web3.read("name");
+  // logger.info(\`合约名称: \${name}\`);
+
   logger.info("\\n✅ Deployment completed!");
 }
 `;
@@ -594,18 +601,15 @@ const EXAMPLE_TEST_SCRIPT = `/**
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
-import { Web3, preloadWeb3Config, logger } from "@dreamer/foundry";
+import { Web3, logger } from "@dreamer/foundry";
 
 describe("MyToken 合约测试", () => {
-  let web3: Web3;
+  let web3: Awaited<ReturnType<typeof Web3>>;
   let deployerAddress: string;
 
   beforeAll(async () => {
-    // 预加载 Web3 配置（从 config/web3.ts 加载）
-    await preloadWeb3Config();
-
-    // 创建 Web3 实例
-    web3 = new Web3("MyToken");
+    // 创建 Web3 实例（会自动加载配置并合并参数）
+    web3 = await Web3("MyToken");
 
     // 获取部署者地址（账户0，Anvil 默认账户）
     deployerAddress = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
@@ -964,11 +968,17 @@ deno run -A jsr:@dreamer/foundry/cli verify --network local --contract MyToken -
 \`\`\`typescript
 import { Web3 } from "@dreamer/foundry";
 
-// 直接使用 Web3 类，配置会自动从 config/web3.ts 加载
-const web3 = new Web3("MyContract");
+// 使用 Web3 工厂函数，配置会自动从 config/web3.ts 加载并合并参数
+const web3 = await Web3("MyContract");
+
+// 也可以传入 options 来覆盖配置文件中的参数
+const web3WithOptions = await Web3("MyContract", {
+  rpcUrl: "http://custom-rpc:8545", // 覆盖配置文件中的 rpcUrl
+  // 其他参数使用配置文件中的值
+});
 \`\`\`
 
-注意：\`config/web3.ts\` 会在模块加载时自动调用 \`preloadWeb3Config()\`，所以你不需要手动调用它。
+注意：\`Web3\` 是一个异步工厂函数，会自动加载 \`config/web3.ts\` 中的配置。如果提供了 \`options\` 参数，会与配置文件中的参数合并，\`options\` 中的值优先。
 
 ## 全局命令说明
 

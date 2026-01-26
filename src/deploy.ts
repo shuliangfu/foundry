@@ -23,7 +23,7 @@ import { join } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
 import { forgeDeploy, loadContract } from "./utils/deploy-utils.ts";
 import type { NetworkConfig, DeployOptions } from "./utils/deploy-utils.ts";
-import { Web3 } from "./utils/web3.ts";
+import { createWeb3 } from "./utils/web3.ts";
 
 /**
  * 部署器接口
@@ -37,7 +37,7 @@ export interface Deployer {
     constructorArgs?: string[] | Record<string, any>,
     options?: DeployOptions,
   ) => Promise<any>;
-  web3: (contractName: string) => any;
+  web3: (contractName?: string) => any;
   loadContract: (contractName: string, network: string, force: boolean) => any;
 }
 
@@ -112,15 +112,21 @@ export function createDeployer(
       // 返回简化的合约实例
       return { address };
     },
-    web3: (contractName: string) => {
-      // 设置环境变量，让 Web3 类能正确加载对应网络的合约
+    web3: (contractName?: string) => {
+      // 设置环境变量，让 Web3 能正确加载对应网络的合约
       setEnv("WEB3_ENV", network);
-      
-      // 尝试不传 options，使用配置文件
-      // 如果配置已加载（通过 preloadWeb3Config），这会成功
-      // 如果配置未加载，构造函数会抛出错误，提示先调用 preloadWeb3Config
-      // 在这种情况下，用户需要在使用 deploy 前先调用 preloadWeb3Config()
-      return new Web3(contractName);
+
+      // 使用 createWeb3 同步创建 Web3 实例
+      // 配置会自动从 config/web3.json 加载并合并 config 中的参数
+      // contractName 是可选的，如果提供则会绑定到指定的合约
+      const web3Options: any = {};
+      if (config.rpcUrl) web3Options.rpcUrl = config.rpcUrl;
+      if (config.chainId) web3Options.chainId = config.chainId;
+      if (config.privateKey) web3Options.privateKey = config.privateKey;
+      if (config.address) web3Options.address = config.address;
+
+      // 同步调用工厂函数，会自动合并配置文件和 options
+      return createWeb3(contractName, web3Options);
     },
     loadContract: (contractName: string, network: string, _force: boolean) => {
       return loadContract(contractName, network);
