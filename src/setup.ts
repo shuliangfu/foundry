@@ -29,37 +29,39 @@ import { logger } from "./utils/logger.ts";
  */
 function parseJsrPackageFromUrl(): { packageName: string; version: string } | null {
   try {
-    // import.meta.url 格式: https://jsr.io/@dreamer/foundry@1.1.0-beta.6/setup.ts
+    // import.meta.url 格式可能是:
+    // - https://jsr.io/@dreamer/foundry@1.1.0-beta.8/setup.ts
+    // - https://jsr.io/@dreamer/foundry@1.1.0-beta.8/setup
     const urlString = import.meta.url;
+    logger.info(`🔍 解析 import.meta.url: ${urlString}`);
+    
     const url = new URL(urlString);
 
     // 检查是否是 JSR URL
     if (url.hostname !== "jsr.io") {
+      logger.info(`⚠️  不是 JSR URL，hostname: ${url.hostname}`);
       return null;
     }
 
-    // 路径格式: /@dreamer/foundry@1.1.0-beta.6/setup.ts
-    // 或者: /@dreamer/foundry@1.1.0-beta.7/setup
-    // 正则表达式需要匹配版本号（可能包含 beta、alpha 等后缀）
-    const pathMatch = url.pathname.match(/^\/@([^/@]+)\/([^/@]+)@([^/]+)\//);
-    if (!pathMatch) {
-      // 尝试另一种格式，可能没有尾部的斜杠
-      const pathMatch2 = url.pathname.match(/^\/@([^/@]+)\/([^/@]+)@([^/]+)$/);
-      if (pathMatch2) {
-        const [, scope, name, version] = pathMatch2;
-        const packageName = `@${scope}/${name}`;
-        return { packageName, version };
-      }
-      return null;
+    logger.info(`✅ 是 JSR URL，pathname: ${url.pathname}`);
+
+    // 路径格式: /@dreamer/foundry@1.1.0-beta.8/setup.ts
+    // 正则表达式需要匹配版本号（可能包含 beta、alpha、数字、点、连字符等）
+    // 版本号格式: 1.1.0-beta.8, 1.0.9, 1.1.0-beta.6 等
+    // 使用非贪婪匹配，匹配到第一个 / 或字符串结束
+    const pathMatch = url.pathname.match(/^\/@([^/@]+)\/([^/@]+)@([^/]+)(?:\/|$)/);
+    if (pathMatch) {
+      const [, scope, name, version] = pathMatch;
+      const packageName = `@${scope}/${name}`;
+      logger.info(`✅ 解析成功: ${packageName}@${version}`);
+      return { packageName, version };
     }
 
-    const [, scope, name, version] = pathMatch;
-    const packageName = `@${scope}/${name}`;
-
-    return { packageName, version };
+    logger.warn(`⚠️  无法匹配路径格式: ${url.pathname}`);
+    return null;
   } catch (error) {
     // 如果是本地运行，返回 null，后续会读取本地项目的配置
-    logger.debug(`解析 JSR URL 失败: ${error}`);
+    logger.warn(`解析 JSR URL 失败: ${error}`);
     return null;
   }
 }
