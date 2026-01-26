@@ -1,3 +1,4 @@
+#!/usr/bin/env -S deno run -A
 /**
  * @title Foundry Deploy
  * @description Main deployment script that scans and executes deployment scripts
@@ -18,11 +19,22 @@
  * ```
  */
 
+import {
+  cwd,
+  dirname,
+  existsSync,
+  join,
+  platform,
+  readdir,
+  setEnv,
+  getEnv,
+} from "@dreamer/runtime-adapter";
 import type { DeployOptions, NetworkConfig } from "./utils/deploy-utils.ts";
 import { forgeDeploy, loadContract } from "./utils/deploy-utils.ts";
-import { cwd, dirname, existsSync, join, platform, readdir, setEnv } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
 import { createWeb3 } from "./utils/web3.ts";
+import { loadEnv } from "./utils/env.ts";
+import { loadWeb3ConfigSync } from "./utils/web3.ts";
 
 /**
  * 部署器接口
@@ -202,6 +214,56 @@ function findContractScript(contractName: string, scripts: string[]): string | n
 }
 
 /**
+ * 加载网络配置
+ */
+async function loadNetworkConfig(): Promise<NetworkConfig> {
+  // 尝试从环境变量加载
+  const rpcUrl = getEnv("RPC_URL");
+  const privateKey = getEnv("PRIVATE_KEY");
+  const address = getEnv("ADDRESS");
+  const chainId = getEnv("CHAIN_ID") ? parseInt(getEnv("CHAIN_ID")!, 10) : undefined;
+
+  if (rpcUrl && privateKey && address) {
+    return {
+      rpcUrl,
+      privateKey,
+      address,
+      chainId,
+    };
+  }
+
+  // 尝试从 config/web3.json 加载
+  try {
+    const web3Config = loadWeb3ConfigSync();
+    if (web3Config && web3Config.accounts && web3Config.accounts.length > 0) {
+      const account = web3Config.accounts[0];
+      return {
+        rpcUrl: web3Config.host,
+        privateKey: account.privateKey,
+        address: account.address,
+        chainId: web3Config.chainId,
+      };
+    }
+  } catch (error) {
+    logger.warn("无法从 config/web3.json 加载配置:", error);
+  }
+
+  // 如果都加载失败，尝试从 .env 文件加载
+  try {
+    const env = await loadEnv();
+    return {
+      rpcUrl: env.RPC_URL || "",
+      privateKey: env.PRIVATE_KEY || "",
+      address: env.ADDRESS || "",
+      chainId: env.CHAIN_ID ? parseInt(env.CHAIN_ID, 10) : undefined,
+    };
+  } catch {
+    logger.error("无法加载网络配置，请设置环境变量或创建 config/web3.json 配置文件");
+    throw new Error("网络配置加载失败");
+  }
+}
+
+/**
  * 执行部署
  */
 export async function deploy(options: DeployScriptOptions): Promise<void> {
@@ -282,4 +344,111 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
 
   logger.info("");
   logger.info("✅ All Deployment Scripts Completed!");
+}
+
+/**
+ * 解析命令行参数
+ */
+function parseArgs(): {
+  network?: string;
+  contracts?: string[];
+  force?: boolean;
+} {
+  const args = Deno.args;
+  let network: string | undefined;
+  const contracts: string[] = [];
+  let force = false;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+
+    if (arg === "--force" || arg === "-f") {
+      force = true;
+    } else if (arg === "--contract" || arg === "-c") {
+      // 收集所有后续的非选项参数作为合约名称
+      while (i + 1 < args.length && !args[i + 1].startsWith("-")) {
+        i++;
+        contracts.push(args[i].toLowerCase());
+      }
+      if (contracts.length === 0) {
+        logger.error("❌ Error: --contract (-c) requires at least one contract name");
+        Deno.exit(1);
+      }
+    } else if (arg === "--network" || arg === "-n") {
+      if (i + 1 < args.length) {
+        network = args[i + 1];
+        i++;
+      } else {
+        logger.error("❌ Error: --network (-n) requires a network name");
+        Deno.exit(1);
+      }
+    } else if (!arg.startsWith("-")) {
+      // 位置参数作为网络名称（向后兼容）
+      if (!network) {
+        network = arg;
+      }
+    }
+  }
+
+  return { network, contracts: contracts.length > 0 ? contracts : undefined, force };
+}
+
+/**
+ * 主函数（当作为脚本直接运行时）
+ */
+async function main() {
+  // 解析命令行参数
+  const { network: networkArg, contracts, force } = parseArgs();
+
+  // 确定网络：优先使用命令行参数，其次使用环境变量，最后使用默认值 local
+  let network: string;
+  if (networkArg) {
+    network = networkArg;
+  } else {
+    try {
+      const env = await loadEnv();
+      network = env.WEB3_ENV || getEnv("WEB3_ENV") || "local";
+    } catch {
+      network = getEnv("WEB3_ENV") || "local";
+    }
+  }
+
+  logger.info("🚀 开始部署");
+  logger.info("网络:", network);
+  logger.info("");
+
+  // 加载网络配置
+  let config: NetworkConfig;
+  try {
+    config = await loadNetworkConfig();
+    logger.info("RPC URL:", config.rpcUrl);
+    logger.info("部署地址:", config.address);
+    if (config.chainId) {
+      logger.info("链 ID:", config.chainId);
+    }
+    logger.info("");
+  } catch (error) {
+    logger.error("加载网络配置失败:", error);
+    Deno.exit(1);
+  }
+
+  // 执行部署
+  try {
+    await deploy({
+      scriptDir: join(cwd(), "script"),
+      network,
+      config,
+      force,
+      contracts,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error("❌ 部署失败:", errorMessage);
+    Deno.exit(1);
+  }
+}
+
+// 当作为脚本直接运行时执行主函数
+if (import.meta.main) {
+  await main();
 }

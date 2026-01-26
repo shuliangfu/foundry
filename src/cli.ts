@@ -23,12 +23,41 @@
 import { Command } from "@dreamer/console";
 import { existsSync, readdir, cwd, getEnv, join, readTextFileSync, readStdin, dirname, platform } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
-import { deploy } from "./deploy.ts";
 import { verify } from "./verify.ts";
 import { init } from "./init.ts";
 import { loadEnv } from "./utils/env.ts";
 import type { NetworkConfig } from "./utils/deploy-utils.ts";
 import { loadWeb3ConfigSync } from "./utils/web3.ts";
+
+/**
+ * 查找项目根目录（包含 deno.json 或 package.json 的目录）
+ * @param startDir - 起始目录，默认为当前工作目录
+ * @returns 项目根目录，如果未找到则返回 null
+ */
+function findProjectRoot(startDir: string): string | null {
+  let currentDir = startDir;
+  const plat = platform();
+  const root = plat === "windows" ? /^[A-Z]:\\$/ : /^\/$/;
+
+  while (true) {
+    // 同时检查 deno.json（Deno）和 package.json（Bun）
+    const denoJsonPath = join(currentDir, "deno.json");
+    const packageJsonPath = join(currentDir, "package.json");
+
+    if (existsSync(denoJsonPath) || existsSync(packageJsonPath)) {
+      return currentDir;
+    }
+
+    // 检查是否到达根目录
+    const parentDir = dirname(currentDir);
+    if (parentDir === currentDir || currentDir.match(root)) {
+      break;
+    }
+    currentDir = parentDir;
+  }
+
+  return null;
+}
 
 /**
  * 提示用户确认
@@ -455,15 +484,89 @@ cli
 
     logger.info("");
     logger.info("------------------------------------------");
-    // 执行部署
+    
+    // 查找项目根目录（包含 deno.json 的目录）
+    const projectRoot = findProjectRoot(cwd());
+    if (!projectRoot) {
+      logger.error("❌ 未找到项目根目录（包含 deno.json 的目录）");
+      Deno.exit(1);
+    }
+
+    // 获取项目的 deno.json 路径
+    const denoJsonPath = join(projectRoot, "deno.json");
+    if (!existsSync(denoJsonPath)) {
+      logger.error(`❌ 未找到项目的 deno.json 文件: ${denoJsonPath}`);
+      Deno.exit(1);
+    }
+
+    // 获取 deploy.ts 脚本的路径
+    // 如果是从 JSR 包运行的，使用 JSR URL；否则使用文件路径
+    let deployScriptPath: string;
+    const currentFileUrl = import.meta.url;
+    
+    if (currentFileUrl.startsWith("https://jsr.io/") || currentFileUrl.startsWith("jsr:")) {
+      // 从 JSR URL 解析包名和版本
+      const jsrMatch = currentFileUrl.match(/jsr:([^@]+)@([^/]+)\//) || 
+                       currentFileUrl.match(/https:\/\/jsr\.io\/([^@]+)@([^/]+)\//);
+      if (jsrMatch) {
+        const [, packageName, version] = jsrMatch;
+        deployScriptPath = `jsr:${packageName}@${version}/deploy`;
+      } else {
+        // 如果无法解析，尝试使用相对路径
+        const currentDir = dirname(currentFileUrl.replace(/^file:\/\//, ""));
+        deployScriptPath = join(currentDir, "deploy.ts");
+      }
+    } else {
+      // 本地运行，使用文件路径
+      const currentDir = dirname(currentFileUrl.replace(/^file:\/\//, ""));
+      deployScriptPath = join(currentDir, "deploy.ts");
+    }
+
+    // 构建命令行参数
+    const deployArgs: string[] = [
+      "run",
+      "-A",
+      "--config",
+      denoJsonPath,
+      deployScriptPath,
+      "--network",
+      finalNetwork,
+    ];
+
+    if (force) {
+      deployArgs.push("--force");
+    }
+
+    if (contracts && contracts.length > 0) {
+      deployArgs.push("--contract");
+      deployArgs.push(...contracts);
+    }
+
+    // 执行部署脚本
     try {
-      await deploy({
-        scriptDir,
-        network: finalNetwork,
-        config,
-        force,
-        contracts: contracts,
+      const cmd = new Deno.Command("deno", {
+        args: deployArgs,
+        stdout: "piped",
+        stderr: "piped",
+        cwd: projectRoot,
       });
+
+      const output = await cmd.output();
+      const stdoutText = new TextDecoder().decode(output.stdout);
+      const stderrText = new TextDecoder().decode(output.stderr);
+
+      // 输出脚本的标准输出
+      if (stdoutText) {
+        console.log(stdoutText);
+      }
+
+      if (!output.success) {
+        // 输出错误信息
+        if (stderrText) {
+          logger.error(stderrText);
+        }
+        Deno.exit(1);
+      }
 
       logger.info("");
       logger.info("✅ 所有部署脚本执行完成！");
