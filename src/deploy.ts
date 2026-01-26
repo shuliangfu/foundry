@@ -450,5 +450,8 @@ async function main() {
 
 // 当作为脚本直接运行时执行主函数
 if (import.meta.main) {
-  await main();
+  main().catch((error) => {
+    logger.error("❌ 执行失败:", error);
+    Deno.exit(1);
+  });
 }
