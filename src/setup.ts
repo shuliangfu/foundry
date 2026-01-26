@@ -20,7 +20,21 @@
  * ```
  */
 
-import { exit, createCommand, existsSync, remove, args, makeTempFile, getEnv, join, writeTextFile, readTextFileSync, cwd, dirname, platform } from "@dreamer/runtime-adapter";
+import {
+  args,
+  createCommand,
+  cwd,
+  dirname,
+  existsSync,
+  exit,
+  getEnv,
+  join,
+  makeTempFile,
+  platform,
+  readTextFileSync,
+  remove,
+  writeTextFile,
+} from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
 
 /**
@@ -34,7 +48,7 @@ function parseJsrPackageFromUrl(): { packageName: string; version: string } | nu
     // - https://jsr.io/@dreamer/foundry@1.1.0-beta.8/setup.ts (旧格式，可能不存在)
     const urlString = import.meta.url;
     logger.info(`🔍 解析 import.meta.url: ${urlString}`);
-    
+
     const url = new URL(urlString);
 
     // 检查是否是 JSR URL
@@ -57,7 +71,7 @@ function parseJsrPackageFromUrl(): { packageName: string; version: string } | nu
       logger.info(`✅ 解析成功（新格式）: ${packageName}@${version}`);
       return { packageName, version };
     }
-    
+
     // 尝试匹配没有后续路径的情况（版本号在末尾）
     pathMatch = url.pathname.match(/^\/@([^/@]+)\/([^/@]+)\/([^/]+)$/);
     if (pathMatch) {
@@ -211,9 +225,9 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
   try {
     // 如果从 URL 解析到了版本，直接使用该版本；否则获取最新版本
     let version: string;
-    
+
     logger.info(`🔍 调试信息: parsedVersion=${parsedVersion}, isLocal=${isLocal}`);
-    
+
     if (parsedVersion && !isLocal) {
       // 从 JSR URL 解析到了版本，直接使用
       version = parsedVersion;
@@ -239,13 +253,42 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
       logger.info(`📦 使用最新版本: ${version}`);
     }
 
-    // 使用指定版本获取 deno.json
-    const denoJsonUrl = `https://jsr.io/${packageName}@${version}/deno.json`;
+    // 直接获取 deno.json 文件内容
+    // JSR API URL 格式: https://jsr.io/@dreamer/foundry/1.1.0-beta.10/deno.json
+    // 注意：版本号前是 / 而不是 @（已验证）
+    // 重要：必须设置 Accept header，不能包含 text/html，否则会返回 HTML 页面
+    const denoJsonUrl = `https://jsr.io/${packageName}/${version}/deno.json`;
     logger.info(`📦 从 JSR 获取 deno.json: ${denoJsonUrl}`);
 
-    const response = await fetch(denoJsonUrl);
+    const response = await fetch(denoJsonUrl, {
+      headers: {
+        "Accept": "application/json, */*",
+      },
+    });
     if (!response.ok) {
       throw new Error(`无法获取 deno.json: ${response.statusText} (${response.status})`);
+    }
+
+    // 检查 Content-Type，确保返回的是 JSON
+    const contentType = response.headers.get("content-type");
+    if (contentType && !contentType.includes("application/json")) {
+      // 如果返回的不是 JSON，可能是 HTML，尝试解析 HTML 中的 JSON
+      const text = await response.text();
+      // 尝试从 HTML 中提取 JSON（通常在 <pre> 标签中）
+      const jsonMatch = text.match(/<pre[^>]*>([\s\S]*?)<\/pre>/);
+      if (jsonMatch) {
+        try {
+          const denoJson = JSON.parse(jsonMatch[1]);
+          logger.info(`✅ 成功从 HTML 中提取 deno.json，版本: ${denoJson.version || version}`);
+          return {
+            version: denoJson.version || version,
+            imports: denoJson.imports || {},
+          };
+        } catch {
+          throw new Error("无法解析 HTML 中的 JSON 内容");
+        }
+      }
+      throw new Error(`返回的内容不是 JSON，Content-Type: ${contentType}`);
     }
 
     const denoJson = await response.json();
