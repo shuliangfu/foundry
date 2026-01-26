@@ -22,6 +22,7 @@ import {
   writeTextFile,
 } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
+import { parseJsrVersionFromUrl } from "./utils/jsr.ts";
 
 /**
  * Foundry 配置文件内容
@@ -283,19 +284,91 @@ site/
 `;
 
 /**
- * 获取当前项目的版本号
+ * 查找框架根目录（包含框架的 deno.json 的目录）
+ * @returns 框架根目录路径，如果未找到则返回 null
+ */
+function findFrameworkRoot(): string | null {
+  // 使用 import.meta.url 获取当前文件的路径
+  // init.ts 在 src/init.ts，所以框架根目录应该是 src 的父目录
+  let currentFileUrl: string;
+  try {
+    // 在 Deno 中，import.meta.url 是 file:// URL
+    currentFileUrl = import.meta.url;
+  } catch {
+    // 如果无法获取 import.meta.url，回退到使用 cwd()
+    return null;
+  }
+
+  // 如果是 JSR URL，无法查找本地文件
+  if (currentFileUrl.startsWith("https://jsr.io/") || currentFileUrl.startsWith("jsr:")) {
+    return null;
+  }
+
+  // 将 URL 转换为文件路径
+  let currentDir: string;
+  if (currentFileUrl.startsWith("file://")) {
+    // Deno/Bun: file:///path/to/file -> /path/to/file
+    currentDir = currentFileUrl.replace(/^file:\/\//, "");
+    // Windows: file:///C:/path -> C:/path
+    if (currentDir.startsWith("/") && /^[A-Z]:/.test(currentDir.substring(1))) {
+      currentDir = currentDir.substring(1);
+    }
+  } else {
+    currentDir = currentFileUrl;
+  }
+
+  // 获取 init.ts 所在的目录（src 目录）
+  const srcDir = dirname(currentDir);
+  // 框架根目录是 src 的父目录
+  const frameworkRoot = dirname(srcDir);
+
+  // 向上查找，找到包含 deno.json 的目录
+  let currentPath = frameworkRoot;
+  while (true) {
+    const denoJsonPath = join(currentPath, "deno.json");
+    if (existsSync(denoJsonPath)) {
+      return currentPath;
+    }
+
+    // 检查是否到达根目录
+    const parentDir = dirname(currentPath);
+    if (parentDir === currentPath) {
+      break;
+    }
+    currentPath = parentDir;
+  }
+
+  return null;
+}
+
+/**
+ * 获取框架的版本号
+ * 优先从 JSR URL 解析，其次从框架的 deno.json 读取
  * @returns 版本号字符串，如果读取失败则返回 "1.0.0"
  */
 function getCurrentVersion(): string {
+  // 首先尝试从 JSR URL 解析版本号
+  const jsrVersion = parseJsrVersionFromUrl();
+  if (jsrVersion) {
+    return jsrVersion;
+  }
+
+  // 如果不是 JSR URL，尝试从本地框架的 deno.json 读取
   try {
-    const denoJsonPath = join(cwd(), "deno.json");
+    const frameworkRoot = findFrameworkRoot();
+    if (!frameworkRoot) {
+      logger.warn("无法找到框架根目录，使用默认版本号");
+      return "1.0.0";
+    }
+
+    const denoJsonPath = join(frameworkRoot, "deno.json");
     if (existsSync(denoJsonPath)) {
       const denoJsonContent = readTextFileSync(denoJsonPath);
       const denoJson = JSON.parse(denoJsonContent);
       return denoJson.version || "1.0.0";
     }
   } catch (error) {
-    logger.warn("无法读取 deno.json 版本号，使用默认版本:", error);
+    logger.warn("无法读取框架 deno.json 版本号，使用默认版本:", error);
   }
   return "1.0.0";
 }

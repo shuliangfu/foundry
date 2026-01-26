@@ -15,6 +15,9 @@ export * from "./deploy-utils.ts";
 // 导出 Web3 工具类
 export * from "./web3.ts";
 
+// 导出 JSR 工具函数
+export * from "./jsr.ts";
+
 // 导出合约工具
 export * from "./contract.ts";
 

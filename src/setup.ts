@@ -34,60 +34,7 @@ import {
   remove,
 } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
-
-/**
- * 从 import.meta.url 解析 JSR 包信息
- * @returns 包名和版本，如果解析失败则返回 null
- */
-function parseJsrPackageFromUrl(): { packageName: string; version: string } | null {
-  try {
-    // import.meta.url 格式可能是:
-    // - https://jsr.io/@dreamer/foundry/1.1.0-beta.9/src/setup.ts (实际格式)
-    // - https://jsr.io/@dreamer/foundry@1.1.0-beta.8/setup.ts (旧格式，可能不存在)
-    const urlString = import.meta.url;
-    const url = new URL(urlString);
-
-    // 检查是否是 JSR URL
-    if (url.hostname !== "jsr.io") {
-      return null;
-    }
-
-    // 实际路径格式: /@dreamer/foundry/1.1.0-beta.9/src/setup.ts
-    // 格式: /@scope/name/version/path/to/file
-    // 先尝试匹配实际格式（版本号前是 /）
-    // 版本号可能包含：数字、点、连字符、beta、alpha 等
-    // 匹配模式: /@scope/name/version/... 其中 version 是第一个路径段（不包含 /）
-    let pathMatch = url.pathname.match(/^\/@([^/@]+)\/([^/@]+)\/([^/]+)\//);
-    if (pathMatch) {
-      const [, scope, name, version] = pathMatch;
-      const packageName = `@${scope}/${name}`;
-      return { packageName, version };
-    }
-
-    // 尝试匹配没有后续路径的情况（版本号在末尾）
-    pathMatch = url.pathname.match(/^\/@([^/@]+)\/([^/@]+)\/([^/]+)$/);
-    if (pathMatch) {
-      const [, scope, name, version] = pathMatch;
-      const packageName = `@${scope}/${name}`;
-      return { packageName, version };
-    }
-
-    // 尝试旧格式（版本号前是 @）
-    pathMatch = url.pathname.match(/^\/@([^/@]+)\/([^/@]+)@([^/]+)(?:\/|$)/);
-    if (pathMatch) {
-      const [, scope, name, version] = pathMatch;
-      const packageName = `@${scope}/${name}`;
-      return { packageName, version };
-    }
-
-    logger.warn(`⚠️  无法匹配路径格式: ${url.pathname}`);
-    return null;
-  } catch (error) {
-    // 如果是本地运行，返回 null，后续会读取本地项目的配置
-    logger.warn(`解析 JSR URL 失败: ${error}`);
-    return null;
-  }
-}
+import { parseJsrPackageFromUrl } from "./utils/jsr.ts";
 
 /**
  * 查找本地项目根目录（包含 deno.json 的目录）
