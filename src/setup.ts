@@ -29,11 +29,9 @@ import {
   exit,
   getEnv,
   join,
-  makeTempFile,
   platform,
   readTextFileSync,
   remove,
-  writeTextFile,
 } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
 
@@ -295,7 +293,7 @@ async function getPaths() {
   const packageName = packageInfo?.packageName || "@dreamer/foundry";
 
   // 从 JSR 远程获取包信息（本地运行时会直接使用本地配置）
-  const { version, imports } = await fetchJsrDenoJson();
+  const { version } = await fetchJsrDenoJson();
 
   // 如果是本地运行，使用本地文件路径；否则使用远程 JSR URL
   let cliUrl: string;
@@ -313,25 +311,10 @@ async function getPaths() {
     cliUrl = `jsr:${packageName}@${version}/cli`;
   }
 
-  // 创建临时 import map，使用远程 JSR URL
-  const importMap = {
-    imports: {
-      ...imports,
-      // 确保主包使用远程 URL
-      [packageName]: `jsr:${packageName}@${version}`,
-    },
-  };
-
-  // 使用 makeTempFile 创建临时文件
-  const tempImportMapPath = await makeTempFile({
-    prefix: "foundry-temp-import-map-",
-    suffix: ".json",
-  });
-
-  // 写入 import map 内容
-  await writeTextFile(tempImportMapPath, JSON.stringify(importMap, null, 2));
-
-  return { cliUrl, importMapPath: tempImportMapPath };
+  // 不再创建临时 import map
+  // 使用 JSR URL 安装时，Deno 会自动解析 JSR 依赖
+  // CLI 脚本中的相对路径导入会在运行时从 JSR 包中解析
+  return { cliUrl };
 }
 
 /**
@@ -343,15 +326,16 @@ async function install(): Promise<void> {
   logger.info("===========================================");
   logger.info("");
 
-  const { cliUrl, importMapPath } = await getPaths();
+  const { cliUrl } = await getPaths();
 
+  // 不使用 --import-map，因为临时文件会在安装后删除
+  // 使用 JSR URL 安装时，Deno 会自动解析 JSR 依赖
+  // CLI 脚本中的相对路径导入（如 ./deploy.ts）会在运行时从 JSR 包中解析
   const args = [
     "install",
     "-A",
     "--global",
     "--force",
-    "--import-map",
-    importMapPath,
     "--name",
     "foundry",
     cliUrl,
@@ -404,15 +388,6 @@ async function install(): Promise<void> {
   } catch (error) {
     logger.error("❌ 安装过程中发生错误:", error);
     exit(1);
-  } finally {
-    // 清理临时 import map 文件
-    try {
-      if (existsSync(importMapPath)) {
-        await remove(importMapPath);
-      }
-    } catch {
-      // 忽略清理错误
-    }
   }
 }
 
