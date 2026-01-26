@@ -979,18 +979,10 @@ cli
         return;
       }
 
-      // 有新版本，询问是否升级
+      // 有新版本，直接升级
       logger.info("");
       logger.info(`发现新版本: ${latestVersion}`);
       logger.info(`当前版本: ${currentVersion}`);
-      logger.info("");
-
-      const shouldUpgrade = await confirm("是否升级到最新版本？");
-      if (!shouldUpgrade) {
-        logger.info("已取消升级");
-        return;
-      }
-
       logger.info("");
       logger.info("开始升级...");
 
