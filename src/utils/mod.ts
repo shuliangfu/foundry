@@ -20,3 +20,6 @@ export * from "./contract.ts";
 
 // 导出时间同步工具
 export * from "./time-sync.ts";
+
+// 导出 logger
+export * from "./logger.ts";
