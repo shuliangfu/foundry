@@ -418,3 +418,58 @@ export function handleCommandResult(
     logger.info(successMessage);
   }
 }
+
+/**
+ * 创建通用的 loading 进度条
+ * @param message 显示的消息文本，例如 "正在检查更新..."
+ * @returns 进度条对象，包含 start 和 stop 方法
+ */
+export function createLoadingProgressBar(message: string) {
+  const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+  let currentFrame = 0;
+  let intervalId: ReturnType<typeof setInterval> | null = null;
+
+  return {
+    /**
+     * 启动进度条
+     * @returns intervalId，用于停止进度条
+     */
+    start(): ReturnType<typeof setInterval> {
+      const update = () => {
+        const frame = frames[currentFrame % frames.length];
+        // 使用 runtime-adapter 的 writeStdoutSync 方法，兼容 Deno 和 Bun
+        try {
+          const text = `\r${frame} ${message}`;
+          writeStdoutSync(new TextEncoder().encode(text));
+        } catch {
+          // 如果写入失败，忽略错误
+        }
+        currentFrame++;
+      };
+
+      // 立即显示第一帧
+      update();
+
+      // 每 100ms 更新一次
+      intervalId = setInterval(update, 100);
+
+      return intervalId;
+    },
+    /**
+     * 停止进度条并清除显示
+     * @param intervalId 由 start() 返回的 intervalId
+     */
+    stop(intervalId: ReturnType<typeof setInterval> | null) {
+      if (intervalId !== null) {
+        clearInterval(intervalId);
+      }
+      // 清除进度条，回到行首并清除整行
+      try {
+        const clearLine = "\r" + " ".repeat(50) + "\r";
+        writeStdoutSync(new TextEncoder().encode(clearLine));
+      } catch {
+        // 如果写入失败，忽略错误
+      }
+    },
+  };
+}

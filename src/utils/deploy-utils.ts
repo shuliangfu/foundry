@@ -25,56 +25,11 @@ import {
   readdirSync,
   readTextFileSync,
   remove,
-  writeStdoutSync,
   writeTextFileSync,
 } from "@dreamer/runtime-adapter";
 import { logger } from "./logger.ts";
+import { createLoadingProgressBar } from "./cli-utils.ts";
 
-/**
- * 创建进度条
- * @returns 进度条对象，包含 start 和 stop 方法
- */
-function createProgressBar() {
-  const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-  let currentFrame = 0;
-  let intervalId: ReturnType<typeof setInterval> | null = null;
-
-  return {
-    start(): ReturnType<typeof setInterval> {
-      const update = () => {
-        const frame = frames[currentFrame % frames.length];
-        // 使用 runtime-adapter 的 writeStdoutSync 方法，兼容 Deno 和 Bun
-        try {
-          const text = `\r${frame} 正在部署中...`;
-          writeStdoutSync(new TextEncoder().encode(text));
-        } catch {
-          // 如果写入失败，忽略错误
-        }
-        currentFrame++;
-      };
-
-      // 立即显示第一帧
-      update();
-
-      // 每 100ms 更新一次
-      intervalId = setInterval(update, 100);
-
-      return intervalId;
-    },
-    stop(intervalId: ReturnType<typeof setInterval> | null) {
-      if (intervalId !== null) {
-        clearInterval(intervalId);
-      }
-      // 清除进度条，回到行首并清除整行
-      try {
-        const clearLine = "\r" + " ".repeat(50) + "\r";
-        writeStdoutSync(new TextEncoder().encode(clearLine));
-      } catch {
-        // 如果写入失败，忽略错误
-      }
-    },
-  };
-}
 
 /**
  * 网络配置接口
@@ -309,7 +264,7 @@ export async function forgeDeploy(
   logger.info(`RPC URL: ${config.rpcUrl}`);
 
   // 显示进度条
-  const progressBar = createProgressBar();
+  const progressBar = createLoadingProgressBar("正在部署中...");
   const progressInterval = progressBar.start();
 
   const cmd = createCommand("forge", {
@@ -370,7 +325,7 @@ export async function forgeDeploy(
         await new Promise((resolve) => setTimeout(resolve, waitTime));
 
         // 重试部署，显示进度条
-        const retryProgressBar = createProgressBar();
+        const retryProgressBar = createLoadingProgressBar("正在部署中...");
         const retryProgressInterval = retryProgressBar.start();
 
         try {

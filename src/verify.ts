@@ -25,58 +25,12 @@ import {
   join,
   readdirSync,
   readTextFileSync,
-  writeStdoutSync,
 } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
 import { loadContract } from "./utils/deploy-utils.ts";
-import { getApiKey, getNetworkName, loadNetworkConfig, executeCommandWithStream } from "./utils/cli-utils.ts";
+import { getApiKey, getNetworkName, loadNetworkConfig, executeCommandWithStream, createLoadingProgressBar } from "./utils/cli-utils.ts";
 import { loadWeb3ConfigSync } from "./utils/web3.ts";
 
-/**
- * 创建验证进度条
- * @returns 进度条对象，包含 start 和 stop 方法
- */
-function createVerifyProgressBar() {
-  const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-  let currentFrame = 0;
-  let intervalId: ReturnType<typeof setInterval> | null = null;
-
-  return {
-    start(): ReturnType<typeof setInterval> {
-      const update = () => {
-        const frame = frames[currentFrame % frames.length];
-        // 使用 runtime-adapter 的 writeStdoutSync 方法，兼容 Deno 和 Bun
-        try {
-          const text = `\r${frame} 正在验证中...`;
-          writeStdoutSync(new TextEncoder().encode(text));
-        } catch {
-          // 如果写入失败，忽略错误
-        }
-        currentFrame++;
-      };
-
-      // 立即显示第一帧
-      update();
-
-      // 每 100ms 更新一次
-      intervalId = setInterval(update, 100);
-
-      return intervalId;
-    },
-    stop(intervalId: ReturnType<typeof setInterval> | null) {
-      if (intervalId !== null) {
-        clearInterval(intervalId);
-      }
-      // 清除进度条，回到行首并清除整行
-      try {
-        const clearLine = "\r" + " ".repeat(50) + "\r";
-        writeStdoutSync(new TextEncoder().encode(clearLine));
-      } catch {
-        // 如果写入失败，忽略错误
-      }
-    },
-  };
-}
 
 /**
  * 网络配置映射
@@ -384,7 +338,7 @@ export async function verify(options: VerifyOptions): Promise<void> {
   args.push("--watch");
 
   // 启动验证进度条
-  const progressBar = createVerifyProgressBar();
+  const progressBar = createLoadingProgressBar("正在验证中...");
   const progressInterval = progressBar.start();
 
   const cmd = createCommand("forge", {

@@ -40,6 +40,7 @@ import {
   getApiKey,
   getNetworkName,
   getProjectConfig,
+  createLoadingProgressBar,
   getScriptPath,
   handleCommandResult,
 } from "./utils/cli-utils.ts";
@@ -161,7 +162,6 @@ async function getLatestVersion(includeBeta: boolean = false, forceRefresh: bool
     if (!metaData) {
       // 缓存未命中或强制刷新，从网络获取
       const metaUrl = `https://jsr.io/${packageName}/meta.json`;
-      logger.info("正在从 JSR 获取最新版本信息...");
       const metaResponse = await fetch(metaUrl);
       if (!metaResponse.ok) {
         throw new Error(`无法获取 meta.json: ${metaResponse.statusText}`);
@@ -953,7 +953,16 @@ cli
       // 检查更新时，总是从网络获取最新版本，不使用缓存
       // 因为需要比较当前版本和最新版本，读取缓存版本号无法正确比较
       logger.info(`正在检查最新${includeBeta ? "（包括 beta）" : "正式"}版本...`);
+      
+      // 创建 loading 进度条
+      const progressBar = createLoadingProgressBar("正在检查更新...");
+      const progressInterval = progressBar.start();
+      
       const latestVersion = await getLatestVersion(includeBeta, true); // 总是强制刷新，从网络获取
+      
+      // 停止进度条
+      progressBar.stop(progressInterval);
+      
       if (!latestVersion) {
         logger.error("❌ 无法获取最新版本号");
         Deno.exit(1);
