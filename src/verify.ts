@@ -18,7 +18,7 @@
  * ```
  */
 
-import { existsSync, readTextFileSync, createCommand } from "@dreamer/runtime-adapter";
+import { existsSync, readTextFileSync, createCommand, join, cwd, readdirSync } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
 import { loadContract } from "./utils/deploy-utils.ts";
 import { getNetworkName, getApiKey, loadNetworkConfig } from "./utils/cli-utils.ts";
@@ -76,14 +76,13 @@ export async function verify(options: VerifyOptions): Promise<void> {
   // 读取 foundry.toml 配置，获取编译器版本和优化次数
   const foundryConfig = readFoundryConfig();
 
-  // 读取合约源码路径
-  const contractPath = `src/${options.contractName}.sol:${options.contractName}`;
-
   // 构建 forge verify-contract 命令
+  // 注意：forge verify-contract 的格式是: verify-contract <地址> <合约名>
+  // 合约名应该是 Solidity 文件中的合约名称，而不是文件路径
   const args = [
     "verify-contract",
     options.address,
-    contractPath,
+    options.contractName, // 使用合约名称，而不是完整路径
     "--chain-id",
     String(options.chainId || 1),
     "--etherscan-api-key",
@@ -96,9 +95,19 @@ export async function verify(options: VerifyOptions): Promise<void> {
     String(foundryConfig.optimizerRuns),
   ];
 
+  // 处理构造函数参数
+  // 如果提供了构造函数参数，使用 cast abi-encode 编码为十六进制字符串
   if (options.constructorArgs && options.constructorArgs.length > 0) {
-    args.push("--constructor-args");
-    args.push(...options.constructorArgs);
+    const encodedArgs = await encodeConstructorArgs(options.contractName, options.network, options.constructorArgs);
+    if (encodedArgs) {
+      args.push("--constructor-args");
+      args.push(encodedArgs);
+      logger.info("ℹ️  使用构造函数参数（已编码）");
+    } else {
+      // 如果编码失败，尝试使用 --guess-constructor-args
+      logger.warn("⚠️  无法编码构造函数参数，尝试使用 --guess-constructor-args");
+      args.push("--guess-constructor-args");
+    }
   }
 
   const cmd = createCommand("forge", {
@@ -122,6 +131,120 @@ export async function verify(options: VerifyOptions): Promise<void> {
     logger.info(stdoutText.trim());
   }
   logger.info(`✅ Contract verified: ${networkConfig.explorerUrl}/${options.address}`);
+}
+
+/**
+ * 查找大小写不敏感的合约文件名
+ * @param contractName 合约名称（可能大小写不匹配）
+ * @param network 网络名称
+ * @returns 实际的文件名（保持原始大小写），如果不存在则返回 null
+ */
+function findContractFileName(contractName: string, network: string): string | null {
+  const abiDir = join(cwd(), "build", "abi", network);
+  
+  if (!existsSync(abiDir)) {
+    return null;
+  }
+  
+  try {
+    const contractNameLower = contractName.toLowerCase();
+    const entries = readdirSync(abiDir);
+    for (const entry of entries) {
+      if (entry.isFile && entry.name.endsWith(".json")) {
+        const fileNameWithoutExt = entry.name.replace(/\.json$/, "");
+        if (fileNameWithoutExt.toLowerCase() === contractNameLower) {
+          return entry.name; // 返回实际的文件名（保持原始大小写）
+        }
+      }
+    }
+  } catch {
+    // 忽略错误
+  }
+  
+  return null;
+}
+
+/**
+ * 从 ABI JSON 文件读取构造参数并编码为 ABI 格式
+ * @param contractName 合约名称
+ * @param network 网络名称
+ * @param constructorArgs 构造函数参数数组（如果提供则使用，否则从 ABI 文件读取）
+ * @returns ABI 编码后的十六进制字符串，如果无法编码则返回 null
+ */
+async function encodeConstructorArgs(
+  contractName: string,
+  network: string,
+  constructorArgs?: string[],
+): Promise<string | null> {
+  // 使用大小写不敏感的文件名查找
+  const actualFileName = findContractFileName(contractName, network);
+  if (!actualFileName) {
+    return null;
+  }
+  
+  const abiPath = join(cwd(), "build", "abi", network, actualFileName);
+
+  try {
+    const abiData = JSON.parse(readTextFileSync(abiPath));
+    
+    // 优先使用提供的构造函数参数，否则从 ABI 文件读取
+    let argsArray: any[] | null = null;
+    if (constructorArgs && constructorArgs.length > 0) {
+      argsArray = constructorArgs;
+    } else if (abiData.args && Array.isArray(abiData.args)) {
+      argsArray = abiData.args;
+    }
+    
+    if (!argsArray || argsArray.length === 0) {
+      return null;
+    }
+
+    // 从 ABI 中获取构造函数定义
+    const abi = abiData.abi || [];
+    const constructor = abi.find((item: any) => item.type === "constructor");
+    
+    if (!constructor || !constructor.inputs) {
+      return null;
+    }
+
+    // 构建构造函数签名用于 cast abi-encode
+    // cast abi-encode 需要 "constructor(type1,type2,...)" 格式
+    const inputTypes = constructor.inputs.map((input: any) => input.type);
+    const signature = `constructor(${inputTypes.join(",")})`;
+
+    // 使用 cast abi-encode 编码参数
+    const castArgs = [
+      "abi-encode",
+      signature,
+      ...argsArray.map((arg: any) => {
+        // 处理数组类型参数（如 address[], uint256[]）
+        if (Array.isArray(arg)) {
+          return `[${arg.join(",")}]`;
+        }
+        return String(arg);
+      }),
+    ];
+
+    const cmd = createCommand("cast", {
+      args: castArgs,
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const output = await cmd.output();
+    
+    if (!output.success) {
+      const error = new TextDecoder().decode(output.stderr);
+      logger.warn(`⚠️  编码构造函数参数失败: ${error}`);
+      return null;
+    }
+
+    const encoded = new TextDecoder().decode(output.stdout).trim();
+    return encoded || null;
+  } catch (error) {
+    logger.warn(`⚠️  编码构造函数参数时出错: ${error}`);
+    return null;
+  }
 }
 
 /**
@@ -327,11 +450,21 @@ async function main() {
     Deno.exit(1);
   }
 
-  // 执行验证
+  // 查找实际的文件名（大小写不敏感）
+  // 这样可以确保使用正确的合约名称（保持原始大小写）
+  const actualFileName = findContractFileName(contractName, network);
+  const actualContractName = actualFileName ? actualFileName.replace(/\.json$/, "") : contractName;
+  
+  // 如果实际文件名与输入不同，提示用户
+  if (actualFileName && actualFileName !== `${contractName}.json`) {
+    logger.info(`ℹ️  合约名称已自动匹配为: ${actualContractName}`);
+  }
+
+  // 执行验证（使用实际的合约名称，因为 forge verify-contract 需要匹配 Solidity 文件中的合约名称）
   try {
     await verify({
       address: contractAddress!,
-      contractName,
+      contractName: actualContractName, // 使用实际的文件名（保持原始大小写）
       network,
       apiKey: finalApiKey!,
       rpcUrl: finalRpcUrl!,
