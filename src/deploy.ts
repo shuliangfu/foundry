@@ -18,7 +18,7 @@
  * ```
  */
 
-import { existsSync, readdir, cwd, setEnv, join } from "./utils/deps.ts";
+import { existsSync, readdir, cwd, setEnv, join, platform, dirname } from "./utils/deps.ts";
 import { logger } from "./utils/logger.ts";
 import { forgeDeploy, loadContract } from "./utils/deploy-utils.ts";
 import type { NetworkConfig, DeployOptions } from "./utils/deploy-utils.ts";
@@ -54,6 +54,36 @@ export interface DeployScriptOptions {
   force?: boolean;
   /** 要部署的合约列表（如果为空则部署所有） */
   contracts?: string[];
+}
+
+/**
+ * 查找项目根目录（包含 deno.json 或 package.json 的目录）
+ * @param startDir - 起始目录，默认为当前工作目录
+ * @returns 项目根目录，如果未找到则返回 null
+ */
+function findProjectRoot(startDir: string): string | null {
+  let currentDir = startDir;
+  const plat = platform();
+  const root = plat === "windows" ? /^[A-Z]:\\$/ : /^\/$/;
+
+  while (true) {
+    // 同时检查 deno.json（Deno）和 package.json（Bun）
+    const denoJsonPath = join(currentDir, "deno.json");
+    const packageJsonPath = join(currentDir, "package.json");
+    
+    if (existsSync(denoJsonPath) || existsSync(packageJsonPath)) {
+      return currentDir;
+    }
+
+    // 检查是否到达根目录
+    const parentDir = dirname(currentDir);
+    if (parentDir === currentDir || currentDir.match(root)) {
+      break;
+    }
+    currentDir = parentDir;
+  }
+
+  return null;
 }
 
 /**
@@ -218,12 +248,24 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
     options.force || false,
   );
 
+  // 查找项目根目录（包含 deno.json 或 package.json 的目录）
+  const projectRoot = findProjectRoot(cwd());
+  if (!projectRoot) {
+    throw new Error("未找到项目根目录（包含 deno.json 或 package.json 的目录）");
+  }
+
   for (let i = 0; i < scripts.length; i++) {
     const script = scripts[i];
     logger.info(`[${i + 1}/${scripts.length}] Executing: ${script}`);
 
     try {
-      const scriptUrl = new URL(`./${script}`, `file://${scriptDir}/`).href;
+      const scriptPath = join(scriptDir, script);
+      const scriptUrl = new URL(`file://${scriptPath}`).href;
+      
+      // 在执行动态导入之前，设置环境变量让 Deno 知道项目根目录
+      // 注意：Deno 的动态导入不会自动查找 deno.json
+      // 但 Deno 会从脚本所在目录向上查找 deno.json
+      // 如果脚本在项目根目录的子目录中，应该能够找到 deno.json
       const scriptModule = await import(scriptUrl);
 
       if (!scriptModule.deploy || typeof scriptModule.deploy !== "function") {
