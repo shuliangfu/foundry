@@ -21,9 +21,3 @@
 
 // 导出部署功能
 export * from "./deploy.ts";
-
-// 导出工具函数
-export * from "./utils/mod.ts";
-
-// 显式导出 Web3 相关类型和函数（确保类型正确导出）
-export * from "./utils/web3.ts";

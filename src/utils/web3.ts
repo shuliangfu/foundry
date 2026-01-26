@@ -15,11 +15,27 @@ import {
 } from "@dreamer/runtime-adapter";
 import {
   addHexPrefix,
+  bytesToHex,
+  computeContractAddress,
   createWeb3Client,
+  encodeFunctionCall as _encodeFunctionCall,
   type ExtendedTransactionReceipt,
+  formatAddress,
+  fromWei,
+  hexToBytes,
+  hexToNumber,
   isAddress,
   isPrivateKey,
+  isTxHash,
+  keccak256,
+  numberToHex,
+  padLeft,
+  padRight,
+  shortenAddress,
+  solidityKeccak256,
+  stripHexPrefix,
   toChecksumAddress,
+  toWei,
 } from "@dreamer/web3";
 import type { ContractInfo } from "./deploy-utils.ts";
 import { loadContract } from "./deploy-utils.ts";
@@ -493,6 +509,34 @@ export class Web3 {
   }
 
   /**
+   * 获取当前账户信息
+   */
+  get currentAccount(): { address: string; privateKey: string; index: number } {
+    return this.account;
+  }
+
+  /**
+   * 获取合约信息
+   */
+  get contractInfo(): ContractInfo | undefined {
+    return this.contract;
+  }
+
+  /**
+   * 获取合约名称
+   */
+  get name(): string {
+    return this.contractName || "";
+  }
+
+  /**
+   * 获取 Web3 客户端实例（用于高级操作）
+   */
+  getClient(): ReturnType<typeof createWeb3Client> {
+    return this.client;
+  }
+
+  /**
    * 获取账户的当前 nonce（交易计数）
    * @param address - 可选，要查询的地址，默认为当前账户地址
    * @returns 返回账户的 nonce 值
@@ -533,6 +577,699 @@ export class Web3 {
       const errorMsg = error instanceof Error ? error.message : String(error);
       throw new Error(`获取 nonce 失败: ${errorMsg}`);
     }
+  }
+
+  /**
+   * 监听合约事件
+   * @param eventName - 事件名称
+   * @param callback - 事件回调函数
+   * @param options - 可选配置
+   * @param options.fromBlock - 起始区块号（如果指定，会先扫描历史事件）
+   * @param options.toBlock - 结束区块号（仅在 fromBlock 指定时有效）
+   * @returns 取消监听的函数
+   *
+   * @example
+   * ```typescript
+   * // 只监听新事件
+   * const off = await web3.onEvent("Transfer", (event) => {
+   *   console.log("Transfer 事件:", event)
+   * })
+   *
+   * // 从指定区块开始监听（包含历史事件）
+   * const offWithHistory = await web3.onEvent("Transfer", (event) => {
+   *   console.log("Transfer 事件:", event)
+   * }, { fromBlock: 1000 })
+   *
+   * // 取消监听
+   * off()
+   * ```
+   */
+  onEvent(
+    eventName: string,
+    callback: (event: unknown) => void,
+    options?: {
+      fromBlock?: number;
+      toBlock?: number;
+    },
+  ): Promise<() => void> {
+    if (!this.contract) {
+      throw new Error("Contract not initialized");
+    }
+
+    const result = this.client.onContractEvent(
+      this.contract.address,
+      eventName,
+      callback,
+      {
+        abi: JSON.parse(JSON.stringify(this.contract.abi)) as string[],
+        fromBlock: options?.fromBlock,
+        toBlock: options?.toBlock,
+      },
+    );
+
+    // 如果返回的是 Promise，直接返回；否则包装成 Promise
+    return result instanceof Promise ? result : Promise.resolve(result);
+  }
+
+  /**
+   * 扫描合约指定方法的所有调用交易
+   * 支持分页和参数解析
+   * @param functionSignature - 函数签名（如 "register(address,string)"）
+   * @param options - 扫描选项
+   * @param options.fromBlock - 起始区块号（可选，默认最近 10000 个区块）
+   * @param options.toBlock - 结束区块号（可选，默认最新区块）
+   * @param options.page - 页码（默认 1）
+   * @param options.pageSize - 每页数量（默认 20）
+   * @param options.abi - 函数 ABI（可选，用于解析函数参数）
+   * @returns 扫描结果，包含交易列表和分页信息
+   *
+   * @example
+   * ```typescript
+   * // 扫描 register 方法的所有调用
+   * const result = await web3.scanMethodTransactions(
+   *   "register(address,string)",
+   *   {
+   *     fromBlock: 1000,
+   *     toBlock: 2000,
+   *     page: 1,
+   *     pageSize: 20,
+   *     abi: ["function register(address user, string name)"]
+   *   }
+   * )
+   * ```
+   */
+  async scanMethodTransactions(
+    functionSignature: string,
+    options?: {
+      fromBlock?: number;
+      toBlock?: number;
+      page?: number;
+      pageSize?: number;
+      abi?: string[];
+    },
+  ): Promise<{
+    transactions: Array<{
+      hash: string;
+      from: string;
+      to: string;
+      blockNumber: number;
+      blockHash: string;
+      timestamp?: number;
+      gasUsed?: string;
+      gasPrice?: string;
+      value: string;
+      data: string;
+      args?: unknown[];
+      receipt?: unknown;
+    }>;
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  }> {
+    if (!this.contract) {
+      throw new Error("Contract not initialized");
+    }
+
+    // 如果提供了 ABI，使用提供的；否则使用合约的完整 ABI
+    const abi = options?.abi
+      ? options.abi
+      : (JSON.parse(JSON.stringify(this.contract.abi)) as string[]);
+
+    // 获取分页参数
+    const page = options?.page || 1;
+    const pageSize = options?.pageSize || 20;
+
+    // 调用框架方法
+    const result = await this.client.scanContractMethodTransactions(
+      this.contract.address,
+      functionSignature,
+      {
+        fromBlock: options?.fromBlock,
+        toBlock: options?.toBlock,
+        abi,
+      },
+    );
+
+    // 计算分页信息
+    const total = result.total || result.transactions.length;
+    const totalPages = Math.ceil(total / pageSize);
+
+    // 手动分页处理（如果框架不支持分页）
+    const startIndex = (page - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedTransactions = result.transactions.slice(startIndex, endIndex);
+
+    return {
+      transactions: paginatedTransactions,
+      total,
+      page,
+      pageSize,
+      totalPages,
+    };
+  }
+
+  /**
+   * 等待交易确认
+   * @param txHash - 交易哈希
+   * @param confirmations - 确认数（默认 1）
+   * @returns 交易收据
+   *
+   * @example
+   * ```typescript
+   * const txHash = await web3.call("transfer", ["0x...", "100"])
+   * const receipt = await web3.waitForTransaction(txHash, 1)
+   * ```
+   */
+  async waitForTransaction(
+    txHash: string,
+    confirmations: number = 1,
+  ): Promise<unknown> {
+    return await this.client.waitForTransaction(txHash, confirmations);
+  }
+
+  /**
+   * 获取交易信息
+   * @param txHash - 交易哈希
+   * @returns 交易信息
+   */
+  async getTransaction(txHash: string): Promise<unknown> {
+    return await this.client.getTransaction(txHash);
+  }
+
+  /**
+   * 获取交易收据
+   * @param txHash - 交易哈希
+   * @returns 交易收据
+   */
+  async getTransactionReceipt(txHash: string): Promise<unknown> {
+    return await this.client.getTransactionReceipt(txHash);
+  }
+
+  /**
+   * 估算 Gas
+   * @param methodName - 函数名称
+   * @param args - 函数参数数组
+   * @param options - 可选配置
+   * @returns 估算的 Gas 数量
+   */
+  async estimateGas(
+    methodName: string,
+    args: unknown[] = [],
+    options?: {
+      value?: string;
+    },
+  ): Promise<string> {
+    if (!this.contract) {
+      throw new Error("Contract not initialized");
+    }
+
+    // 使用 encodeFunctionCall 方法编码函数调用数据
+    const data = await this.encodeFunctionCall(methodName, args);
+
+    return await this.client.estimateGas({
+      from: this.account.address,
+      to: this.contract.address,
+      data,
+      value: options?.value || "0",
+    });
+  }
+
+  /**
+   * 编码函数调用数据
+   * 支持函数重载，可以通过函数签名或函数名+参数数量自动匹配
+   * @param functionName - 函数名称或函数签名（如 "transfer" 或 "transfer(address,uint256)"）
+   * @param args - 函数参数数组
+   * @returns 编码后的数据
+   *
+   * @example
+   * ```typescript
+   * // 使用函数名（自动匹配重载）
+   * const data = await web3.encodeFunctionCall("transfer", ["0x...", "1000000000000000000"])
+   *
+   * // 使用函数签名（精确匹配）
+   * const data = await web3.encodeFunctionCall("transfer(address,uint256)", ["0x...", "1000000000000000000"])
+   * ```
+   */
+  encodeFunctionCall(
+    functionName: string,
+    args: unknown[],
+  ): Promise<string> {
+    if (!this.contract) {
+      throw new Error("Contract not initialized");
+    }
+
+    // 从 ABI 中查找函数定义（支持重载函数，通过参数数量匹配）
+    let abiFunction: AbiItem | undefined;
+
+    // 如果函数名包含函数签名（如 "buyNode(uint256)"），则精确匹配
+    if (functionName.includes("(") && functionName.includes(")")) {
+      // 提取函数名和参数类型
+      const match = functionName.match(/^(\w+)\((.*)\)$/);
+      if (match) {
+        const [, name, paramsStr] = match;
+        const paramTypes = paramsStr ? paramsStr.split(",").map((p) => p.trim()) : [];
+
+        // 查找匹配的函数签名
+        abiFunction = this.contract.abi.find(
+          (item: AbiItem) => {
+            if (item.type !== "function" || item.name !== name) return false;
+            const itemParamTypes = (item.inputs || []).map((input) => input.type);
+            return itemParamTypes.length === paramTypes.length &&
+              itemParamTypes.every((type: string, i: number) => type === paramTypes[i]);
+          },
+        );
+      }
+    }
+
+    // 如果没有找到精确匹配，或者函数名不包含签名，则按参数数量匹配
+    if (!abiFunction) {
+      const functionNameOnly = functionName.includes("(")
+        ? functionName.match(/^(\w+)/)?.[1] || functionName
+        : functionName;
+
+      // 先尝试精确匹配函数名和参数数量
+      const candidates = this.contract.abi.filter(
+        (item: AbiItem) => item.type === "function" && item.name === functionNameOnly,
+      );
+
+      if (candidates.length === 1) {
+        // 只有一个匹配，直接使用
+        abiFunction = candidates[0];
+      } else if (candidates.length > 1) {
+        // 多个重载函数，根据参数数量匹配
+        abiFunction = candidates.find(
+          (item: AbiItem) => (item.inputs || []).length === args.length,
+        );
+
+        // 如果还是找不到，使用第一个（可能是默认行为）
+        if (!abiFunction && candidates.length > 0) {
+          abiFunction = candidates[0];
+        }
+      }
+    }
+
+    if (!abiFunction || abiFunction.type !== "function") {
+      throw new Error(`函数 "${functionName}" 在合约 ABI 中不存在`);
+    }
+
+    // 构建函数签名（如 "transfer(address,uint256)"）
+    const functionSignature = `${abiFunction.name}(${
+      (abiFunction.inputs || []).map((input) => input.type).join(",")
+    })`;
+
+    // 使用框架的 encodeFunctionCall 工具函数编码函数调用数据
+    return Promise.resolve(_encodeFunctionCall(functionSignature, args));
+  }
+
+  /**
+   * 检查地址是否为合约地址
+   * @param address - 地址（可选，默认使用合约地址）
+   * @returns 是否为合约地址
+   */
+  async isContract(address?: string): Promise<boolean> {
+    if (!this.contract) {
+      throw new Error("Contract not initialized");
+    }
+
+    return await this.client.isContract(address || this.contract.address);
+  }
+
+  /**
+   * 获取余额
+   * @param address - 地址（可选，默认使用当前账户的地址）
+   * @returns 余额（wei）
+   */
+  async getBalance(address?: string): Promise<string> {
+    // 如果没有指定地址，使用当前账户的地址
+    return await this.client.getBalance(address || this.account.address);
+  }
+
+  /**
+   * 获取当前区块号
+   * @returns 区块号
+   */
+  async getBlockNumber(): Promise<number> {
+    return await this.client.getBlockNumber();
+  }
+
+  /**
+   * 获取网络信息
+   * @returns 网络信息
+   */
+  async getNetwork(): Promise<{ chainId: number; name: string }> {
+    return await this.client.getNetwork();
+  }
+
+  /**
+   * 获取链 ID
+   * @returns 链 ID
+   */
+  async getChainId(): Promise<number> {
+    return await this.client.getChainId();
+  }
+
+  /**
+   * 获取 Gas 价格
+   * @returns Gas 价格
+   */
+  async getGasPrice(): Promise<string> {
+    return await this.client.getGasPrice();
+  }
+
+  /**
+   * 发送交易
+   * @param options - 交易选项
+   * @returns 交易哈希
+   */
+  async sendTransaction(
+    options: { to: string; value: string; data?: string; gasLimit?: string },
+  ): Promise<string> {
+    return await this.client.sendTransaction(options);
+  }
+
+  /**
+   * 签名消息
+   * @param message - 消息内容
+   * @returns 签名
+   */
+  async signMessage(message: string): Promise<string> {
+    return await this.client.signMessage(message);
+  }
+
+  /**
+   * 验证消息签名
+   * @param message - 消息内容
+   * @param signature - 签名
+   * @param address - 地址
+   * @returns 是否有效
+   */
+  async verifyMessage(
+    message: string,
+    signature: string,
+    address: string,
+  ): Promise<boolean> {
+    return await this.client.verifyMessage(message, signature, address);
+  }
+
+  // ==================== 常用工具方法 ====================
+
+  /**
+   * 单位转换：Wei 转其他单位
+   * @param value - Wei 值（字符串）
+   * @param unit - 目标单位：wei, kwei, mwei, gwei, szabo, finney, ether
+   * @returns 转换后的值
+   *
+   * @example
+   * ```typescript
+   * const eth = web3.fromWei("1000000000000000000", "ether") // "1.0"
+   * const gwei = web3.fromWei("1000000000", "gwei") // "1.0"
+   * ```
+   */
+  fromWei(
+    value: string,
+    unit: "wei" | "kwei" | "mwei" | "gwei" | "szabo" | "finney" | "ether",
+  ): string {
+    return fromWei(value, unit);
+  }
+
+  /**
+   * 单位转换：其他单位转 Wei（实例方法）
+   * @param value - 数值（字符串）
+   * @param unit - 源单位：wei, kwei, mwei, gwei, szabo, finney, ether
+   * @returns 转换后的 Wei 值
+   *
+   * @example
+   * ```typescript
+   * const wei = web3.toWei("1", "ether") // "1000000000000000000"
+   * const wei = web3.toWei("1", "gwei") // "1000000000"
+   * ```
+   */
+  toWei(
+    value: string,
+    unit: "wei" | "kwei" | "mwei" | "gwei" | "szabo" | "finney" | "ether" =
+      "ether",
+  ): string {
+    return toWei(value, unit);
+  }
+
+  /**
+   * 验证地址格式
+   * @param address - 地址字符串
+   * @returns 是否为有效地址
+   *
+   * @example
+   * ```typescript
+   * const isValid = web3.isAddress("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb") // true
+   * ```
+   */
+  isAddress(address: string): boolean {
+    return isAddress(address);
+  }
+
+  /**
+   * 转换为校验和地址
+   * @param address - 地址字符串
+   * @returns 校验和地址
+   *
+   * @example
+   * ```typescript
+   * const checksummed = web3.toChecksumAddress("0x742d35cc6634c0532925a3b844bc9e7595f0beb")
+   * // "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
+   * ```
+   */
+  toChecksumAddress(address: string): string {
+    return toChecksumAddress(address);
+  }
+
+  /**
+   * 格式化地址（添加 0x 前缀，转小写）
+   * @param address - 地址字符串
+   * @returns 格式化后的地址
+   *
+   * @example
+   * ```typescript
+   * const formatted = web3.formatAddress("742d35cc6634c0532925a3b844bc9e7595f0beb")
+   * // "0x742d35cc6634c0532925a3b844bc9e7595f0beb"
+   * ```
+   */
+  formatAddress(address: string): string {
+    return formatAddress(address);
+  }
+
+  /**
+   * 缩短地址显示（用于 UI）
+   * @param address - 地址字符串
+   * @param chars - 显示字符数（默认 4）
+   * @returns 缩短后的地址
+   *
+   * @example
+   * ```typescript
+   * const short = web3.shortenAddress("0x742d35cc6634c0532925a3b844bc9e7595f0beb")
+   * // "0x742d...0beb"
+   * ```
+   */
+  shortenAddress(address: string, chars: number = 4): string {
+    return shortenAddress(address, chars);
+  }
+
+  /**
+   * Keccak-256 哈希
+   * @param data - 要哈希的数据
+   * @returns 哈希值（0x 开头的十六进制字符串）
+   *
+   * @example
+   * ```typescript
+   * const hash = await web3.keccak256("hello world") // "0x..."
+   * ```
+   */
+  async keccak256(data: string): Promise<string> {
+    return await keccak256(data);
+  }
+
+  /**
+   * Solidity Keccak-256 哈希（处理 ABI 编码）
+   * @param types - 类型数组
+   * @param values - 值数组
+   * @returns 哈希值
+   *
+   * @example
+   * ```typescript
+   * const hash = await web3.solidityKeccak256(
+   *   ["address", "uint256"],
+   *   ["0x...", "100"]
+   * )
+   * ```
+   */
+  async solidityKeccak256(
+    types: string[],
+    values: unknown[],
+  ): Promise<string> {
+    return await solidityKeccak256(types, values);
+  }
+
+  /**
+   * 十六进制转字节数组
+   * @param hex - 十六进制字符串
+   * @returns 字节数组
+   *
+   * @example
+   * ```typescript
+   * const bytes = web3.hexToBytes("0x48656c6c6f")
+   * // Uint8Array([72, 101, 108, 108, 111])
+   * ```
+   */
+  hexToBytes(hex: string): Uint8Array {
+    return hexToBytes(hex);
+  }
+
+  /**
+   * 字节数组转十六进制
+   * @param bytes - 字节数组
+   * @returns 十六进制字符串
+   *
+   * @example
+   * ```typescript
+   * const hex = web3.bytesToHex(new Uint8Array([72, 101, 108, 108, 111]))
+   * // "0x48656c6c6f"
+   * ```
+   */
+  bytesToHex(bytes: Uint8Array): string {
+    return bytesToHex(bytes);
+  }
+
+  /**
+   * 十六进制转数字
+   * @param hex - 十六进制字符串
+   * @returns 数字
+   *
+   * @example
+   * ```typescript
+   * const num = web3.hexToNumber("0xff") // 255
+   * ```
+   */
+  hexToNumber(hex: string): number {
+    return hexToNumber(hex);
+  }
+
+  /**
+   * 数字转十六进制
+   * @param num - 数字
+   * @returns 十六进制字符串
+   *
+   * @example
+   * ```typescript
+   * const hex = web3.numberToHex(255) // "0xff"
+   * ```
+   */
+  numberToHex(num: number): string {
+    return numberToHex(num);
+  }
+
+  /**
+   * 移除 0x 前缀
+   * @param hex - 十六进制字符串
+   * @returns 移除前缀后的字符串
+   *
+   * @example
+   * ```typescript
+   * const withoutPrefix = web3.stripHexPrefix("0xff") // "ff"
+   * ```
+   */
+  stripHexPrefix(hex: string): string {
+    return stripHexPrefix(hex);
+  }
+
+  /**
+   * 添加 0x 前缀
+   * @param hex - 十六进制字符串
+   * @returns 添加前缀后的字符串
+   *
+   * @example
+   * ```typescript
+   * const withPrefix = web3.addHexPrefix("ff") // "0xff"
+   * ```
+   */
+  addHexPrefix(hex: string): string {
+    return addHexPrefix(hex);
+  }
+
+  /**
+   * 左侧填充
+   * @param value - 值
+   * @param length - 目标长度
+   * @param char - 填充字符（默认 "0"）
+   * @returns 填充后的字符串
+   *
+   * @example
+   * ```typescript
+   * const leftPadded = web3.padLeft("ff", 4) // "00ff"
+   * ```
+   */
+  padLeft(value: string, length: number, char: string = "0"): string {
+    return padLeft(value, length, char);
+  }
+
+  /**
+   * 右侧填充
+   * @param value - 值
+   * @param length - 目标长度
+   * @param char - 填充字符（默认 "0"）
+   * @returns 填充后的字符串
+   *
+   * @example
+   * ```typescript
+   * const rightPadded = web3.padRight("ff", 4) // "ff00"
+   * ```
+   */
+  padRight(value: string, length: number, char: string = "0"): string {
+    return padRight(value, length, char);
+  }
+
+  /**
+   * 验证私钥格式
+   * @param privateKey - 私钥字符串
+   * @returns 是否为有效私钥
+   *
+   * @example
+   * ```typescript
+   * const isValidKey = web3.isPrivateKey("0x...") // true
+   * ```
+   */
+  isPrivateKey(privateKey: string): boolean {
+    return isPrivateKey(privateKey);
+  }
+
+  /**
+   * 验证交易哈希格式
+   * @param txHash - 交易哈希字符串
+   * @returns 是否为有效交易哈希
+   *
+   * @example
+   * ```typescript
+   * const isValidHash = web3.isTxHash("0x...") // true
+   * ```
+   */
+  isTxHash(txHash: string): boolean {
+    return isTxHash(txHash);
+  }
+
+  /**
+   * 计算合约地址（CREATE）
+   * @param deployer - 部署者地址
+   * @param nonce - 部署者的 nonce
+   * @returns 合约地址
+   *
+   * @example
+   * ```typescript
+   * const contractAddress = await web3.computeContractAddress("0x...", 0)
+   * ```
+   */
+  async computeContractAddress(
+    deployer: string,
+    nonce: number,
+  ): Promise<string> {
+    return await computeContractAddress(deployer, nonce);
   }
 
   /**
