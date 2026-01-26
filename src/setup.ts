@@ -47,17 +47,12 @@ function parseJsrPackageFromUrl(): { packageName: string; version: string } | nu
     // - https://jsr.io/@dreamer/foundry/1.1.0-beta.9/src/setup.ts (实际格式)
     // - https://jsr.io/@dreamer/foundry@1.1.0-beta.8/setup.ts (旧格式，可能不存在)
     const urlString = import.meta.url;
-    logger.info(`🔍 解析 import.meta.url: ${urlString}`);
-
     const url = new URL(urlString);
 
     // 检查是否是 JSR URL
     if (url.hostname !== "jsr.io") {
-      logger.info(`⚠️  不是 JSR URL，hostname: ${url.hostname}`);
       return null;
     }
-
-    logger.info(`✅ 是 JSR URL，pathname: ${url.pathname}`);
 
     // 实际路径格式: /@dreamer/foundry/1.1.0-beta.9/src/setup.ts
     // 格式: /@scope/name/version/path/to/file
@@ -68,7 +63,6 @@ function parseJsrPackageFromUrl(): { packageName: string; version: string } | nu
     if (pathMatch) {
       const [, scope, name, version] = pathMatch;
       const packageName = `@${scope}/${name}`;
-      logger.info(`✅ 解析成功（新格式）: ${packageName}@${version}`);
       return { packageName, version };
     }
 
@@ -77,7 +71,6 @@ function parseJsrPackageFromUrl(): { packageName: string; version: string } | nu
     if (pathMatch) {
       const [, scope, name, version] = pathMatch;
       const packageName = `@${scope}/${name}`;
-      logger.info(`✅ 解析成功（新格式，无后续路径）: ${packageName}@${version}`);
       return { packageName, version };
     }
 
@@ -86,7 +79,6 @@ function parseJsrPackageFromUrl(): { packageName: string; version: string } | nu
     if (pathMatch) {
       const [, scope, name, version] = pathMatch;
       const packageName = `@${scope}/${name}`;
-      logger.info(`✅ 解析成功（旧格式）: ${packageName}@${version}`);
       return { packageName, version };
     }
 
@@ -192,21 +184,14 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
 
   // 如果是本地运行（packageInfo 为 null），尝试读取本地项目的 deno.json
   if (!packageInfo) {
-    logger.info("📦 检测到本地运行，尝试读取本地项目配置...");
     isLocal = true;
     packageInfo = readLocalDenoJson();
-    if (packageInfo) {
-      logger.info(`📦 从本地项目读取: ${packageInfo.packageName}@${packageInfo.version}`);
-    }
-  } else {
-    logger.info(`📦 从 JSR URL 解析: ${packageInfo.packageName}@${packageInfo.version}`);
   }
 
   // 如果是本地运行，直接使用本地项目的 deno.json
   if (isLocal && packageInfo) {
     const localDenoJson = readLocalDenoJsonFull();
     if (localDenoJson) {
-      logger.info("📦 使用本地项目的 deno.json 配置");
       return localDenoJson;
     }
   }
@@ -217,7 +202,6 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
   if (packageInfo) {
     packageName = packageInfo.packageName;
     parsedVersion = packageInfo.version;
-    logger.info(`📦 使用包: ${packageName}@${parsedVersion}`);
   } else {
     logger.warn("⚠️  无法从 import.meta.url 或本地项目解析包信息，使用默认值");
   }
@@ -226,19 +210,11 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
     // 如果从 URL 解析到了版本，直接使用该版本；否则获取最新版本
     let version: string;
 
-    logger.info(`🔍 调试信息: parsedVersion=${parsedVersion}, isLocal=${isLocal}`);
-
     if (parsedVersion && !isLocal) {
       // 从 JSR URL 解析到了版本，直接使用
       version = parsedVersion;
-      logger.info(`📦 使用 URL 中的版本: ${version}`);
     } else {
       // 获取最新版本（只有在本地运行或无法解析版本时才执行）
-      if (isLocal) {
-        logger.info("📦 本地运行，获取最新版本");
-      } else {
-        logger.warn(`⚠️  无法从 URL 解析版本 (parsedVersion=${parsedVersion})，获取最新版本`);
-      }
       const metaUrl = `https://jsr.io/${packageName}/meta.json`;
       const metaResponse = await fetch(metaUrl);
       if (!metaResponse.ok) {
@@ -250,7 +226,6 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
         throw new Error("无法从 meta.json 获取最新版本");
       }
       version = latestVersion;
-      logger.info(`📦 使用最新版本: ${version}`);
     }
 
     // 直接获取 deno.json 文件内容
@@ -258,7 +233,6 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
     // 注意：版本号前是 / 而不是 @（已验证）
     // 重要：必须设置 Accept header，不能包含 text/html，否则会返回 HTML 页面
     const denoJsonUrl = `https://jsr.io/${packageName}/${version}/deno.json`;
-    logger.info(`📦 从 JSR 获取 deno.json: ${denoJsonUrl}`);
 
     const response = await fetch(denoJsonUrl, {
       headers: {
@@ -279,7 +253,6 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
       if (jsonMatch) {
         try {
           const denoJson = JSON.parse(jsonMatch[1]);
-          logger.info(`✅ 成功从 HTML 中提取 deno.json，版本: ${denoJson.version || version}`);
           return {
             version: denoJson.version || version,
             imports: denoJson.imports || {},
@@ -292,7 +265,6 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
     }
 
     const denoJson = await response.json();
-    logger.info(`✅ 成功获取 deno.json，版本: ${denoJson.version || version}`);
     return {
       version: denoJson.version || version,
       imports: denoJson.imports || {},
@@ -384,8 +356,6 @@ async function install(): Promise<void> {
     "foundry",
     cliUrl,
   ];
-
-  console.log(args);
 
   try {
     // 使用 deno install 命令安装到全局
