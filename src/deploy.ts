@@ -413,20 +413,10 @@ async function main() {
     }
   }
 
-  logger.info("🚀 开始部署");
-  logger.info("网络:", network);
-  logger.info("");
-
-  // 加载网络配置
+  // 加载网络配置（不输出信息，因为 cli.ts 已经输出了）
   let config: NetworkConfig;
   try {
     config = await loadNetworkConfig();
-    logger.info("RPC URL:", config.rpcUrl);
-    logger.info("部署地址:", config.address);
-    if (config.chainId) {
-      logger.info("链 ID:", config.chainId);
-    }
-    logger.info("");
   } catch (error) {
     logger.error("加载网络配置失败:", error);
     Deno.exit(1);
