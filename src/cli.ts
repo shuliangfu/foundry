@@ -153,7 +153,7 @@ async function getLatestVersion(includeBeta: boolean = false, forceRefresh: bool
   try {
     const packageInfo = parseJsrPackageFromUrl();
     const packageName = packageInfo?.packageName || "@dreamer/foundry";
-    
+
     // 尝试从缓存读取 meta.json（如果不需要强制刷新）
     const cacheKey = `meta_${packageName.replace(/[^a-zA-Z0-9]/g, "_")}`;
     let metaData: any = forceRefresh ? null : readCache(cacheKey, "latest");
@@ -176,11 +176,11 @@ async function getLatestVersion(includeBeta: boolean = false, forceRefresh: bool
       // JSR meta.json 的 versions 是一个对象，格式为: { "1.0.0": { createdAt: "..." }, ... }
       const versionsObj = metaData.versions || {};
       const allVersions = Object.keys(versionsObj);
-      
+
       if (allVersions.length === 0) {
         throw new Error("无法从 meta.json 获取版本列表");
       }
-      
+
       // 按版本号排序，找到最新的版本
       const sortedVersions = [...allVersions].sort((a: string, b: string) => {
         return compareVersions(b, a); // 降序排列，最新的在前
@@ -934,8 +934,7 @@ cli
   })
   .action(async (_args, options) => {
     const includeBeta = options.beta === true;
-    const forceRefresh = options.force === true;
-    
+
     logger.info("===========================================");
     logger.info("🔄 检查 Foundry CLI 更新");
     logger.info("===========================================");
@@ -951,12 +950,10 @@ cli
 
       logger.info(`当前版本: ${currentVersion}`);
 
-      // 获取最新版本（如果 force 为 true，强制刷新缓存）
-      if (forceRefresh) {
-        logger.info("强制刷新版本缓存...");
-      }
+      // 检查更新时，总是从网络获取最新版本，不使用缓存
+      // 因为需要比较当前版本和最新版本，读取缓存版本号无法正确比较
       logger.info(`正在检查最新${includeBeta ? "（包括 beta）" : "正式"}版本...`);
-      const latestVersion = await getLatestVersion(includeBeta, forceRefresh);
+      const latestVersion = await getLatestVersion(includeBeta, true); // 总是强制刷新，从网络获取
       if (!latestVersion) {
         logger.error("❌ 无法获取最新版本号");
         Deno.exit(1);
@@ -968,7 +965,7 @@ cli
       const comparison = compareVersions(latestVersion, currentVersion);
       if (comparison <= 0) {
         logger.info("");
-        logger.info(`✅ 您已经安装了最新${includeBeta ? "（包括 beta）" : "正式"}版本！`);
+        logger.info(`✅ 当前已经是最新${includeBeta ? "（包括 beta）" : "正式"}版本，无需更新！`);
         logger.info("");
         return;
       }
