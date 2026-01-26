@@ -101,20 +101,29 @@ export function loadWeb3ConfigSync(projectRoot?: string): NetworkConfig | null {
     const web3Env = getEnv("WEB3_ENV") || "local";
 
     // 从配置中获取对应环境的配置
-    // 优先直接使用网络名称作为 key（新格式）
-    // 保持向后兼容，支持 Web3Config 包装（旧格式）
+    // 新格式：支持 chain + network 结构
+    // 格式：{ "chain": "bsc", "network": { "local": {...}, "testnet": {...}, "mainnet": {...} } }
     let config: NetworkConfig | null = null;
-    if (jsonConfig[web3Env]) {
-      // 新格式：直接使用网络名称作为顶级 key
+    
+    if (jsonConfig.chain && jsonConfig.network) {
+      // 新格式：chain + network 结构
+      if (jsonConfig.network[web3Env]) {
+        config = jsonConfig.network[web3Env];
+      } else if (jsonConfig.network.local) {
+        // 默认使用 local
+        config = jsonConfig.network.local;
+      }
+    } else if (jsonConfig[web3Env]) {
+      // 向后兼容：直接使用网络名称作为顶级 key（旧格式）
       config = jsonConfig[web3Env];
     } else if (jsonConfig.local) {
-      // 新格式：默认使用 local
+      // 向后兼容：默认使用 local（旧格式）
       config = jsonConfig.local;
     } else if (jsonConfig.Web3Config && jsonConfig.Web3Config[web3Env]) {
-      // 旧格式：支持 Web3Config 包装（向后兼容）
+      // 向后兼容：支持 Web3Config 包装（旧格式）
       config = jsonConfig.Web3Config[web3Env];
     } else if (jsonConfig.Web3Config && jsonConfig.Web3Config.local) {
-      // 旧格式：默认使用 local
+      // 向后兼容：默认使用 local（旧格式）
       config = jsonConfig.Web3Config.local;
     } else if (jsonConfig.web3Config) {
       // 兼容其他可能的格式

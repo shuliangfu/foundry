@@ -18,29 +18,208 @@
  * ```
  */
 
-import { existsSync, readTextFileSync, createCommand, join, cwd, readdirSync } from "@dreamer/runtime-adapter";
+import {
+  createCommand,
+  cwd,
+  existsSync,
+  join,
+  readdirSync,
+  readTextFileSync,
+  writeStdoutSync,
+} from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
 import { loadContract } from "./utils/deploy-utils.ts";
-import { getNetworkName, getApiKey, loadNetworkConfig } from "./utils/cli-utils.ts";
+import { getApiKey, getNetworkName, loadNetworkConfig } from "./utils/cli-utils.ts";
+import { loadWeb3ConfigSync } from "./utils/web3.ts";
+
+/**
+ * 创建验证进度条
+ * @returns 进度条对象，包含 start 和 stop 方法
+ */
+function createVerifyProgressBar() {
+  const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+  let currentFrame = 0;
+  let intervalId: ReturnType<typeof setInterval> | null = null;
+
+  return {
+    start(): ReturnType<typeof setInterval> {
+      const update = () => {
+        const frame = frames[currentFrame % frames.length];
+        // 使用 runtime-adapter 的 writeStdoutSync 方法，兼容 Deno 和 Bun
+        try {
+          const text = `\r${frame} 正在验证中...`;
+          writeStdoutSync(new TextEncoder().encode(text));
+        } catch {
+          // 如果写入失败，忽略错误
+        }
+        currentFrame++;
+      };
+
+      // 立即显示第一帧
+      update();
+
+      // 每 100ms 更新一次
+      intervalId = setInterval(update, 100);
+
+      return intervalId;
+    },
+    stop(intervalId: ReturnType<typeof setInterval> | null) {
+      if (intervalId !== null) {
+        clearInterval(intervalId);
+      }
+      // 清除进度条，回到行首并清除整行
+      try {
+        const clearLine = "\r" + " ".repeat(50) + "\r";
+        writeStdoutSync(new TextEncoder().encode(clearLine));
+      } catch {
+        // 如果写入失败，忽略错误
+      }
+    },
+  };
+}
 
 /**
  * 网络配置映射
+ * 格式：{ chain: { testnet: {...}, mainnet: {...} } }
+ * 注意：所有 API URL 都使用 /api 后缀（Etherscan 兼容格式）
  */
 const NETWORK_MAP: Record<string, {
-  apiUrl: string;
-  explorerUrl: string;
+  testnet?: {
+    apiUrl: string;
+    explorerUrl: string;
+  };
+  mainnet?: {
+    apiUrl: string;
+    explorerUrl: string;
+  };
 }> = {
-  sepolia: {
-    apiUrl: "https://api-sepolia.etherscan.io/api",
-    explorerUrl: "https://sepolia.etherscan.io/address",
+  bsc: {
+    testnet: {
+      apiUrl: "https://api-testnet.bscscan.com/api",
+      explorerUrl: "https://testnet.bscscan.com/address",
+    },
+    mainnet: {
+      apiUrl: "https://api.bscscan.com/api",
+      explorerUrl: "https://bscscan.com/address",
+    },
   },
-  testnet: {
-    apiUrl: "https://api-testnet.bscscan.com/api",
-    explorerUrl: "https://testnet.bscscan.com/address",
+  eth: {
+    testnet: {
+      apiUrl: "https://api-sepolia.etherscan.io/api",
+      explorerUrl: "https://sepolia.etherscan.io/address",
+    },
+    mainnet: {
+      apiUrl: "https://api.etherscan.io/api",
+      explorerUrl: "https://etherscan.io/address",
+    },
   },
-  mainnet: {
-    apiUrl: "https://api.bscscan.com/api",
-    explorerUrl: "https://bscscan.com/address",
+  polygon: {
+    testnet: {
+      // Polygon 测试网现在是 Amoy (Chain ID: 80002)
+      apiUrl: "https://api-amoy.polygonscan.com/api",
+      explorerUrl: "https://amoy.polygonscan.com/address",
+    },
+    mainnet: {
+      apiUrl: "https://api.polygonscan.com/api",
+      explorerUrl: "https://polygonscan.com/address",
+    },
+  },
+  arbitrum: {
+    testnet: {
+      // Arbitrum Sepolia 测试网
+      apiUrl: "https://api-sepolia.arbiscan.io/api",
+      explorerUrl: "https://sepolia.arbiscan.io/address",
+    },
+    mainnet: {
+      apiUrl: "https://api.arbiscan.io/api",
+      explorerUrl: "https://arbiscan.io/address",
+    },
+  },
+  base: {
+    testnet: {
+      // Base Sepolia 测试网
+      apiUrl: "https://api-sepolia.basescan.org/api",
+      explorerUrl: "https://sepolia.basescan.org/address",
+    },
+    mainnet: {
+      apiUrl: "https://api.basescan.org/api",
+      explorerUrl: "https://basescan.org/address",
+    },
+  },
+  optimism: {
+    testnet: {
+      // Optimism Sepolia 测试网 (OP Sepolia)
+      apiUrl: "https://api-sepolia-optimistic.etherscan.io/api",
+      explorerUrl: "https://sepolia-optimistic.etherscan.io/address",
+    },
+    mainnet: {
+      apiUrl: "https://api-optimistic.etherscan.io/api",
+      explorerUrl: "https://optimistic.etherscan.io/address",
+    },
+  },
+  zkSync: {
+    // 注意：zkSync Era 不使用标准的 Etherscan API，可能需要特殊处理
+    // 这里保留配置，但验证时可能需要使用不同的方法
+    testnet: {
+      apiUrl: "https://api-sepolia-era.zksync.network/api",
+      explorerUrl: "https://sepolia.explorer.zksync.io/address",
+    },
+    mainnet: {
+      apiUrl: "https://api-era.zksync.network/api",
+      explorerUrl: "https://explorer.zksync.io/address",
+    },
+  },
+  avalanche: {
+    testnet: {
+      // Avalanche Fuji 测试网
+      apiUrl: "https://api-testnet.snowtrace.io/api",
+      explorerUrl: "https://testnet.snowtrace.io/address",
+    },
+    mainnet: {
+      apiUrl: "https://api.snowtrace.io/api",
+      explorerUrl: "https://snowtrace.io/address",
+    },
+  },
+  // 添加更多链的支持
+  linea: {
+    testnet: {
+      apiUrl: "https://api-testnet.lineascan.build/api",
+      explorerUrl: "https://sepolia.lineascan.build/address",
+    },
+    mainnet: {
+      apiUrl: "https://api.lineascan.build/api",
+      explorerUrl: "https://lineascan.build/address",
+    },
+  },
+  scroll: {
+    testnet: {
+      apiUrl: "https://api-sepolia.scrollscan.com/api",
+      explorerUrl: "https://sepolia.scrollscan.com/address",
+    },
+    mainnet: {
+      apiUrl: "https://api.scrollscan.com/api",
+      explorerUrl: "https://scrollscan.com/address",
+    },
+  },
+  mantle: {
+    testnet: {
+      apiUrl: "https://api-explorer.testnet.mantle.xyz/api",
+      explorerUrl: "https://explorer.testnet.mantle.xyz/address",
+    },
+    mainnet: {
+      apiUrl: "https://api-explorer.mantle.xyz/api",
+      explorerUrl: "https://explorer.mantle.xyz/address",
+    },
+  },
+  blast: {
+    testnet: {
+      apiUrl: "https://api-sepolia.blastscan.io/api",
+      explorerUrl: "https://sepolia.blastscan.io/address",
+    },
+    mainnet: {
+      apiUrl: "https://api.blastscan.io/api",
+      explorerUrl: "https://blastscan.io/address",
+    },
   },
 };
 
@@ -68,9 +247,54 @@ export interface VerifyOptions {
  * 验证合约
  */
 export async function verify(options: VerifyOptions): Promise<void> {
-  const networkConfig = NETWORK_MAP[options.network];
+  // 尝试从 web3.json 读取 chain 信息
+  let chain: string | null = null;
+  try {
+    const web3Config = loadWeb3ConfigSync();
+    if (web3Config) {
+      // 尝试从配置文件读取 chain 信息
+      const configPath = join(cwd(), "config", "web3.json");
+      if (existsSync(configPath)) {
+        const configText = readTextFileSync(configPath);
+        const config = JSON.parse(configText);
+        if (config.chain) {
+          chain = config.chain;
+        }
+      }
+    }
+  } catch {
+    // 如果读取失败，忽略错误
+  }
+
+  // 根据 chain 和 network 查找网络配置
+  let networkConfig: { apiUrl: string; explorerUrl: string } | null = null;
+  
+  if (chain && NETWORK_MAP[chain]) {
+    // 如果找到了 chain，从 NETWORK_MAP 中查找对应的 network
+    const chainConfig = NETWORK_MAP[chain];
+    if (options.network === "testnet" && chainConfig.testnet) {
+      networkConfig = chainConfig.testnet;
+    } else if (options.network === "mainnet" && chainConfig.mainnet) {
+      networkConfig = chainConfig.mainnet;
+    }
+  }
+
+  // 如果未找到配置，尝试向后兼容的方式（直接使用 network 作为 key）
   if (!networkConfig) {
-    throw new Error(`Unsupported network: ${options.network}`);
+    // 向后兼容：如果 network 是 "testnet" 或 "mainnet"，且 chain 是 "bsc"，使用旧的映射方式
+    if (options.network === "testnet" && (!chain || chain === "bsc")) {
+      networkConfig = NETWORK_MAP.bsc?.testnet || null;
+    } else if (options.network === "mainnet" && (!chain || chain === "bsc")) {
+      networkConfig = NETWORK_MAP.bsc?.mainnet || null;
+    } else if (options.network === "sepolia") {
+      networkConfig = NETWORK_MAP.eth?.testnet || null;
+    }
+  }
+
+  if (!networkConfig) {
+    throw new Error(
+      `Unsupported network: ${options.network}${chain ? ` (chain: ${chain})` : ""}. Please check your config/web3.json file.`,
+    );
   }
 
   // 读取 foundry.toml 配置，获取编译器版本和优化次数
@@ -99,7 +323,11 @@ export async function verify(options: VerifyOptions): Promise<void> {
   // 处理构造函数参数
   // 如果提供了构造函数参数，使用 cast abi-encode 编码为十六进制字符串
   if (options.constructorArgs && options.constructorArgs.length > 0) {
-    const encodedArgs = await encodeConstructorArgs(options.contractName, options.network, options.constructorArgs);
+    const encodedArgs = await encodeConstructorArgs(
+      options.contractName,
+      options.network,
+      options.constructorArgs,
+    );
     if (encodedArgs) {
       args.push("--constructor-args");
       args.push(encodedArgs);
@@ -118,10 +346,10 @@ export async function verify(options: VerifyOptions): Promise<void> {
     stdout: "piped",
     stderr: "piped",
   });
-  
+
   const checkOutput = await checkCmd.output();
   const contractCode = new TextDecoder().decode(checkOutput.stdout).trim();
-  
+
   if (!checkOutput.success || !contractCode || contractCode === "0x" || contractCode.length <= 2) {
     logger.error("❌ 错误：链上未找到合约");
     logger.error(`   地址: ${options.address}`);
@@ -134,22 +362,30 @@ export async function verify(options: VerifyOptions): Promise<void> {
     logger.error("");
     logger.error("请检查：");
     if (options.network === "testnet") {
-      logger.error(`  - 在 BSCScan 上查看地址: https://testnet.bscscan.com/address/${options.address}`);
+      logger.error(
+        `  - 在 BSCScan 上查看地址: https://testnet.bscscan.com/address/${options.address}`,
+      );
     } else if (options.network === "mainnet") {
       logger.error(`  - 在 BSCScan 上查看地址: https://bscscan.com/address/${options.address}`);
     } else if (options.network === "sepolia") {
-      logger.error(`  - 在 Etherscan 上查看地址: https://sepolia.etherscan.io/address/${options.address}`);
+      logger.error(
+        `  - 在 Etherscan 上查看地址: https://sepolia.etherscan.io/address/${options.address}`,
+      );
     }
     logger.error("  - 确保合约已成功部署");
     logger.error("  - 如果刚刚部署，请等待几个区块确认");
     throw new Error(`Contract not found on chain at address ${options.address}`);
   }
-  
+
   logger.info("✅ 链上找到合约代码，开始验证...");
   logger.info("");
 
   // 添加 --watch 参数，等待验证完成
   args.push("--watch");
+
+  // 启动验证进度条
+  const progressBar = createVerifyProgressBar();
+  const progressInterval = progressBar.start();
 
   const cmd = createCommand("forge", {
     args,
@@ -158,13 +394,17 @@ export async function verify(options: VerifyOptions): Promise<void> {
   });
 
   const output = await cmd.output();
+
+  // 停止进度条
+  progressBar.stop(progressInterval);
+
   const stdoutText = new TextDecoder().decode(output.stdout);
   const stderrText = new TextDecoder().decode(output.stderr);
 
   if (!output.success) {
     logger.error("Verification failed:");
     logger.error(stderrText);
-    
+
     // 检查是否是 API Key 相关的错误
     if (stderrText.includes("Invalid API Key") || stderrText.includes("API key")) {
       logger.error("");
@@ -175,15 +415,66 @@ export async function verify(options: VerifyOptions): Promise<void> {
       logger.error("   4. 可以在 .env 文件中设置: ETH_API_KEY=your-api-key");
       logger.error("   5. 或使用命令行参数: --api-key your-api-key");
     }
-    
+
     throw new Error(`Verification failed: ${stderrText}`);
   }
 
-  // 输出成功信息（stdout 可能包含验证成功的详细信息）
-  if (stdoutText.trim()) {
-    logger.info(stdoutText.trim());
+  // 过滤并处理输出信息
+  // 移除重复的 "Submitting verification" 和状态检查信息
+  const filteredOutput = stdoutText
+    .split("\n")
+    .filter((line) => {
+      const trimmedLine = line.trim();
+
+      // 过滤掉重复的提交信息和状态检查信息
+      if (trimmedLine.includes("Submitting verification for")) {
+        return false;
+      }
+      if (trimmedLine.includes("Submitted contract for verification:")) {
+        return false;
+      }
+      if (trimmedLine.includes("Contract verification status:")) {
+        return false;
+      }
+      if (
+        trimmedLine.startsWith("Response:") &&
+        (trimmedLine.includes("`OK`") || trimmedLine.includes("`NOTOK`"))
+      ) {
+        return false;
+      }
+      if (
+        trimmedLine.startsWith("Details:") &&
+        (trimmedLine.includes("Pending in queue") || trimmedLine.includes("Already Verified"))
+      ) {
+        return false;
+      }
+      if (trimmedLine.startsWith("GUID:") || trimmedLine.startsWith("URL:")) {
+        return false;
+      }
+      // 保留其他重要信息
+      return trimmedLine.length > 0;
+    })
+    .join("\n")
+    .trim();
+
+  // 检查是否验证成功
+  const isVerified = stdoutText.includes("Already Verified") ||
+    stdoutText.includes("Successfully verified") ||
+    stdoutText.includes("Contract successfully verified");
+
+  if (isVerified) {
+    // 提取合约地址的浏览器链接（如果存在）
+    const urlMatch = stdoutText.match(/URL:\s*(https?:\/\/[^\s]+)/);
+    const explorerUrl = urlMatch ? urlMatch[1] : `${networkConfig.explorerUrl}/${options.address}`;
+
+    logger.info(`✅ 合约验证成功: ${explorerUrl}`);
+  } else if (filteredOutput) {
+    // 如果有其他重要输出，显示它
+    logger.info(filteredOutput);
+  } else {
+    // 默认成功消息
+    logger.info(`✅ Contract verified: ${networkConfig.explorerUrl}/${options.address}`);
   }
-  logger.info(`✅ Contract verified: ${networkConfig.explorerUrl}/${options.address}`);
 }
 
 /**
@@ -194,11 +485,11 @@ export async function verify(options: VerifyOptions): Promise<void> {
  */
 export function findContractFileName(contractName: string, network: string): string | null {
   const abiDir = join(cwd(), "build", "abi", network);
-  
+
   if (!existsSync(abiDir)) {
     return null;
   }
-  
+
   try {
     const contractNameLower = contractName.toLowerCase();
     const entries = readdirSync(abiDir);
@@ -213,7 +504,7 @@ export function findContractFileName(contractName: string, network: string): str
   } catch {
     // 忽略错误
   }
-  
+
   return null;
 }
 
@@ -234,12 +525,12 @@ async function encodeConstructorArgs(
   if (!actualFileName) {
     return null;
   }
-  
+
   const abiPath = join(cwd(), "build", "abi", network, actualFileName);
 
   try {
     const abiData = JSON.parse(readTextFileSync(abiPath));
-    
+
     // 优先使用提供的构造函数参数，否则从 ABI 文件读取
     let argsArray: any[] | null = null;
     if (constructorArgs && constructorArgs.length > 0) {
@@ -247,7 +538,7 @@ async function encodeConstructorArgs(
     } else if (abiData.args && Array.isArray(abiData.args)) {
       argsArray = abiData.args;
     }
-    
+
     if (!argsArray || argsArray.length === 0) {
       return null;
     }
@@ -255,7 +546,7 @@ async function encodeConstructorArgs(
     // 从 ABI 中获取构造函数定义
     const abi = abiData.abi || [];
     const constructor = abi.find((item: any) => item.type === "constructor");
-    
+
     if (!constructor || !constructor.inputs) {
       return null;
     }
@@ -285,7 +576,7 @@ async function encodeConstructorArgs(
     });
 
     const output = await cmd.output();
-    
+
     if (!output.success) {
       const error = new TextDecoder().decode(output.stderr);
       logger.warn(`⚠️  编码构造函数参数失败: ${error}`);
@@ -428,13 +719,20 @@ function parseArgs(): {
   };
 }
 
-
 /**
  * 主函数（当作为脚本直接运行时）
  */
 async function main() {
   // 解析命令行参数
-  const { network: networkArg, contract: contractName, address, rpcUrl, apiKey, chainId, constructorArgs } = parseArgs();
+  const {
+    network: networkArg,
+    contract: contractName,
+    address,
+    rpcUrl,
+    apiKey,
+    chainId,
+    constructorArgs,
+  } = parseArgs();
 
   // 确定网络：优先使用命令行参数，其次使用环境变量
   const network = await getNetworkName(networkArg, false) || "local";
@@ -507,7 +805,7 @@ async function main() {
   // 这样可以确保使用正确的合约名称（保持原始大小写）
   const actualFileName = findContractFileName(contractName, network);
   const actualContractName = actualFileName ? actualFileName.replace(/\.json$/, "") : contractName;
-  
+
   // 如果实际文件名与输入不同，提示用户
   if (actualFileName && actualFileName !== `${contractName}.json`) {
     logger.info(`ℹ️  合约名称已自动匹配为: ${actualContractName}`);

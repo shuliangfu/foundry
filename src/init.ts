@@ -484,38 +484,41 @@ const VSCODE_EXTENSIONS = `{
  * config/web3.json 模板内容
  */
 const CONFIG_WEB3_JSON = `{
-  "local": {
-    "chainId": 31337,
-    "host": "http://127.0.0.1:8545",
-    "wss": "ws://127.0.0.1:8545",
-    "accounts": [
-      {
-        "address": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-        "privateKey": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-      }
-    ]
-  },
-  "testnet": {
-    "chainId": 97,
-    "host": "https://bsc-testnet.nodereal.io/v1/your-api-key",
-    "wss": "wss://bsc-testnet.nodereal.io/ws/v1/your-api-key",
-    "accounts": [
-      {
-        "address": "your-testnet-address-here",
-        "privateKey": "your-testnet-private-key-here"
-      }
-    ]
-  },
-  "mainnet": {
-    "chainId": 56,
-    "host": "https://go.getblock.io/your-api-key",
-    "wss": "wss://go.getblock.io/your-api-key",
-    "accounts": [
-      {
-        "address": "your-mainnet-address-here",
-        "privateKey": "your-mainnet-private-key-here"
-      }
-    ]
+  "chain": "bsc",
+  "network": {
+    "local": {
+      "chainId": 31337,
+      "host": "http://127.0.0.1:8545",
+      "wss": "ws://127.0.0.1:8545",
+      "accounts": [
+        {
+          "address": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+          "privateKey": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+        }
+      ]
+    },
+    "testnet": {
+      "chainId": 97,
+      "host": "https://bsc-testnet.nodereal.io/v1/your-api-key",
+      "wss": "wss://bsc-testnet.nodereal.io/ws/v1/your-api-key",
+      "accounts": [
+        {
+          "address": "your-testnet-address-here",
+          "privateKey": "your-testnet-private-key-here"
+        }
+      ]
+    },
+    "mainnet": {
+      "chainId": 56,
+      "host": "https://go.getblock.io/your-api-key",
+      "wss": "wss://go.getblock.io/your-api-key",
+      "accounts": [
+        {
+          "address": "your-mainnet-address-here",
+          "privateKey": "your-mainnet-private-key-here"
+        }
+      ]
+    }
   }
 }
 `;
