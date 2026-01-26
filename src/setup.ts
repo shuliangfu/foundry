@@ -30,7 +30,8 @@ import { logger } from "./utils/logger.ts";
 function parseJsrPackageFromUrl(): { packageName: string; version: string } | null {
   try {
     // import.meta.url 格式: https://jsr.io/@dreamer/foundry@1.1.0-beta.6/setup.ts
-    const url = new URL(import.meta.url);
+    const urlString = import.meta.url;
+    const url = new URL(urlString);
 
     // 检查是否是 JSR URL
     if (url.hostname !== "jsr.io") {
@@ -38,8 +39,17 @@ function parseJsrPackageFromUrl(): { packageName: string; version: string } | nu
     }
 
     // 路径格式: /@dreamer/foundry@1.1.0-beta.6/setup.ts
+    // 或者: /@dreamer/foundry@1.1.0-beta.7/setup
+    // 正则表达式需要匹配版本号（可能包含 beta、alpha 等后缀）
     const pathMatch = url.pathname.match(/^\/@([^/@]+)\/([^/@]+)@([^/]+)\//);
     if (!pathMatch) {
+      // 尝试另一种格式，可能没有尾部的斜杠
+      const pathMatch2 = url.pathname.match(/^\/@([^/@]+)\/([^/@]+)@([^/]+)$/);
+      if (pathMatch2) {
+        const [, scope, name, version] = pathMatch2;
+        const packageName = `@${scope}/${name}`;
+        return { packageName, version };
+      }
       return null;
     }
 
@@ -47,8 +57,9 @@ function parseJsrPackageFromUrl(): { packageName: string; version: string } | nu
     const packageName = `@${scope}/${name}`;
 
     return { packageName, version };
-  } catch {
+  } catch (error) {
     // 如果是本地运行，返回 null，后续会读取本地项目的配置
+    logger.debug(`解析 JSR URL 失败: ${error}`);
     return null;
   }
 }
@@ -152,6 +163,8 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
     if (packageInfo) {
       logger.info(`📦 从本地项目读取: ${packageInfo.packageName}@${packageInfo.version}`);
     }
+  } else {
+    logger.info(`📦 从 JSR URL 解析: ${packageInfo.packageName}@${packageInfo.version}`);
   }
 
   // 如果是本地运行，直接使用本地项目的 deno.json
@@ -175,34 +188,49 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
   }
 
   try {
-    // 总是先获取 meta.json 来获取最新版本
-    const metaUrl = `https://jsr.io/${packageName}/meta.json`;
-    const metaResponse = await fetch(metaUrl);
-    if (!metaResponse.ok) {
-      throw new Error(`无法获取 meta.json: ${metaResponse.statusText}`);
-    }
-    const metaData = await metaResponse.json();
-    const latestVersion = metaData.latest || metaData.versions?.[0];
-    if (!latestVersion) {
-      throw new Error("无法从 meta.json 获取最新版本");
+    // 如果从 URL 解析到了版本，直接使用该版本；否则获取最新版本
+    let version: string;
+    
+    if (parsedVersion && !isLocal) {
+      // 从 JSR URL 解析到了版本，直接使用
+      version = parsedVersion;
+      logger.info(`📦 使用 URL 中的版本: ${version}`);
+    } else {
+      // 获取最新版本
+      const metaUrl = `https://jsr.io/${packageName}/meta.json`;
+      const metaResponse = await fetch(metaUrl);
+      if (!metaResponse.ok) {
+        throw new Error(`无法获取 meta.json: ${metaResponse.statusText}`);
+      }
+      const metaData = await metaResponse.json();
+      const latestVersion = metaData.latest || metaData.versions?.[0];
+      if (!latestVersion) {
+        throw new Error("无法从 meta.json 获取最新版本");
+      }
+      version = latestVersion;
+      logger.info(`📦 使用最新版本: ${version}`);
     }
 
-    // 使用最新版本获取 deno.json
-    const version = latestVersion;
+    // 使用指定版本获取 deno.json
     const denoJsonUrl = `https://jsr.io/${packageName}@${version}/deno.json`;
+    logger.info(`📦 从 JSR 获取 deno.json: ${denoJsonUrl}`);
 
     const response = await fetch(denoJsonUrl);
     if (!response.ok) {
-      throw new Error(`无法获取 deno.json: ${response.statusText}`);
+      throw new Error(`无法获取 deno.json: ${response.statusText} (${response.status})`);
     }
 
     const denoJson = await response.json();
+    logger.info(`✅ 成功获取 deno.json，版本: ${denoJson.version || version}`);
     return {
       version: denoJson.version || version,
       imports: denoJson.imports || {},
     };
   } catch (error) {
     logger.error("❌ 获取 deno.json 信息失败:", error);
+    if (error instanceof Error) {
+      logger.error(`   错误详情: ${error.message}`);
+    }
     exit(1);
   }
 }
