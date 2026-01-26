@@ -23,7 +23,6 @@
 import { Command } from "@dreamer/console";
 import { existsSync, readdir, cwd, getEnv, join, readTextFileSync, readStdin, dirname, platform } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
-import { verify } from "./verify.ts";
 import { init } from "./init.ts";
 import { loadEnv } from "./utils/env.ts";
 import type { NetworkConfig } from "./utils/deploy-utils.ts";
@@ -645,6 +644,9 @@ cli
               continue;
             }
 
+            // 导入验证函数
+            const { verify } = await import("./verify.ts");
+            
             // 调用验证函数
             await verify({
               address: contractInfo.address,
@@ -776,88 +778,106 @@ cli
     logger.info("------------------------------------------");
     logger.info("");
 
-    // 确定合约地址
-    let contractAddress = address;
-    let contractInfo: any = null;
-    if (!contractAddress) {
-      try {
-        const { loadContract } = await import("./utils/deploy-utils.ts");
-        contractInfo = loadContract(contractName, finalNetwork);
-        contractAddress = contractInfo.address;
-        logger.info("从部署记录读取合约地址:", contractAddress);
-      } catch {
-        logger.error("❌ 无法读取合约地址，请使用 --address 参数指定");
-        Deno.exit(1);
+    // 查找项目根目录（包含 deno.json 的目录）
+    const projectRoot = findProjectRoot(cwd());
+    if (!projectRoot) {
+      logger.error("❌ 未找到项目根目录（包含 deno.json 的目录）");
+      Deno.exit(1);
+    }
+
+    // 获取项目的 deno.json 路径
+    const denoJsonPath = join(projectRoot, "deno.json");
+    if (!existsSync(denoJsonPath)) {
+      logger.error(`❌ 未找到项目的 deno.json 文件: ${denoJsonPath}`);
+      Deno.exit(1);
+    }
+
+    // 获取 verify.ts 脚本的路径
+    // 如果是从 JSR 包运行的，使用 JSR URL；否则使用文件路径
+    let verifyScriptPath: string;
+    const currentFileUrl = import.meta.url;
+    
+    if (currentFileUrl.startsWith("https://jsr.io/") || currentFileUrl.startsWith("jsr:")) {
+      // 从 JSR URL 解析包名和版本
+      const jsrMatch = currentFileUrl.match(/jsr:([^@]+)@([^/]+)\//) || 
+                       currentFileUrl.match(/https:\/\/jsr\.io\/([^@]+)@([^/]+)\//);
+      if (jsrMatch) {
+        const [, packageName, version] = jsrMatch;
+        verifyScriptPath = `jsr:${packageName}@${version}/verify`;
+      } else {
+        // 如果无法解析，尝试使用相对路径
+        const currentDir = dirname(currentFileUrl.replace(/^file:\/\//, ""));
+        verifyScriptPath = join(currentDir, "verify.ts");
       }
     } else {
-      // 如果提供了地址，也尝试加载合约信息以获取构造函数参数
-      try {
-        const { loadContract } = await import("./utils/deploy-utils.ts");
-        contractInfo = loadContract(contractName, finalNetwork);
-      } catch {
-        // 如果加载失败，忽略，使用命令行参数
-      }
+      // 本地运行，使用文件路径
+      const currentDir = dirname(currentFileUrl.replace(/^file:\/\//, ""));
+      verifyScriptPath = join(currentDir, "verify.ts");
     }
 
-    // 如果没有提供构造函数参数，尝试从合约信息中读取
-    let finalConstructorArgs: string[] | undefined;
-    if (contractInfo && contractInfo.args) {
-      finalConstructorArgs = contractInfo.args;
-      if (finalConstructorArgs && finalConstructorArgs.length > 0) {
-        logger.info("从部署记录读取构造函数参数:", finalConstructorArgs.join(", "));
-      }
+    // 构建命令行参数
+    const verifyArgs: string[] = [
+      "run",
+      "-A",
+      "--config",
+      denoJsonPath,
+      verifyScriptPath,
+      "--network",
+      finalNetwork,
+      "--contract",
+      contractName,
+      "--api-key",
+      apiKey!,
+    ];
+
+    if (address) {
+      verifyArgs.push("--address");
+      verifyArgs.push(address);
     }
 
-    // 确定 RPC URL 和链 ID
-    let finalRpcUrl = rpcUrl;
-    let finalChainId = chainId;
-
-    if (!finalRpcUrl || !finalChainId) {
-      try {
-        const config = await loadNetworkConfig(finalNetwork);
-        finalRpcUrl = finalRpcUrl || config.rpcUrl;
-        finalChainId = finalChainId || config.chainId;
-      } catch {
-        logger.warn("无法从配置加载 RPC URL 和链 ID，请使用 --rpc-url 和 --chain-id 参数指定");
-      }
+    if (rpcUrl) {
+      verifyArgs.push("--rpc-url");
+      verifyArgs.push(rpcUrl);
     }
 
-    if (!finalRpcUrl) {
-      logger.error("❌ 未指定 RPC URL，请使用 --rpc-url 参数或配置环境变量");
-      Deno.exit(1);
+    if (chainId) {
+      verifyArgs.push("--chain-id");
+      verifyArgs.push(chainId.toString());
     }
 
-    if (!finalChainId) {
-      logger.error("❌ 未指定链 ID，请使用 --chain-id 参数或配置环境变量");
-      Deno.exit(1);
-    }
-
-    logger.info("合约地址:", contractAddress);
-    logger.info("RPC URL:", finalRpcUrl);
-    logger.info("链 ID:", finalChainId);
-    if (finalConstructorArgs && finalConstructorArgs.length > 0) {
-      logger.info("构造函数参数:", finalConstructorArgs.join(", "));
-    }
-    logger.info("");
-
-    // 执行验证
+    // 执行验证脚本
     try {
-      await verify({
-        address: contractAddress!,
-        contractName,
-        network: finalNetwork,
-        apiKey: apiKey!,
-        rpcUrl: finalRpcUrl!,
-        chainId: finalChainId,
-        constructorArgs: finalConstructorArgs || undefined,
+      const cmd = new Deno.Command("deno", {
+        args: verifyArgs,
+        stdout: "piped",
+        stderr: "piped",
+        cwd: projectRoot,
       });
+
+      const output = await cmd.output();
+      const stdoutText = new TextDecoder().decode(output.stdout);
+      const stderrText = new TextDecoder().decode(output.stderr);
+
+      // 输出脚本的标准输出
+      if (stdoutText) {
+        console.log(stdoutText);
+      }
+
+      if (!output.success) {
+        // 输出错误信息
+        if (stderrText) {
+          logger.error(stderrText);
+        }
+        Deno.exit(1);
+      }
 
       logger.info("");
       logger.info("------------------------------------------");
       logger.info("✅ 合约验证成功！");
       logger.info("------------------------------------------");
     } catch (error) {
-      logger.error("❌ 验证失败:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error("❌ 验证失败:", errorMessage);
       Deno.exit(1);
     }
   });
