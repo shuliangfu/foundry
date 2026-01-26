@@ -3,7 +3,7 @@
  * @description CLI 相关的工具函数，用于减少代码重复
  */
 
-import { cwd, dirname, existsSync, join, getEnv, platform } from "@dreamer/runtime-adapter";
+import { cwd, dirname, existsSync, join, getEnv, platform, writeStdoutSync } from "@dreamer/runtime-adapter";
 import { logger } from "./logger.ts";
 import { parseJsrPackageFromUrl } from "./jsr.ts";
 import { loadEnv } from "./env.ts";
@@ -108,7 +108,119 @@ export function getScriptPath(scriptName: "deploy" | "verify"): string {
 }
 
 /**
+ * 执行命令并实时输出流（通用函数）
+ * 适用于任何 Command 对象（Deno.Command 或 runtime-adapter 的 createCommand 返回的对象）
+ * @param child - 已 spawn 的子进程对象
+ * @returns 执行结果，包含 stdout 和 stderr
+ */
+export async function executeCommandWithStream(
+  child: { 
+    stdout: ReadableStream<Uint8Array> | null; 
+    stderr: ReadableStream<Uint8Array> | null; 
+    status: any; // 兼容 Deno.Command 和 runtime-adapter 的 createCommand 返回的不同类型
+  },
+): Promise<{ stdout: string; stderr: string; success: boolean }> {
+  // 检查 stdout 和 stderr 是否存在
+  if (!child.stdout || !child.stderr) {
+    throw new Error("Command stdout or stderr is null");
+  }
+  
+  // 处理 status 可能是函数的情况
+  const statusPromise = typeof child.status === "function" ? child.status() : child.status;
+  // 收集输出的缓冲区
+  const stdoutChunks: Uint8Array[] = [];
+  const stderrChunks: Uint8Array[] = [];
+  
+  // 实时读取并输出 stdout
+  const stdoutReader = child.stdout.getReader();
+  const readStdout = async () => {
+    const decoder = new TextDecoder();
+    try {
+      while (true) {
+        const { done, value } = await stdoutReader.read();
+        if (done) break;
+        
+        stdoutChunks.push(value);
+        // 实时输出到控制台（使用 runtime-adapter 的 writeStdoutSync 方法，兼容 Deno 和 Bun）
+        const text = decoder.decode(value, { stream: true });
+        writeStdoutSync(new TextEncoder().encode(text));
+      }
+    } catch (_error) {
+      // 忽略读取错误
+    } finally {
+      stdoutReader.releaseLock();
+    }
+  };
+  
+  // 实时读取并输出 stderr
+  const stderrReader = child.stderr.getReader();
+  const readStderr = async () => {
+    const decoder = new TextDecoder();
+    try {
+      while (true) {
+        const { done, value } = await stderrReader.read();
+        if (done) break;
+        
+        stderrChunks.push(value);
+        // 实时输出到控制台（使用 runtime-adapter 的 writeStdoutSync 方法，兼容 Deno 和 Bun）
+        // 注意：runtime-adapter 没有提供 writeStderrSync，使用 writeStdoutSync 输出 stderr
+        const text = decoder.decode(value, { stream: true });
+        writeStdoutSync(new TextEncoder().encode(text));
+      }
+    } catch (_error) {
+      // 忽略读取错误
+    } finally {
+      stderrReader.releaseLock();
+    }
+  };
+  
+  // 并行读取 stdout 和 stderr
+  await Promise.all([readStdout(), readStderr()]);
+  
+  // 等待进程完成
+  const statusResult = await statusPromise;
+  
+  // 合并所有输出块
+  const decoder = new TextDecoder();
+  
+  // 计算总长度
+  const stdoutTotalLength = stdoutChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const stderrTotalLength = stderrChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  
+  // 创建合并后的数组
+  const mergedStdout = new Uint8Array(stdoutTotalLength);
+  const mergedStderr = new Uint8Array(stderrTotalLength);
+  
+  // 复制数据到合并后的数组
+  let stdoutOffset = 0;
+  for (const chunk of stdoutChunks) {
+    mergedStdout.set(chunk, stdoutOffset);
+    stdoutOffset += chunk.length;
+  }
+  
+  let stderrOffset = 0;
+  for (const chunk of stderrChunks) {
+    mergedStderr.set(chunk, stderrOffset);
+    stderrOffset += chunk.length;
+  }
+  
+  // 解码为文本
+  const finalStdout = decoder.decode(mergedStdout);
+  const finalStderr = decoder.decode(mergedStderr);
+
+  // 处理 status 的 success 字段（兼容不同的返回类型）
+  const success = statusResult.success ?? (statusResult.code === 0 || statusResult.code === null);
+
+  return {
+    stdout: finalStdout,
+    stderr: finalStderr,
+    success,
+  };
+}
+
+/**
  * 执行 Deno 子命令
+ * 实时输出日志，不等待命令完成
  * @param scriptPath - 脚本路径
  * @param denoJsonPath - deno.json 路径
  * @param projectRoot - 项目根目录
@@ -147,24 +259,22 @@ export async function executeDenoCommand(
     cwd: projectRoot,
   });
 
-  const output = await cmd.output();
+  // 使用 spawn 来实时读取输出
+  const child = cmd.spawn();
+  
+  // 使用通用流式输出函数
+  const result = await executeCommandWithStream(child);
+  
   const endTime = Date.now();
   const duration = endTime - startTime;
   
   logger.info(`[执行] ✅ 命令执行完成，耗时: ${duration}ms`);
-  
-  const stdoutText = new TextDecoder().decode(output.stdout);
-  const stderrText = new TextDecoder().decode(output.stderr);
 
-  if (!output.success) {
-    logger.info(`[执行] ❌ 命令执行失败，stderr: ${stderrText.substring(0, 200)}`);
+  if (!result.success) {
+    logger.info(`[执行] ❌ 命令执行失败`);
   }
 
-  return {
-    stdout: stdoutText,
-    stderr: stderrText,
-    success: output.success,
-  };
+  return result;
 }
 
 /**
@@ -190,10 +300,10 @@ export async function getApiKey(apiKeyFromOption?: string): Promise<string | nul
 
 /**
  * 加载网络配置（从环境变量、config/web3.json 或 .env 文件）
- * @param network - 网络名称（可选，用于从 web3.json 加载特定网络配置）
+ * @param _network - 网络名称（可选，用于从 web3.json 加载特定网络配置，当前未使用）
  * @returns 网络配置
  */
-export async function loadNetworkConfig(network?: string): Promise<{
+export async function loadNetworkConfig(_network?: string): Promise<{
   rpcUrl: string;
   privateKey: string;
   address: string;

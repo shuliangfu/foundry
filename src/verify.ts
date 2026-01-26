@@ -29,7 +29,7 @@ import {
 } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
 import { loadContract } from "./utils/deploy-utils.ts";
-import { getApiKey, getNetworkName, loadNetworkConfig } from "./utils/cli-utils.ts";
+import { getApiKey, getNetworkName, loadNetworkConfig, executeCommandWithStream } from "./utils/cli-utils.ts";
 import { loadWeb3ConfigSync } from "./utils/web3.ts";
 
 /**
@@ -393,15 +393,19 @@ export async function verify(options: VerifyOptions): Promise<void> {
     stderr: "piped",
   });
 
-  const output = await cmd.output();
+  // 使用 spawn 来实时读取输出
+  const child = cmd.spawn();
+  
+  // 使用通用流式输出函数
+  const result = await executeCommandWithStream(child);
 
   // 停止进度条
   progressBar.stop(progressInterval);
 
-  const stdoutText = new TextDecoder().decode(output.stdout);
-  const stderrText = new TextDecoder().decode(output.stderr);
+  const stdoutText = result.stdout;
+  const stderrText = result.stderr;
 
-  if (!output.success) {
+  if (!result.success) {
     logger.error("Verification failed:");
     logger.error(stderrText);
 
