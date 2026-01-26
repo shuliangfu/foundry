@@ -1087,7 +1087,16 @@ async function isDirectoryEmpty(dirPath: string): Promise<boolean> {
  */
 async function confirm(message: string): Promise<boolean> {
   logger.warn(message);
-  logger.info("请输入 'yes' 或 'y' 确认，其他任何输入将取消操作：");
+  // 使用 Deno.stdout.write 在同一行显示输入提示（不换行）
+  const prompt = "请输入 'yes' 或 'y' 确认，其他任何输入将取消操作：";
+  if (typeof Deno.stdout.write === "function") {
+    // Deno 环境
+    const encoder = new TextEncoder();
+    await Deno.stdout.write(encoder.encode(prompt));
+  } else {
+    // 其他环境，使用 logger.info
+    logger.info(prompt);
+  }
 
   try {
     const buffer = new Uint8Array(1024);

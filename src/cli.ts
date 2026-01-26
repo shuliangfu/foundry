@@ -66,7 +66,16 @@ function findProjectRoot(startDir: string): string | null {
  */
 async function confirm(message: string): Promise<boolean> {
   console.warn(message);
-  console.log("请输入 'yes' 或 'y' 确认，其他任何输入将取消操作：");
+  // 使用 process.stdout.write 在同一行显示输入提示（不换行）
+  const prompt = "请输入 'yes' 或 'y' 确认，其他任何输入将取消操作：";
+  if (typeof Deno.stdout.write === "function") {
+    // Deno 环境
+    const encoder = new TextEncoder();
+    await Deno.stdout.write(encoder.encode(prompt));
+  } else {
+    // 其他环境，使用 console.log
+    console.log(prompt);
+  }
 
   try {
     const buffer = new Uint8Array(1024);
