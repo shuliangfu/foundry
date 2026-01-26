@@ -415,7 +415,11 @@ function getDenoJsonTemplate(version: string): string {
     "lib": ["deno.window"],
     "strict": true,
     "noImplicitAny": false
-  }
+  },
+  "allowScripts": {
+    "allow": [],
+    "deny": ["npm:esbuild@0.27.2", "npm:puppeteer@24.36.0"]
+  },
 }
 `;
 }

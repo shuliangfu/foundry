@@ -28,6 +28,7 @@ import {
   readdir,
   setEnv,
   getEnv,
+  writeStdoutSync,
 } from "@dreamer/runtime-adapter";
 import type { DeployOptions, NetworkConfig } from "./utils/deploy-utils.ts";
 import { forgeDeploy, loadContract } from "./utils/deploy-utils.ts";
@@ -316,6 +317,52 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
     throw new Error("未找到项目根目录（包含 deno.json 或 package.json 的目录）");
   }
 
+  /**
+   * 创建进度条
+   * @returns 进度条对象，包含 start 和 stop 方法
+   */
+  function createProgressBar() {
+    const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+    let currentFrame = 0;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    return {
+      start(): ReturnType<typeof setInterval> {
+        const update = () => {
+          const frame = frames[currentFrame % frames.length];
+          // 使用 runtime-adapter 的 writeStdoutSync 方法，兼容 Deno 和 Bun
+          try {
+            const text = `\r${frame} 正在部署中...`;
+            writeStdoutSync(new TextEncoder().encode(text));
+          } catch {
+            // 如果写入失败，忽略错误
+          }
+          currentFrame++;
+        };
+
+        // 立即显示第一帧
+        update();
+        
+        // 每 100ms 更新一次
+        intervalId = setInterval(update, 100);
+        
+        return intervalId;
+      },
+      stop(intervalId: ReturnType<typeof setInterval> | null) {
+        if (intervalId !== null) {
+          clearInterval(intervalId);
+        }
+        // 清除进度条，回到行首并清除整行
+        try {
+          const clearLine = "\r" + " ".repeat(50) + "\r";
+          writeStdoutSync(new TextEncoder().encode(clearLine));
+        } catch {
+          // 如果写入失败，忽略错误
+        }
+      },
+    };
+  }
+
   for (let i = 0; i < scripts.length; i++) {
     const script = scripts[i];
     logger.info(`[${i + 1}/${scripts.length}] Executing: ${script}`);
@@ -333,8 +380,20 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
         continue;
       }
 
-      await scriptModule.deploy(deployer);
-      logger.info(`✅ ${script} completed successfully`);
+      // 显示进度条
+      const progressBar = createProgressBar();
+      const progressInterval = progressBar.start();
+
+      try {
+        await scriptModule.deploy(deployer);
+        // 停止进度条
+        progressBar.stop(progressInterval);
+        logger.info(`✅ ${script} completed successfully`);
+      } catch (error) {
+        // 停止进度条
+        progressBar.stop(progressInterval);
+        throw error;
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(`❌ Error executing ${script}: ${errorMessage}`);
