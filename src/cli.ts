@@ -33,13 +33,20 @@ import {
   readTextFileSync,
 } from "@dreamer/runtime-adapter";
 import { init } from "./init.ts";
+import { readCache, writeCache } from "./utils/cache.ts";
+import {
+  executeDenoCommand,
+  getApiKey,
+  getNetworkName,
+  getProjectConfig,
+  getScriptPath,
+  handleCommandResult,
+} from "./utils/cli-utils.ts";
 import type { NetworkConfig } from "./utils/deploy-utils.ts";
 import { loadEnv } from "./utils/env.ts";
 import { parseJsrPackageFromUrl, parseJsrVersionFromUrl } from "./utils/jsr.ts";
 import { logger } from "./utils/logger.ts";
 import { loadWeb3ConfigSync } from "./utils/web3.ts";
-import { getProjectConfig, getScriptPath, executeDenoCommand, getApiKey, getNetworkName, handleCommandResult } from "./utils/cli-utils.ts";
-
 
 /**
  * 提示用户确认
@@ -137,7 +144,7 @@ function findFrameworkRoot(): string | null {
 
 /**
  * 从 JSR 服务器获取版本号
- * 优先从 import.meta.url 解析，如果无法解析则从 JSR API 获取
+ * 优先从 import.meta.url 解析，如果无法解析则从 JSR API 获取（使用文件缓存）
  * @returns 版本号字符串，如果读取失败则返回 undefined
  */
 async function getVersion(): Promise<string | undefined> {
@@ -148,34 +155,51 @@ async function getVersion(): Promise<string | undefined> {
       return parsedVersion;
     }
 
-    // 如果无法从 URL 解析，尝试从 JSR API 获取最新版本
+    // 如果无法从 URL 解析，尝试从 JSR API 获取最新版本（使用缓存）
     const packageInfo = parseJsrPackageFromUrl();
     const packageName = packageInfo?.packageName || "@dreamer/foundry";
 
-    // 获取包的 meta.json 以获取最新版本
-    const metaUrl = `https://jsr.io/${packageName}/meta.json`;
-    const metaResponse = await fetch(metaUrl);
-    if (!metaResponse.ok) {
-      throw new Error(`无法获取 meta.json: ${metaResponse.statusText}`);
+    // 尝试从缓存读取 meta.json
+    const cacheKey = `meta_${packageName.replace(/[^a-zA-Z0-9]/g, "_")}`;
+    let metaData: any = readCache(cacheKey, "latest");
+
+    if (!metaData) {
+      // 缓存未命中，从网络获取
+      const metaUrl = `https://jsr.io/${packageName}/meta.json`;
+      const metaResponse = await fetch(metaUrl);
+      if (!metaResponse.ok) {
+        throw new Error(`无法获取 meta.json: ${metaResponse.statusText}`);
+      }
+      metaData = await metaResponse.json();
+      // 写入缓存（使用 "latest" 作为版本标识）
+      await writeCache(cacheKey, "latest", metaData);
     }
-    const metaData = await metaResponse.json();
+
     const latestVersion = metaData.latest || metaData.versions?.[0];
     if (!latestVersion) {
       throw new Error("无法从 meta.json 获取最新版本");
     }
 
-    // 从 JSR API 获取 deno.json 并读取版本号
-    const denoJsonUrl = `https://jsr.io/${packageName}/${latestVersion}/deno.json`;
-    const response = await fetch(denoJsonUrl, {
-      headers: {
-        "Accept": "application/json, */*",
-      },
-    });
-    if (!response.ok) {
-      throw new Error(`无法获取 deno.json: ${response.statusText} (${response.status})`);
+    // 尝试从缓存读取 deno.json
+    const denoJsonCacheKey = `deno_json_${packageName.replace(/[^a-zA-Z0-9]/g, "_")}`;
+    let denoJson: any = readCache(denoJsonCacheKey, latestVersion);
+
+    if (!denoJson) {
+      // 缓存未命中，从网络获取
+      const denoJsonUrl = `https://jsr.io/${packageName}/${latestVersion}/deno.json`;
+      const response = await fetch(denoJsonUrl, {
+        headers: {
+          "Accept": "application/json, */*",
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`无法获取 deno.json: ${response.statusText} (${response.status})`);
+      }
+      denoJson = await response.json();
+      // 写入缓存（使用版本号作为标识）
+      await writeCache(denoJsonCacheKey, latestVersion, denoJson);
     }
 
-    const denoJson = await response.json();
     return denoJson.version || latestVersion;
   } catch {
     // 如果从 JSR 获取失败，尝试从本地框架的 deno.json 读取（作为后备方案）
@@ -392,9 +416,9 @@ cli
       logger.error("   或在 .env 文件中设置: WEB3_ENV=testnet");
       Deno.exit(1);
     }
-    
+
     const finalNetwork: string = network;
-    
+
     // 如果未从命令行指定网络，且从环境变量读取到了，显示提示
     if (!options.network && network !== "local") {
       logger.info(`从 .env 文件读取网络配置: ${network}`);
@@ -525,17 +549,17 @@ cli
       deployArgs.push(...contracts);
     }
 
-      // 执行部署脚本
-      try {
-        const result = await executeDenoCommand(
-          deployScriptPath,
-          denoJsonPath,
-          projectRoot,
-          deployArgs,
-        );
+    // 执行部署脚本
+    try {
+      const result = await executeDenoCommand(
+        deployScriptPath,
+        denoJsonPath,
+        projectRoot,
+        deployArgs,
+      );
 
-        // 处理执行结果
-        handleCommandResult(result, "✅ 所有部署脚本执行完成！");
+      // 处理执行结果
+      handleCommandResult(result, "✅ 所有部署脚本执行完成！");
 
       // 如果启用了验证，自动验证所有部署的合约
       if (shouldVerify) {
@@ -680,9 +704,9 @@ cli
       logger.error("   或在 .env 文件中设置: WEB3_ENV=testnet");
       Deno.exit(1);
     }
-    
+
     const finalNetwork: string = network;
-    
+
     // 如果未从命令行指定网络，且从环境变量读取到了，显示提示
     if (!options.network && network !== "local") {
       logger.info(`从 .env 文件读取网络配置: ${network}`);
@@ -756,7 +780,7 @@ cli
 
       // 处理执行结果
       handleCommandResult(result);
-      
+
       logger.info("");
       logger.info("------------------------------------------");
       logger.info("✅ 合约验证成功！");

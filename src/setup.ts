@@ -35,6 +35,7 @@ import {
 } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
 import { parseJsrPackageFromUrl } from "./utils/jsr.ts";
+import { readCache, writeCache } from "./utils/cache.ts";
 
 /**
  * 查找本地项目根目录（包含 deno.json 的目录）
@@ -160,12 +161,22 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
       version = parsedVersion;
     } else {
       // 获取最新版本（只有在本地运行或无法解析版本时才执行）
-      const metaUrl = `https://jsr.io/${packageName}/meta.json`;
-      const metaResponse = await fetch(metaUrl);
-      if (!metaResponse.ok) {
-        throw new Error(`无法获取 meta.json: ${metaResponse.statusText}`);
+      // 先尝试从缓存读取 meta.json
+      const metaCacheKey = `meta_${packageName}`;
+      let metaData: any = readCache(metaCacheKey, "latest");
+      
+      if (!metaData) {
+        // 缓存未命中，从网络获取
+        const metaUrl = `https://jsr.io/${packageName}/meta.json`;
+        const metaResponse = await fetch(metaUrl);
+        if (!metaResponse.ok) {
+          throw new Error(`无法获取 meta.json: ${metaResponse.statusText}`);
+        }
+        metaData = await metaResponse.json();
+        // 写入缓存
+        await writeCache(metaCacheKey, "latest", metaData);
       }
-      const metaData = await metaResponse.json();
+      
       const latestVersion = metaData.latest || metaData.versions?.[0];
       if (!latestVersion) {
         throw new Error("无法从 meta.json 获取最新版本");
@@ -177,39 +188,48 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
     // JSR API URL 格式: https://jsr.io/@dreamer/foundry/1.1.0-beta.10/deno.json
     // 注意：版本号前是 / 而不是 @（已验证）
     // 重要：必须设置 Accept header，不能包含 text/html，否则会返回 HTML 页面
-    const denoJsonUrl = `https://jsr.io/${packageName}/${version}/deno.json`;
+    
+    // 先尝试从缓存读取 deno.json
+    const denoJsonCacheKey = `deno.json_${packageName}`;
+    let denoJson: any = readCache(denoJsonCacheKey, version);
+    
+    if (!denoJson) {
+      // 缓存未命中，从网络获取
+      const denoJsonUrl = `https://jsr.io/${packageName}/${version}/deno.json`;
 
-    const response = await fetch(denoJsonUrl, {
-      headers: {
-        "Accept": "application/json, */*",
-      },
-    });
-    if (!response.ok) {
-      throw new Error(`无法获取 deno.json: ${response.statusText} (${response.status})`);
-    }
-
-    // 检查 Content-Type，确保返回的是 JSON
-    const contentType = response.headers.get("content-type");
-    if (contentType && !contentType.includes("application/json")) {
-      // 如果返回的不是 JSON，可能是 HTML，尝试解析 HTML 中的 JSON
-      const text = await response.text();
-      // 尝试从 HTML 中提取 JSON（通常在 <pre> 标签中）
-      const jsonMatch = text.match(/<pre[^>]*>([\s\S]*?)<\/pre>/);
-      if (jsonMatch) {
-        try {
-          const denoJson = JSON.parse(jsonMatch[1]);
-          return {
-            version: denoJson.version || version,
-            imports: denoJson.imports || {},
-          };
-        } catch {
-          throw new Error("无法解析 HTML 中的 JSON 内容");
-        }
+      const response = await fetch(denoJsonUrl, {
+        headers: {
+          "Accept": "application/json, */*",
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`无法获取 deno.json: ${response.statusText} (${response.status})`);
       }
-      throw new Error(`返回的内容不是 JSON，Content-Type: ${contentType}`);
+
+      // 检查 Content-Type，确保返回的是 JSON
+      const contentType = response.headers.get("content-type");
+      if (contentType && !contentType.includes("application/json")) {
+        // 如果返回的不是 JSON，可能是 HTML，尝试解析 HTML 中的 JSON
+        const text = await response.text();
+        // 尝试从 HTML 中提取 JSON（通常在 <pre> 标签中）
+        const jsonMatch = text.match(/<pre[^>]*>([\s\S]*?)<\/pre>/);
+        if (jsonMatch) {
+          try {
+            denoJson = JSON.parse(jsonMatch[1]);
+          } catch {
+            throw new Error("无法解析 HTML 中的 JSON 内容");
+          }
+        } else {
+          throw new Error(`返回的内容不是 JSON，Content-Type: ${contentType}`);
+        }
+      } else {
+        denoJson = await response.json();
+      }
+      
+      // 写入缓存
+      await writeCache(denoJsonCacheKey, version, denoJson);
     }
 
-    const denoJson = await response.json();
     return {
       version: denoJson.version || version,
       imports: denoJson.imports || {},
