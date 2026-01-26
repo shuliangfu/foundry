@@ -30,8 +30,8 @@ import { logger } from "./utils/logger.ts";
 function parseJsrPackageFromUrl(): { packageName: string; version: string } | null {
   try {
     // import.meta.url 格式可能是:
-    // - https://jsr.io/@dreamer/foundry@1.1.0-beta.8/setup.ts
-    // - https://jsr.io/@dreamer/foundry@1.1.0-beta.8/setup
+    // - https://jsr.io/@dreamer/foundry/1.1.0-beta.9/src/setup.ts (实际格式)
+    // - https://jsr.io/@dreamer/foundry@1.1.0-beta.8/setup.ts (旧格式，可能不存在)
     const urlString = import.meta.url;
     logger.info(`🔍 解析 import.meta.url: ${urlString}`);
     
@@ -45,15 +45,34 @@ function parseJsrPackageFromUrl(): { packageName: string; version: string } | nu
 
     logger.info(`✅ 是 JSR URL，pathname: ${url.pathname}`);
 
-    // 路径格式: /@dreamer/foundry@1.1.0-beta.8/setup.ts
-    // 正则表达式需要匹配版本号（可能包含 beta、alpha、数字、点、连字符等）
-    // 版本号格式: 1.1.0-beta.8, 1.0.9, 1.1.0-beta.6 等
-    // 使用非贪婪匹配，匹配到第一个 / 或字符串结束
-    const pathMatch = url.pathname.match(/^\/@([^/@]+)\/([^/@]+)@([^/]+)(?:\/|$)/);
+    // 实际路径格式: /@dreamer/foundry/1.1.0-beta.9/src/setup.ts
+    // 格式: /@scope/name/version/path/to/file
+    // 先尝试匹配实际格式（版本号前是 /）
+    // 版本号可能包含：数字、点、连字符、beta、alpha 等
+    // 匹配模式: /@scope/name/version/... 其中 version 是第一个路径段（不包含 /）
+    let pathMatch = url.pathname.match(/^\/@([^/@]+)\/([^/@]+)\/([^/]+)\//);
     if (pathMatch) {
       const [, scope, name, version] = pathMatch;
       const packageName = `@${scope}/${name}`;
-      logger.info(`✅ 解析成功: ${packageName}@${version}`);
+      logger.info(`✅ 解析成功（新格式）: ${packageName}@${version}`);
+      return { packageName, version };
+    }
+    
+    // 尝试匹配没有后续路径的情况（版本号在末尾）
+    pathMatch = url.pathname.match(/^\/@([^/@]+)\/([^/@]+)\/([^/]+)$/);
+    if (pathMatch) {
+      const [, scope, name, version] = pathMatch;
+      const packageName = `@${scope}/${name}`;
+      logger.info(`✅ 解析成功（新格式，无后续路径）: ${packageName}@${version}`);
+      return { packageName, version };
+    }
+
+    // 尝试旧格式（版本号前是 @）
+    pathMatch = url.pathname.match(/^\/@([^/@]+)\/([^/@]+)@([^/]+)(?:\/|$)/);
+    if (pathMatch) {
+      const [, scope, name, version] = pathMatch;
+      const packageName = `@${scope}/${name}`;
+      logger.info(`✅ 解析成功（旧格式）: ${packageName}@${version}`);
       return { packageName, version };
     }
 
@@ -193,12 +212,19 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
     // 如果从 URL 解析到了版本，直接使用该版本；否则获取最新版本
     let version: string;
     
+    logger.info(`🔍 调试信息: parsedVersion=${parsedVersion}, isLocal=${isLocal}`);
+    
     if (parsedVersion && !isLocal) {
       // 从 JSR URL 解析到了版本，直接使用
       version = parsedVersion;
       logger.info(`📦 使用 URL 中的版本: ${version}`);
     } else {
-      // 获取最新版本
+      // 获取最新版本（只有在本地运行或无法解析版本时才执行）
+      if (isLocal) {
+        logger.info("📦 本地运行，获取最新版本");
+      } else {
+        logger.warn(`⚠️  无法从 URL 解析版本 (parsedVersion=${parsedVersion})，获取最新版本`);
+      }
       const metaUrl = `https://jsr.io/${packageName}/meta.json`;
       const metaResponse = await fetch(metaUrl);
       if (!metaResponse.ok) {
