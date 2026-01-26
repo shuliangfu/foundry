@@ -3,11 +3,11 @@
  * @title Foundry Verify
  * @description Contract verification utilities for Etherscan/BSCScan
  * 使用 @dreamer/runtime-adapter 兼容 Deno 和 Bun
- * 
+ *
  * @example
  * ```typescript
  * import { verify } from "@dreamer/foundry/verify";
- * 
+ *
  * await verify({
  *   address: "0x...",
  *   contractName: "MyContract",
@@ -18,12 +18,10 @@
  * ```
  */
 
-import { existsSync, readTextFileSync, createCommand, getEnv } from "@dreamer/runtime-adapter";
+import { existsSync, readTextFileSync, createCommand } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
-import { loadEnv } from "./utils/env.ts";
 import { loadContract } from "./utils/deploy-utils.ts";
-import { loadWeb3ConfigSync } from "./utils/web3.ts";
-import type { NetworkConfig } from "./utils/deploy-utils.ts";
+import { getNetworkName, getApiKey, loadNetworkConfig } from "./utils/cli-utils.ts";
 
 /**
  * 网络配置映射
@@ -36,19 +34,11 @@ const NETWORK_MAP: Record<string, {
     apiUrl: "https://api-sepolia.etherscan.io/api",
     explorerUrl: "https://sepolia.etherscan.io/address",
   },
-  mainnet: {
-    apiUrl: "https://api.etherscan.io/api",
-    explorerUrl: "https://etherscan.io/address",
-  },
   testnet: {
     apiUrl: "https://api-testnet.bscscan.com/api",
     explorerUrl: "https://testnet.bscscan.com/address",
   },
-  bsc_testnet: {
-    apiUrl: "https://api-testnet.bscscan.com/api",
-    explorerUrl: "https://testnet.bscscan.com/address",
-  },
-  bsc: {
+  mainnet: {
     apiUrl: "https://api.bscscan.com/api",
     explorerUrl: "https://bscscan.com/address",
   },
@@ -85,10 +75,10 @@ export async function verify(options: VerifyOptions): Promise<void> {
 
   // 读取 foundry.toml 配置，获取编译器版本和优化次数
   const foundryConfig = readFoundryConfig();
-  
+
   // 读取合约源码路径
   const contractPath = `src/${options.contractName}.sol:${options.contractName}`;
-  
+
   // 构建 forge verify-contract 命令
   const args = [
     "verify-contract",
@@ -262,55 +252,6 @@ function parseArgs(): {
   };
 }
 
-/**
- * 加载网络配置
- */
-async function loadNetworkConfigSync(): Promise<NetworkConfig> {
-  // 尝试从环境变量加载
-  const rpcUrl = getEnv("RPC_URL");
-  const privateKey = getEnv("PRIVATE_KEY");
-  const address = getEnv("ADDRESS");
-  const chainId = getEnv("CHAIN_ID") ? parseInt(getEnv("CHAIN_ID")!, 10) : undefined;
-
-  if (rpcUrl && privateKey && address) {
-    return {
-      rpcUrl,
-      privateKey,
-      address,
-      chainId,
-    };
-  }
-
-  // 尝试从 config/web3.json 加载
-  try {
-    const web3Config = loadWeb3ConfigSync();
-    if (web3Config && web3Config.accounts && web3Config.accounts.length > 0) {
-      const account = web3Config.accounts[0];
-      return {
-        rpcUrl: web3Config.host,
-        privateKey: account.privateKey,
-        address: account.address,
-        chainId: web3Config.chainId,
-      };
-    }
-  } catch (error) {
-    logger.warn("无法从 config/web3.json 加载配置:", error);
-  }
-
-  // 如果都加载失败，尝试从 .env 文件加载
-  try {
-    const env = await loadEnv();
-    return {
-      rpcUrl: env.RPC_URL || "",
-      privateKey: env.PRIVATE_KEY || "",
-      address: env.ADDRESS || "",
-      chainId: env.CHAIN_ID ? parseInt(env.CHAIN_ID, 10) : undefined,
-    };
-  } catch {
-    logger.error("无法加载网络配置，请设置环境变量或创建 config/web3.json 配置文件");
-    throw new Error("网络配置加载失败");
-  }
-}
 
 /**
  * 主函数（当作为脚本直接运行时）
@@ -320,17 +261,7 @@ async function main() {
   const { network: networkArg, contract: contractName, address, rpcUrl, apiKey, chainId, constructorArgs } = parseArgs();
 
   // 确定网络：优先使用命令行参数，其次使用环境变量
-  let network: string;
-  if (networkArg) {
-    network = networkArg;
-  } else {
-    try {
-      const env = await loadEnv();
-      network = env.WEB3_ENV || getEnv("WEB3_ENV") || "local";
-    } catch {
-      network = getEnv("WEB3_ENV") || "local";
-    }
-  }
+  const network = await getNetworkName(networkArg, false) || "local";
 
   if (!contractName) {
     logger.error("❌ 未指定合约名称");
@@ -338,17 +269,8 @@ async function main() {
     Deno.exit(1);
   }
 
-  // 如果未提供 API Key，尝试从环境变量读取
-  let finalApiKey = apiKey;
-  if (!finalApiKey) {
-    try {
-      const env = await loadEnv();
-      finalApiKey = env.ETH_API_KEY || getEnv("ETH_API_KEY");
-    } catch {
-      finalApiKey = getEnv("ETH_API_KEY");
-    }
-  }
-
+  // 获取 API Key（从命令行参数或环境变量）
+  const finalApiKey = await getApiKey(apiKey);
   if (!finalApiKey) {
     logger.error("❌ 未指定 API Key");
     logger.error("   请使用 --api-key 参数或设置环境变量 ETH_API_KEY");
@@ -387,7 +309,7 @@ async function main() {
 
   if (!finalRpcUrl || !finalChainId) {
     try {
-      const config = await loadNetworkConfigSync();
+      const config = await loadNetworkConfig();
       finalRpcUrl = finalRpcUrl || config.rpcUrl;
       finalChainId = finalChainId || config.chainId;
     } catch {

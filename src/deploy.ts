@@ -21,20 +21,17 @@
 
 import {
   cwd,
-  dirname,
   existsSync,
-  getEnv,
   join,
-  platform,
   readdir,
   setEnv,
   writeStdoutSync,
 } from "@dreamer/runtime-adapter";
 import type { DeployOptions, NetworkConfig } from "./utils/deploy-utils.ts";
 import { forgeDeploy, loadContract } from "./utils/deploy-utils.ts";
-import { loadEnv } from "./utils/env.ts";
 import { logger } from "./utils/logger.ts";
-import { createWeb3, loadWeb3ConfigSync } from "./utils/web3.ts";
+import { createWeb3 } from "./utils/web3.ts";
+import { getNetworkName, loadNetworkConfig as loadNetworkConfigUtil } from "./utils/cli-utils.ts";
 
 /**
  * 部署器接口
@@ -68,35 +65,6 @@ export interface DeployScriptOptions {
   contracts?: string[];
 }
 
-/**
- * 查找项目根目录（包含 deno.json 或 package.json 的目录）
- * @param startDir - 起始目录，默认为当前工作目录
- * @returns 项目根目录，如果未找到则返回 null
- */
-function findProjectRoot(startDir: string): string | null {
-  let currentDir = startDir;
-  const plat = platform();
-  const root = plat === "windows" ? /^[A-Z]:\\$/ : /^\/$/;
-
-  while (true) {
-    // 同时检查 deno.json（Deno）和 package.json（Bun）
-    const denoJsonPath = join(currentDir, "deno.json");
-    const packageJsonPath = join(currentDir, "package.json");
-
-    if (existsSync(denoJsonPath) || existsSync(packageJsonPath)) {
-      return currentDir;
-    }
-
-    // 检查是否到达根目录
-    const parentDir = dirname(currentDir);
-    if (parentDir === currentDir || currentDir.match(root)) {
-      break;
-    }
-    currentDir = parentDir;
-  }
-
-  return null;
-}
 
 /**
  * 扫描部署脚本
@@ -213,55 +181,6 @@ function findContractScript(contractName: string, scripts: string[]): string | n
   return null;
 }
 
-/**
- * 加载网络配置
- */
-async function loadNetworkConfig(): Promise<NetworkConfig> {
-  // 尝试从环境变量加载
-  const rpcUrl = getEnv("RPC_URL");
-  const privateKey = getEnv("PRIVATE_KEY");
-  const address = getEnv("ADDRESS");
-  const chainId = getEnv("CHAIN_ID") ? parseInt(getEnv("CHAIN_ID")!, 10) : undefined;
-
-  if (rpcUrl && privateKey && address) {
-    return {
-      rpcUrl,
-      privateKey,
-      address,
-      chainId,
-    };
-  }
-
-  // 尝试从 config/web3.json 加载
-  try {
-    const web3Config = loadWeb3ConfigSync();
-    if (web3Config && web3Config.accounts && web3Config.accounts.length > 0) {
-      const account = web3Config.accounts[0];
-      return {
-        rpcUrl: web3Config.host,
-        privateKey: account.privateKey,
-        address: account.address,
-        chainId: web3Config.chainId,
-      };
-    }
-  } catch (error) {
-    logger.warn("无法从 config/web3.json 加载配置:", error);
-  }
-
-  // 如果都加载失败，尝试从 .env 文件加载
-  try {
-    const env = await loadEnv();
-    return {
-      rpcUrl: env.RPC_URL || "",
-      privateKey: env.PRIVATE_KEY || "",
-      address: env.ADDRESS || "",
-      chainId: env.CHAIN_ID ? parseInt(env.CHAIN_ID, 10) : undefined,
-    };
-  } catch {
-    logger.error("无法加载网络配置，请设置环境变量或创建 config/web3.json 配置文件");
-    throw new Error("网络配置加载失败");
-  }
-}
 
 /**
  * 执行部署
@@ -311,8 +230,10 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
   );
 
   // 查找项目根目录（包含 deno.json 或 package.json 的目录）
-  const projectRoot = findProjectRoot(cwd());
-  if (!projectRoot) {
+  // 使用 getProjectConfig 来获取项目根目录（虽然这里暂时不需要使用，但保留用于未来扩展）
+  const { getProjectConfig } = await import("./utils/cli-utils.ts");
+  const projectConfig = getProjectConfig();
+  if (!projectConfig) {
     throw new Error("未找到项目根目录（包含 deno.json 或 package.json 的目录）");
   }
 
@@ -461,22 +382,12 @@ async function main() {
   const { network: networkArg, contracts, force } = parseArgs();
 
   // 确定网络：优先使用命令行参数，其次使用环境变量，最后使用默认值 local
-  let network: string;
-  if (networkArg) {
-    network = networkArg;
-  } else {
-    try {
-      const env = await loadEnv();
-      network = env.WEB3_ENV || getEnv("WEB3_ENV") || "local";
-    } catch {
-      network = getEnv("WEB3_ENV") || "local";
-    }
-  }
+  const network = await getNetworkName(networkArg, false) || "local";
 
   // 加载网络配置（不输出信息，因为 cli.ts 已经输出了）
   let config: NetworkConfig;
   try {
-    config = await loadNetworkConfig();
+    config = await loadNetworkConfigUtil();
   } catch (error) {
     logger.error("加载网络配置失败:", error);
     Deno.exit(1);

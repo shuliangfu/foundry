@@ -38,36 +38,8 @@ import { loadEnv } from "./utils/env.ts";
 import { parseJsrPackageFromUrl, parseJsrVersionFromUrl } from "./utils/jsr.ts";
 import { logger } from "./utils/logger.ts";
 import { loadWeb3ConfigSync } from "./utils/web3.ts";
+import { getProjectConfig, getScriptPath, executeDenoCommand, getApiKey, getNetworkName, handleCommandResult } from "./utils/cli-utils.ts";
 
-/**
- * 查找项目根目录（包含 deno.json 或 package.json 的目录）
- * @param startDir - 起始目录，默认为当前工作目录
- * @returns 项目根目录，如果未找到则返回 null
- */
-function findProjectRoot(startDir: string): string | null {
-  let currentDir = startDir;
-  const plat = platform();
-  const root = plat === "windows" ? /^[A-Z]:\\$/ : /^\/$/;
-
-  while (true) {
-    // 同时检查 deno.json（Deno）和 package.json（Bun）
-    const denoJsonPath = join(currentDir, "deno.json");
-    const packageJsonPath = join(currentDir, "package.json");
-
-    if (existsSync(denoJsonPath) || existsSync(packageJsonPath)) {
-      return currentDir;
-    }
-
-    // 检查是否到达根目录
-    const parentDir = dirname(currentDir);
-    if (parentDir === currentDir || currentDir.match(root)) {
-      break;
-    }
-    currentDir = parentDir;
-  }
-
-  return null;
-}
 
 /**
  * 提示用户确认
@@ -411,30 +383,22 @@ cli
     type: "string",
   })
   .action(async (_args, options) => {
-    // 如果未指定网络，尝试从 .env 文件读取 WEB3_ENV
-    let network = options.network as string | undefined;
+    // 获取网络名称（从命令行参数或环境变量）
+    const network = await getNetworkName(options.network as string | undefined, false);
     if (!network) {
-      try {
-        const env = await loadEnv();
-        network = env.WEB3_ENV || getEnv("WEB3_ENV");
-        if (!network) {
-          logger.error("❌ 未指定网络");
-          logger.error("   请使用 --network 参数指定网络，或在 .env 文件中设置 WEB3_ENV");
-          logger.error("   示例: foundry deploy --network testnet");
-          logger.error("   或在 .env 文件中设置: WEB3_ENV=testnet");
-          Deno.exit(1);
-        }
-        logger.info(`从 .env 文件读取网络配置: ${network}`);
-      } catch {
-        logger.error("❌ 未指定网络且无法读取 .env 文件");
-        logger.error("   请使用 --network 参数指定网络");
-        logger.error("   示例: foundry deploy --network testnet");
-        Deno.exit(1);
-      }
+      logger.error("❌ 未指定网络");
+      logger.error("   请使用 --network 参数指定网络，或在 .env 文件中设置 WEB3_ENV");
+      logger.error("   示例: foundry deploy --network testnet");
+      logger.error("   或在 .env 文件中设置: WEB3_ENV=testnet");
+      Deno.exit(1);
     }
-
-    // 此时 network 一定不是 undefined
-    const finalNetwork = network as string;
+    
+    const finalNetwork: string = network;
+    
+    // 如果未从命令行指定网络，且从环境变量读取到了，显示提示
+    if (!options.network && network !== "local") {
+      logger.info(`从 .env 文件读取网络配置: ${network}`);
+    }
 
     const contracts = options.contract as string[] | undefined;
     const force = options.force as boolean || false;
@@ -537,56 +501,20 @@ cli
       });
     }
 
-    logger.info("");
     logger.info("------------------------------------------");
 
-    // 查找项目根目录（包含 deno.json 的目录）
-    const projectRoot = findProjectRoot(cwd());
-    if (!projectRoot) {
-      logger.error("❌ 未找到项目根目录（包含 deno.json 的目录）");
+    // 获取项目配置（项目根目录和 deno.json 路径）
+    const projectConfig = getProjectConfig();
+    if (!projectConfig) {
       Deno.exit(1);
     }
+    const { projectRoot, denoJsonPath } = projectConfig;
 
-    // 获取项目的 deno.json 路径
-    const denoJsonPath = join(projectRoot, "deno.json");
-    if (!existsSync(denoJsonPath)) {
-      logger.error(`❌ 未找到项目的 deno.json 文件: ${denoJsonPath}`);
-      Deno.exit(1);
-    }
-
-    // 获取 deploy.ts 脚本的路径
-    // 如果是从 JSR 包运行的，使用 JSR URL；否则使用文件路径
-    let deployScriptPath: string;
-    const currentFileUrl = import.meta.url;
-
-    if (currentFileUrl.startsWith("https://jsr.io/") || currentFileUrl.startsWith("jsr:")) {
-      // 从 JSR URL 解析包名和版本
-      const jsrMatch = currentFileUrl.match(/jsr:([^@]+)@([^/]+)\//) ||
-        currentFileUrl.match(/https:\/\/jsr\.io\/([^@]+)@([^/]+)\//);
-      if (jsrMatch) {
-        const [, packageName, version] = jsrMatch;
-        deployScriptPath = `jsr:${packageName}@${version}/deploy`;
-      } else {
-        // 如果无法解析，尝试使用相对路径
-        const currentDir = dirname(currentFileUrl.replace(/^file:\/\//, ""));
-        deployScriptPath = join(currentDir, "deploy.ts");
-      }
-    } else {
-      // 本地运行，使用文件路径
-      const currentDir = dirname(currentFileUrl.replace(/^file:\/\//, ""));
-      deployScriptPath = join(currentDir, "deploy.ts");
-    }
+    // 获取 deploy.ts 脚本的路径（使用缓存）
+    const deployScriptPath = getScriptPath("deploy");
 
     // 构建命令行参数
-    const deployArgs: string[] = [
-      "run",
-      "-A",
-      "--config",
-      denoJsonPath,
-      deployScriptPath,
-      "--network",
-      finalNetwork,
-    ];
+    const deployArgs: string[] = ["--network", finalNetwork];
 
     if (force) {
       deployArgs.push("--force");
@@ -597,34 +525,17 @@ cli
       deployArgs.push(...contracts);
     }
 
-    // 执行部署脚本
-    try {
-      const cmd = new Deno.Command("deno", {
-        args: deployArgs,
-        stdout: "piped",
-        stderr: "piped",
-        cwd: projectRoot,
-      });
+      // 执行部署脚本
+      try {
+        const result = await executeDenoCommand(
+          deployScriptPath,
+          denoJsonPath,
+          projectRoot,
+          deployArgs,
+        );
 
-      const output = await cmd.output();
-      const stdoutText = new TextDecoder().decode(output.stdout);
-      const stderrText = new TextDecoder().decode(output.stderr);
-
-      // 输出脚本的标准输出
-      if (stdoutText) {
-        console.log(stdoutText);
-      }
-
-      if (!output.success) {
-        // 输出错误信息
-        if (stderrText) {
-          logger.error(stderrText);
-        }
-        Deno.exit(1);
-      }
-
-      logger.info("");
-      logger.info("✅ 所有部署脚本执行完成！");
+        // 处理执行结果
+        handleCommandResult(result, "✅ 所有部署脚本执行完成！");
 
       // 如果启用了验证，自动验证所有部署的合约
       if (shouldVerify) {
@@ -633,17 +544,8 @@ cli
         logger.info("🔍 开始验证合约...");
         logger.info("------------------------------------------");
 
-        // 获取 API Key
-        let finalApiKey = apiKey;
-        if (!finalApiKey) {
-          try {
-            const env = await loadEnv();
-            finalApiKey = env.ETH_API_KEY || getEnv("ETH_API_KEY");
-          } catch {
-            finalApiKey = getEnv("ETH_API_KEY");
-          }
-        }
-
+        // 获取 API Key（从命令行参数或环境变量）
+        const finalApiKey = await getApiKey(apiKey);
         if (!finalApiKey) {
           logger.error("❌ 未指定 API Key");
           logger.error("   请使用 --api-key 参数提供 API Key，或在 .env 文件中设置 ETH_API_KEY");
@@ -769,48 +671,30 @@ cli
     type: "number",
   })
   .action(async (_args, options) => {
-    // 如果未指定网络，尝试从 .env 文件读取 WEB3_ENV
-    let network = options.network as string | undefined;
+    // 获取网络名称（从命令行参数或环境变量）
+    const network = await getNetworkName(options.network as string | undefined, false);
     if (!network) {
-      try {
-        const env = await loadEnv();
-        network = env.WEB3_ENV || getEnv("WEB3_ENV");
-        if (!network) {
-          logger.error("❌ 未指定网络");
-          logger.error("   请使用 --network 参数指定网络，或在 .env 文件中设置 WEB3_ENV");
-          logger.error("   示例: foundry verify --network testnet --contract MyToken");
-          logger.error("   或在 .env 文件中设置: WEB3_ENV=testnet");
-          Deno.exit(1);
-        }
-        logger.info(`从 .env 文件读取网络配置: ${network}`);
-      } catch (_error) {
-        logger.error("❌ 未指定网络且无法读取 .env 文件");
-        logger.error("   请使用 --network 参数指定网络");
-        logger.error("   示例: foundry verify --network testnet --contract MyToken");
-        Deno.exit(1);
-      }
+      logger.error("❌ 未指定网络");
+      logger.error("   请使用 --network 参数指定网络，或在 .env 文件中设置 WEB3_ENV");
+      logger.error("   示例: foundry verify --network testnet --contract MyToken");
+      logger.error("   或在 .env 文件中设置: WEB3_ENV=testnet");
+      Deno.exit(1);
+    }
+    
+    const finalNetwork: string = network;
+    
+    // 如果未从命令行指定网络，且从环境变量读取到了，显示提示
+    if (!options.network && network !== "local") {
+      logger.info(`从 .env 文件读取网络配置: ${network}`);
     }
 
-    // 此时 network 一定不是 undefined
-    const finalNetwork = network as string;
-
     const contractName = options.contract as string;
-    let apiKey = options["api-key"] as string | undefined;
     const address = options.address as string | undefined;
     const rpcUrl = options["rpc-url"] as string | undefined;
     const chainId = options["chain-id"] as number | undefined;
 
-    // 如果未提供 API Key，尝试从环境变量读取
-    if (!apiKey) {
-      try {
-        const env = await loadEnv();
-        apiKey = env.ETH_API_KEY || getEnv("ETH_API_KEY");
-      } catch {
-        // 如果加载 .env 失败，尝试直接从环境变量读取
-        apiKey = getEnv("ETH_API_KEY");
-      }
-    }
-
+    // 获取 API Key（从命令行参数或环境变量）
+    const apiKey = await getApiKey(options["api-key"] as string | undefined);
     if (!apiKey) {
       logger.error("❌ 未指定 API Key");
       logger.error("   请使用 --api-key 参数或设置环境变量 ETH_API_KEY");
@@ -826,50 +710,18 @@ cli
     logger.info("------------------------------------------");
     logger.info("");
 
-    // 查找项目根目录（包含 deno.json 的目录）
-    const projectRoot = findProjectRoot(cwd());
-    if (!projectRoot) {
-      logger.error("❌ 未找到项目根目录（包含 deno.json 的目录）");
+    // 获取项目配置（项目根目录和 deno.json 路径）
+    const projectConfig = getProjectConfig();
+    if (!projectConfig) {
       Deno.exit(1);
     }
+    const { projectRoot, denoJsonPath } = projectConfig;
 
-    // 获取项目的 deno.json 路径
-    const denoJsonPath = join(projectRoot, "deno.json");
-    if (!existsSync(denoJsonPath)) {
-      logger.error(`❌ 未找到项目的 deno.json 文件: ${denoJsonPath}`);
-      Deno.exit(1);
-    }
-
-    // 获取 verify.ts 脚本的路径
-    // 如果是从 JSR 包运行的，使用 JSR URL；否则使用文件路径
-    let verifyScriptPath: string;
-    const currentFileUrl = import.meta.url;
-
-    if (currentFileUrl.startsWith("https://jsr.io/") || currentFileUrl.startsWith("jsr:")) {
-      // 从 JSR URL 解析包名和版本
-      const jsrMatch = currentFileUrl.match(/jsr:([^@]+)@([^/]+)\//) ||
-        currentFileUrl.match(/https:\/\/jsr\.io\/([^@]+)@([^/]+)\//);
-      if (jsrMatch) {
-        const [, packageName, version] = jsrMatch;
-        verifyScriptPath = `jsr:${packageName}@${version}/verify`;
-      } else {
-        // 如果无法解析，尝试使用相对路径
-        const currentDir = dirname(currentFileUrl.replace(/^file:\/\//, ""));
-        verifyScriptPath = join(currentDir, "verify.ts");
-      }
-    } else {
-      // 本地运行，使用文件路径
-      const currentDir = dirname(currentFileUrl.replace(/^file:\/\//, ""));
-      verifyScriptPath = join(currentDir, "verify.ts");
-    }
+    // 获取 verify.ts 脚本的路径（使用缓存）
+    const verifyScriptPath = getScriptPath("verify");
 
     // 构建命令行参数
     const verifyArgs: string[] = [
-      "run",
-      "-A",
-      "--config",
-      denoJsonPath,
-      verifyScriptPath,
       "--network",
       finalNetwork,
       "--contract",
@@ -895,30 +747,16 @@ cli
 
     // 执行验证脚本
     try {
-      const cmd = new Deno.Command("deno", {
-        args: verifyArgs,
-        stdout: "piped",
-        stderr: "piped",
-        cwd: projectRoot,
-      });
+      const result = await executeDenoCommand(
+        verifyScriptPath,
+        denoJsonPath,
+        projectRoot,
+        verifyArgs,
+      );
 
-      const output = await cmd.output();
-      const stdoutText = new TextDecoder().decode(output.stdout);
-      const stderrText = new TextDecoder().decode(output.stderr);
-
-      // 输出脚本的标准输出
-      if (stdoutText) {
-        console.log(stdoutText);
-      }
-
-      if (!output.success) {
-        // 输出错误信息
-        if (stderrText) {
-          logger.error(stderrText);
-        }
-        Deno.exit(1);
-      }
-
+      // 处理执行结果
+      handleCommandResult(result);
+      
       logger.info("");
       logger.info("------------------------------------------");
       logger.info("✅ 合约验证成功！");
