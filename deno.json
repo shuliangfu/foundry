@@ -1,12 +1,14 @@
 {
-  "version": "1.1.0-beta.25",
+  "version": "1.1.0-beta.26",
   "name": "@dreamer/foundry",
   "description": "Foundry deployment and verification utilities for Deno and Bun",
   "license": "MIT",
   "exports": {
     ".": "./src/mod.ts",
     "./cli": "./src/cli.ts",
-    "./setup": "./src/setup.ts"
+    "./setup": "./src/setup.ts",
+    "./deploy": "./src/deploy.ts",
+    "./verify": "./src/verify.ts"
   },
   "publish": {
     "exclude": [
