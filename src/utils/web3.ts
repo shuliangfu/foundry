@@ -64,6 +64,9 @@ function findConfigDir(startDir: string): string | null {
 	return null;
 }
 
+// 注意：自动预加载已移除，改为在 Web3 构造函数中按需加载
+// 这样可以避免在模块加载时阻塞，特别是在 init 命令执行时
+
 function loadWeb3Config(projectRoot?: string): Promise<NetworkConfig | null> {
 	// 如果正在加载，返回同一个 Promise
 	if (web3ConfigLoading) {
@@ -153,6 +156,7 @@ export class Web3 {
 	private contract?: ContractInfo;
 	private contractName?: string;
 	private account: { address: string; privateKey: string; index: number };
+	private rpcUrl: string;
 
 	/**
 	 * 创建 Web3 实例并绑定合约
@@ -264,37 +268,43 @@ export class Web3 {
 					index: accountIndex,
 				};
 			} else {
-				// 如果未提供 options 且配置未加载，尝试检查配置文件是否存在
-				// 配置读取逻辑在 loadWeb3Config() 函数中（第67-125行）：
-				// 1. 从当前目录向上查找 config/web3.ts 文件
-				// 2. 动态导入配置模块
-				// 3. 根据 WEB3_ENV 环境变量选择对应环境的配置
-				// 4. 将配置缓存到 web3ConfigCache
+				// 如果未提供 options 且配置未加载，尝试自动加载配置
 				if (!options || Object.keys(options).length === 0) {
-					// 尝试查找配置文件，给出更友好的错误提示
+					// 尝试查找配置文件
 					const configDir = findConfigDir(cwd());
 					const configPath = configDir ? join(configDir, "config", "web3.ts") : null;
 					
 					if (configPath && existsSync(configPath)) {
-						// 配置文件存在但未加载
-						throw new Error(
-							`Web3 配置未加载。检测到配置文件存在：${configPath}\n` +
-							`请在使用前调用 preloadWeb3Config() 来加载配置，或者提供 options 参数。\n` +
-							`示例：await preloadWeb3Config(); const web3 = new Web3('MyContract');`,
-						);
+						// 配置文件存在，尝试同步等待配置加载（如果正在加载）
+						// 如果配置正在加载，等待它完成
+						if (web3ConfigLoading) {
+							// 注意：这里不能真正等待，因为构造函数是同步的
+							// 但我们可以检查缓存是否已经更新
+							// 如果配置还未加载完成，抛出错误提示用户稍后重试或使用 preloadWeb3Config
+							throw new Error(
+								`Web3 配置正在加载中。请稍后重试，或先调用 await preloadWeb3Config() 确保配置已加载。\n` +
+								`配置文件路径：${configPath}`,
+							);
+						} else {
+							// 配置文件存在但未加载，提示用户调用 preloadWeb3Config
+							throw new Error(
+								`Web3 配置未加载。检测到配置文件存在：${configPath}\n` +
+								`配置会在模块加载时自动加载，但如果立即使用可能需要先调用 preloadWeb3Config()。\n` +
+								`示例：await preloadWeb3Config(); const web3 = new Web3('MyContract');`,
+							);
+						}
 					} else {
 						// 配置文件不存在
 						throw new Error(
 							`Web3 配置未找到。请创建 config/web3.ts 配置文件，或提供 options 参数。\n` +
-							`配置文件路径：从当前目录向上查找，直到找到包含 config/web3.ts 的目录。\n` +
-							`示例：await preloadWeb3Config(); const web3 = new Web3('MyContract');`,
+							`配置文件路径：从当前目录向上查找，直到找到包含 config/web3.ts 的目录。`,
 						);
 					}
 				} else {
 					// 提供了部分 options 但配置未加载，需要提供完整的 options
 					throw new Error(
 						"Web3 配置未找到。请检查 WEB3_ENV 环境变量或提供完整的 options.privateKey 和 options.address。\n" +
-						"如果使用配置文件，请确保 config/web3.ts 存在，并在使用前调用 preloadWeb3Config()",
+						"如果使用配置文件，请确保 config/web3.ts 存在，配置会在模块加载时自动加载。",
 					);
 				}
 			}
@@ -330,6 +340,9 @@ export class Web3 {
 			// 传递 account 参数，让框架正确识别账户（使用 this.account 中的地址）
 			// 这可能是框架的要求，即使有 privateKey 也需要 account
 			clientOptions.account = this.account.address;
+
+			// 保存 RPC URL，用于后续的 RPC 调用（如获取 nonce）
+			this.rpcUrl = clientOptions.rpcUrl;
 
 			this.client = createWeb3Client(clientOptions);
 		} catch (error) {
@@ -399,6 +412,56 @@ export class Web3 {
 
 		// callContract 已经自动等待交易确认，返回交易收据
 		return result as ExtendedTransactionReceipt;
+	}
+
+	/**
+	 * 获取账户地址
+	 */
+	get accountAddress(): string {
+		return this.account.address;
+	}
+
+	/**
+	 * 获取账户的当前 nonce（交易计数）
+	 * @param address - 可选，要查询的地址，默认为当前账户地址
+	 * @returns 返回账户的 nonce 值
+	 */
+	async getNonce(address?: string): Promise<number> {
+		const targetAddress = address || this.account.address;
+		
+		try {
+			// 直接调用 RPC 的 eth_getTransactionCount 方法
+			// 这是标准的 JSON-RPC 方法，用于获取账户的交易计数（nonce）
+			const response = await fetch(this.rpcUrl, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					jsonrpc: "2.0",
+					method: "eth_getTransactionCount",
+					params: [targetAddress, "latest"],
+					id: 1,
+				}),
+			});
+
+			if (!response.ok) {
+				throw new Error(`RPC 请求失败: ${response.statusText}`);
+			}
+
+			const data = await response.json();
+			
+			if (data.error) {
+				throw new Error(`RPC 错误: ${data.error.message || JSON.stringify(data.error)}`);
+			}
+
+			// 将十六进制字符串转换为数字
+			const nonceHex = data.result as string;
+			return parseInt(nonceHex, 16);
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			throw new Error(`获取 nonce 失败: ${errorMsg}`);
+		}
 	}
 
 	/**

@@ -134,6 +134,15 @@ foundry deploy --network testnet --contract MyToken MyContract
 
 # 强制重新部署
 foundry deploy --network testnet --contract MyToken --force
+
+# 部署并自动验证合约（需要 API Key）
+foundry deploy --network testnet --verify --api-key YOUR_API_KEY
+
+# 如果设置了环境变量 ETH_API_KEY，可以省略 --api-key 参数
+foundry deploy --network testnet --verify
+
+# 部署指定合约并验证
+foundry deploy --network testnet --contract MyToken --verify --api-key YOUR_API_KEY
 ```
 
 #### 验证合约

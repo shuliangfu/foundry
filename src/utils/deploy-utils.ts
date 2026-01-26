@@ -15,10 +15,57 @@
  * ```
  */
 
-import { existsSync, readTextFileSync, writeTextFileSync, mkdir, cwd } from "@dreamer/runtime-adapter";
+import { existsSync, readTextFileSync, writeTextFileSync, mkdir, cwd, remove, readdir } from "@dreamer/runtime-adapter";
 import { join } from "@dreamer/runtime-adapter";
 import { createCommand } from "@dreamer/runtime-adapter";
+import { writeStdoutSync } from "@dreamer/runtime-adapter";
 import { logger } from "./logger.ts";
+
+/**
+ * 创建进度条
+ * @returns 进度条对象，包含 start 和 stop 方法
+ */
+function createProgressBar() {
+  const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+  let currentFrame = 0;
+  let intervalId: ReturnType<typeof setInterval> | null = null;
+
+  return {
+    start(): ReturnType<typeof setInterval> {
+      const update = () => {
+        const frame = frames[currentFrame % frames.length];
+        // 使用 runtime-adapter 的 writeStdoutSync 方法，兼容 Deno 和 Bun
+        try {
+          const text = `\r${frame} 正在部署中...`;
+          writeStdoutSync(new TextEncoder().encode(text));
+        } catch {
+          // 如果写入失败，忽略错误
+        }
+        currentFrame++;
+      };
+
+      // 立即显示第一帧
+      update();
+      
+      // 每 100ms 更新一次
+      intervalId = setInterval(update, 100);
+      
+      return intervalId;
+    },
+    stop(intervalId: ReturnType<typeof setInterval> | null) {
+      if (intervalId !== null) {
+        clearInterval(intervalId);
+      }
+      // 清除进度条，回到行首并清除整行
+      try {
+        const clearLine = "\r" + " ".repeat(50) + "\r";
+        writeStdoutSync(new TextEncoder().encode(clearLine));
+      } catch {
+        // 如果写入失败，忽略错误
+      }
+    },
+  };
+}
 
 /**
  * 网络配置接口
@@ -63,6 +110,91 @@ export interface ContractInfo {
 }
 
 /**
+ * 清理 Foundry broadcast 目录中的交易记录
+ * @param _network 网络名称（保留用于未来扩展）
+ */
+async function cleanBroadcastDir(_network: string): Promise<void> {
+  try {
+    const broadcastDir = join(cwd(), "broadcast");
+    if (!existsSync(broadcastDir)) {
+      return;
+    }
+
+    // Foundry 的 broadcast 目录结构通常是: broadcast/{script_name}/{chain_id}/run-latest.json
+    // 为了确保能重新部署，我们需要更彻底地清理交易记录
+    // 删除整个链目录，这样更彻底
+
+    // 尝试读取 broadcast 目录
+    const entries = await readdir(broadcastDir);
+
+    // 清理所有子目录中的链目录（删除整个 chain_id 目录）
+    for (const entry of entries) {
+      if (entry.isDirectory) {
+        const scriptDir = join(broadcastDir, entry.name);
+        const scriptEntries = await readdir(scriptDir);
+
+        for (const chainEntry of scriptEntries) {
+          if (chainEntry.isDirectory) {
+            const chainDir = join(scriptDir, chainEntry.name);
+
+            // 删除整个链目录，这样更彻底
+            try {
+              await remove(chainDir, { recursive: true });
+              logger.info(`已清理交易记录目录: ${chainDir}`);
+            } catch (_error) {
+              // 如果删除目录失败，尝试只删除 run-latest.json
+              const runLatestPath = join(chainDir, "run-latest.json");
+              if (existsSync(runLatestPath)) {
+                await remove(runLatestPath);
+                logger.info(`已清理交易记录: ${runLatestPath}`);
+              } else {
+                logger.warn(`无法清理交易记录: ${chainDir}`);
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch (error) {
+    // 清理失败不影响部署，只记录警告
+    logger.warn(`清理 broadcast 目录时出错: ${error}`);
+  }
+}
+
+/**
+ * 检查合约是否已部署
+ * @param contractName 合约名称
+ * @param network 网络名称
+ * @param abiDir ABI 输出目录
+ * @returns 如果合约已存在返回地址，否则返回 null
+ */
+function checkContractExists(
+  contractName: string,
+  network: string,
+  abiDir?: string,
+): string | null {
+  try {
+    const buildDir = abiDir || join(cwd(), "build", "abi", network);
+    const abiPath = join(buildDir, `${contractName}.json`);
+
+    if (!existsSync(abiPath)) {
+      return null;
+    }
+
+    const data = JSON.parse(readTextFileSync(abiPath));
+    const address = data.address || null;
+
+    if (!address || address === "0x0000000000000000000000000000000000000000") {
+      return null;
+    }
+
+    return address;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 部署合约
  * @param contractName 合约名称
  * @param config 网络配置
@@ -76,6 +208,21 @@ export async function forgeDeploy(
   constructorArgs: string[] | Record<string, any> = [],
   options: DeployOptions = {},
 ): Promise<string> {
+  // 检查合约是否已存在
+  const network = options.abiDir?.split("/").pop() || "local";
+  const existingAddress = checkContractExists(contractName, network, options.abiDir);
+
+  if (existingAddress && !options.force) {
+    logger.warn(`⚠️  合约 ${contractName} 已存在，地址: ${existingAddress}`);
+    logger.warn(`   如需重新部署，请使用 --force 参数强制部署。`);
+    return existingAddress;
+  }
+
+  // 如果 force 为 true，清理之前的交易记录
+  if (options.force) {
+    await cleanBroadcastDir(network);
+  }
+
   // 转换构造函数参数为数组
   if (typeof constructorArgs === "object" && constructorArgs !== null && !Array.isArray(constructorArgs)) {
     constructorArgs = Object.values(constructorArgs);
@@ -114,6 +261,13 @@ export async function forgeDeploy(
     forgeArgs.push("--chain-id", String(options.chainId || config.chainId));
   }
 
+  logger.info(`正在部署合约 ${contractName}...`);
+  logger.info(`RPC URL: ${config.rpcUrl}`);
+  
+  // 显示进度条
+  const progressBar = createProgressBar();
+  const progressInterval = progressBar.start();
+
   const cmd = createCommand("forge", {
     args: forgeArgs,
     stdout: "piped",
@@ -122,15 +276,110 @@ export async function forgeDeploy(
   });
 
   const output = await cmd.output();
+  
+  // 停止进度条
+  progressBar.stop(progressInterval);
+  
   const stdoutText = new TextDecoder().decode(output.stdout);
   const stderrText = new TextDecoder().decode(output.stderr);
 
+  // 检查是否是 "transaction already imported" 错误
+  const isTransactionAlreadyImported = stderrText.includes("transaction already imported") ||
+    stderrText.includes("error code -32003");
+
   if (!output.success) {
+    // 如果是 "transaction already imported" 错误且 force 为 true，清理后重试
+    if (isTransactionAlreadyImported && options.force) {
+      logger.warn("检测到交易已存在，正在清理后重试...");
+      const network = options.abiDir?.split("/").pop() || "local";
+      await cleanBroadcastDir(network);
+
+      // 等待一段时间，让 RPC 节点清除交易缓存
+      logger.info("等待 RPC 节点清除交易缓存...");
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // 重试部署，显示进度条
+      const retryProgressBar = createProgressBar();
+      const retryProgressInterval = retryProgressBar.start();
+
+      const retryCmd = createCommand("forge", {
+        args: forgeArgs,
+        stdout: "piped",
+        stderr: "piped",
+        cwd: cwd(),
+      });
+
+      const retryOutput = await retryCmd.output();
+      
+      // 停止重试进度条
+      retryProgressBar.stop(retryProgressInterval);
+      
+      const retryStdoutText = new TextDecoder().decode(retryOutput.stdout);
+      const retryStderrText = new TextDecoder().decode(retryOutput.stderr);
+
+      if (!retryOutput.success) {
+        // 如果重试仍然失败，可能是 RPC 节点缓存了交易
+        logger.error("重试部署失败，可能是 RPC 节点缓存了交易:");
+        logger.error(retryStderrText);
+        logger.error("\n提示：如果使用的是本地 Anvil 节点，请重启节点以清除交易缓存。");
+        throw new Error(`Deployment failed: ${retryStderrText}`);
+      }
+
+      // 使用重试的输出
+      return await extractAddressFromOutput(retryStdoutText, retryStderrText, contractName, options, constructorArgs as string[]);
+    }
+
+    // 如果是 "transaction already imported" 错误但未使用 force，给出提示并尝试获取已存在的地址
+    if (isTransactionAlreadyImported && !options.force) {
+      logger.warn(`⚠️  合约 ${contractName} 的交易已存在，跳过部署。`);
+      logger.warn(`   如需重新部署，请使用 --force 参数强制重新部署。`);
+
+      // 尝试从已存在的合约信息中获取地址
+      try {
+        const network = options.abiDir?.split("/").pop() || "local";
+        const existingAddress = checkContractExists(contractName, network, options.abiDir);
+        if (existingAddress) {
+          logger.info(`   当前合约地址: ${existingAddress}`);
+          return existingAddress;
+        } else {
+          // 尝试从错误输出中提取地址（Foundry 可能会在错误信息中包含地址）
+          const addressPattern = /(0x[a-fA-F0-9]{40})/i;
+          const addressMatch = stderrText.match(addressPattern) || stdoutText.match(addressPattern);
+          if (addressMatch && addressMatch[1]) {
+            const extractedAddress = addressMatch[1];
+            logger.info(`   从交易信息中提取的合约地址: ${extractedAddress}`);
+            return extractedAddress;
+          }
+
+          logger.warn(`   无法获取已存在的合约地址，请检查 build/abi/${network}/${contractName}.json 文件。`);
+          // 即使找不到地址，也不抛出错误，返回空字符串让调用者处理
+          return "";
+        }
+      } catch {
+        // 如果无法获取地址，给出提示但不抛出错误
+        logger.warn(`   无法获取已存在的合约地址。`);
+        return "";
+      }
+    }
+
     logger.error("Deployment failed:");
     logger.error(stderrText);
     throw new Error(`Deployment failed: ${stderrText}`);
   }
 
+  return await extractAddressFromOutput(stdoutText, stderrText, contractName, options, constructorArgs as string[]);
+}
+
+/**
+ * 从部署输出中提取合约地址并保存
+ */
+async function extractAddressFromOutput(
+  stdoutText: string,
+  stderrText: string,
+  contractName: string,
+  options: DeployOptions,
+  constructorArgs: string[],
+): Promise<string> {
   // 尝试从 JSON 输出中提取地址和交易哈希
   let address: string | null = null;
   let txHash: string | null = null;
@@ -189,11 +438,10 @@ export async function forgeDeploy(
 
   // 保存合约信息
   const network = options.abiDir?.split("/").pop() || "local";
-  await saveContract(contractName, address, network, constructorArgs as string[], options.abiDir);
+  await saveContract(contractName, address, network, constructorArgs, options.abiDir, options.force);
 
-  logger.info(`✅ ${contractName} deployed to: ${address}`);
   if (txHash) {
-    logger.info(`   交易哈希: ${txHash}`);
+    logger.info(`✅ 交易哈希: ${txHash}`);
   }
 
   return address;
@@ -201,6 +449,12 @@ export async function forgeDeploy(
 
 /**
  * 保存合约信息到 JSON 文件
+ * @param contractName 合约名称
+ * @param address 合约地址
+ * @param network 网络名称
+ * @param constructorArgs 构造函数参数
+ * @param abiDir ABI 输出目录
+ * @param force 是否强制覆盖已存在的合约信息
  */
 async function saveContract(
   contractName: string,
@@ -208,9 +462,20 @@ async function saveContract(
   network: string,
   constructorArgs: string[],
   abiDir?: string,
+  force?: boolean,
 ): Promise<void> {
   const buildDir = abiDir || join(cwd(), "build", "abi", network);
   await mkdir(buildDir, { recursive: true });
+
+  const outputPath = join(buildDir, `${contractName}.json`);
+
+  // 如果合约已存在且未使用 force，跳过保存
+  if (!force && existsSync(outputPath)) {
+    logger.warn(`⚠️  合约 ${contractName} 已存在，跳过保存 ABI。如需覆盖，请使用 --force 参数。`);
+    logger.warn(`   现有地址: ${JSON.parse(readTextFileSync(outputPath)).address}`);
+    logger.warn(`   新地址: ${address}`);
+    return;
+  }
 
   const artifactPath = join(
     cwd(),
@@ -229,7 +494,6 @@ async function saveContract(
       abi: [],
       args: constructorArgs,
     };
-    const outputPath = join(buildDir, `${contractName}.json`);
     writeTextFileSync(outputPath, JSON.stringify(contractData, null, 2));
     return;
   }
@@ -247,9 +511,8 @@ async function saveContract(
     args: constructorArgs,
   };
 
-  const outputPath = join(buildDir, `${contractName}.json`);
   writeTextFileSync(outputPath, JSON.stringify(contractData, null, 2));
-  logger.info(`合约信息已保存到: ${join("build", "abi", network, `${contractName}.json`)}`);
+  logger.info(`✅ 合约信息已保存到: ${join("build", "abi", network, `${contractName}.json`)}`);
 }
 
 /**

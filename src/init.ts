@@ -564,9 +564,7 @@ import { logger } from "@dreamer/foundry";
  * @param deployer 部署器对象
  */
 export async function deploy(deployer: Deployer) {
-  logger.info("------------------------------------------");
-  logger.info("开始部署 MyToken 合约");
-  logger.info("------------------------------------------\\n");
+  logger.info("开始部署 MyToken 合约\\n");
 
   // MyToken 构造函数参数
   const args = [
@@ -630,7 +628,7 @@ describe("MyToken 合约测试", () => {
 
     it("应该能够读取小数位数", async () => {
       const decimals = await web3.read("decimals");
-      expect(decimals).toBe(18n);
+      expect(Number(decimals)).toBe(18);
     });
 
     it("应该能够读取总供应量", async () => {
@@ -871,39 +869,92 @@ deno install
 forge build
 \`\`\`
 
-### 2. 配置环境变量
+### 2. 安装全局命令（可选）
+
+如果你想使用全局命令 \`foundry\` 来部署和验证合约，可以运行：
 
 \`\`\`bash
-# 复制环境变量模板
-cp .env.example .env
+deno run -A jsr:@dreamer/foundry/setup
+\`\`\`
 
+安装后，你就可以在任何地方使用 \`foundry\` 命令了。
+
+### 3. 配置环境变量
+
+\`\`\`bash
 # 编辑 .env 文件，配置你的环境变量
 # WEB3_ENV=local  # 可选: local, testnet, mainnet
 # ETH_API_KEY=your-api-key  # 用于合约验证
 \`\`\`
 
-### 3. 配置网络
+注意：项目初始化时已自动创建 \`.env\` 文件，你可以直接编辑它。
+
+### 4. 配置网络
 
 编辑 \`config/web3.ts\` 文件，配置你的网络和账户信息。
 
-### 4. 编译合约
+### 5. 编译合约
 
 \`\`\`bash
 forge build
 \`\`\`
 
-### 5. 运行测试
+### 6. 运行测试
 
 \`\`\`bash
-forge test
-# 或使用 Deno 测试
+# 使用 Deno 测试
 deno test -A tests/
+
+# 或使用 Bun 测试
+bun test tests/
 \`\`\`
 
-### 6. 部署合约
+### 7. 部署合约
+
+#### 使用全局命令（推荐）
 
 \`\`\`bash
-deno run -A deploy.ts
+# 部署所有合约到指定网络
+foundry deploy --network local
+
+# 部署指定合约
+foundry deploy --network local --contract MyToken
+
+# 强制重新部署（覆盖已存在的合约）
+foundry deploy --network local --force
+
+# 部署并自动验证合约（需要 API Key）
+foundry deploy --network local --verify --api-key YOUR_API_KEY
+
+# 如果设置了环境变量 ETH_API_KEY，可以省略 --api-key 参数
+foundry deploy --network local --verify
+
+# 部署指定合约并验证
+foundry deploy --network local --contract MyToken --verify --api-key YOUR_API_KEY
+\`\`\`
+
+#### 使用 Deno 直接运行
+
+\`\`\`bash
+deno run -A jsr:@dreamer/foundry/cli deploy --network local
+\`\`\`
+
+### 8. 验证合约
+
+#### 使用全局命令（推荐）
+
+\`\`\`bash
+# 验证合约（需要 API Key）
+foundry verify --network local --contract MyToken --api-key YOUR_API_KEY
+
+# 如果设置了环境变量 ETH_API_KEY，可以省略 --api-key 参数
+foundry verify --network local --contract MyToken
+\`\`\`
+
+#### 使用 Deno 直接运行
+
+\`\`\`bash
+deno run -A jsr:@dreamer/foundry/cli verify --network local --contract MyToken --api-key YOUR_API_KEY
 \`\`\`
 
 ## 使用 @dreamer/foundry 库
@@ -911,14 +962,31 @@ deno run -A deploy.ts
 本项目使用 \`@dreamer/foundry\` 库进行部署和验证：
 
 \`\`\`typescript
-import { deploy, verify, preloadWeb3Config, Web3 } from "@dreamer/foundry";
+import { Web3 } from "@dreamer/foundry";
 
-// 预加载 Web3 配置
-await preloadWeb3Config();
-
-// 使用 Web3 类
+// 直接使用 Web3 类，配置会自动从 config/web3.ts 加载
 const web3 = new Web3("MyContract");
 \`\`\`
+
+注意：\`config/web3.ts\` 会在模块加载时自动调用 \`preloadWeb3Config()\`，所以你不需要手动调用它。
+
+## 全局命令说明
+
+安装全局命令后，可以使用以下命令：
+
+- \`foundry deploy\` - 部署智能合约
+  - \`--network <网络名>\` - 指定网络（可选，默认从 .env 读取 WEB3_ENV）
+  - \`--contract <合约名>\` - 指定要部署的合约（可选）
+  - \`--force\` 或 \`-f\` - 强制重新部署，即使合约已存在
+  - \`--verify\` - 部署后自动验证合约（需要提供 --api-key 或在 .env 文件中设置 ETH_API_KEY）
+  - \`--api-key <API_KEY>\` - Etherscan/BSCScan API Key（验证时需要，可选，如果设置了 ETH_API_KEY 环境变量）
+
+- \`foundry verify\` - 验证智能合约
+  - \`--network <网络名>\` - 指定网络（可选，默认从 .env 读取 WEB3_ENV）
+  - \`--contract <合约名>\` - 要验证的合约名称
+  - \`--api-key <API_KEY>\` - Etherscan API Key（可选，如果设置了 ETH_API_KEY 环境变量）
+
+- \`foundry init [项目名]\` - 初始化新的 Foundry 项目
 
 ## 更多信息
 
@@ -1061,7 +1129,7 @@ export async function init(projectRoot?: string): Promise<void> {
     logger.info("===========================================");
     logger.info("");
     logger.info("下一步：");
-    logger.info("  1. 配置环境变量: cp .env.example .env");
+    logger.info("  1. 编辑 .env 文件配置环境变量");
     logger.info("  2. 编辑 config/web3.ts 配置网络和账户");
     logger.info("  3. 安装 Deno 依赖: deno install");
     logger.info("  4. 编译合约: forge build");

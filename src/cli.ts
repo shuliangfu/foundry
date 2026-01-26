@@ -3,7 +3,7 @@
  * @module
  * @title Foundry CLI
  * @description Foundry deployment and verification command-line tool.
- * 
+ *
  * This module provides CLI commands for deploying and verifying smart contracts.
  * It uses @dreamer/console and @dreamer/runtime-adapter for Deno and Bun compatibility.
  *
@@ -99,7 +99,13 @@ async function loadNetworkConfig(network: string): Promise<NetworkConfig> {
   try {
     const configPath = join(cwd(), "config", "web3.ts");
     if (existsSync(configPath)) {
-      const configUrl = new URL(`file://${configPath}`).href;
+      // 使用与 deploy.ts 相同的方式导入
+      const projectRoot = cwd();
+      const configDir = join(projectRoot, "config");
+      // 确保路径以 / 结尾，并使用正斜杠
+      const normalizedDir = configDir.replace(/\\/g, "/") + "/";
+      const configUrl = new URL(`web3.ts`, `file://${normalizedDir}`).href;
+
       const configModule = await import(configUrl);
 
       // 设置环境变量
@@ -124,6 +130,13 @@ async function loadNetworkConfig(network: string): Promise<NetworkConfig> {
     }
   } catch (error) {
     logger.warn("无法从 config/web3.ts 加载配置:", error);
+    // 输出更详细的错误信息以便调试
+    if (error instanceof Error) {
+      logger.warn(`错误详情: ${error.message}`);
+      if (error.stack) {
+        logger.warn(`错误堆栈: ${error.stack}`);
+      }
+    }
   }
 
   // 如果都加载失败，尝试从 .env 文件加载
@@ -260,6 +273,17 @@ cli
     description: "强制重新部署，即使合约已存在",
     type: "boolean",
   })
+  .option({
+    name: "verify",
+    description: "部署后自动验证合约（需要提供 --api-key 或在 .env 文件中设置 ETH_API_KEY）",
+    type: "boolean",
+  })
+  .option({
+    name: "api-key",
+    description: "Etherscan/BSCScan API Key（验证时需要，如果不提供则从环境变量 ETH_API_KEY 读取）",
+    requiresValue: true,
+    type: "string",
+  })
   .action(async (_args, options) => {
     // 如果未指定网络，尝试从 .env 文件读取 WEB3_ENV
     let network = options.network as string | undefined;
@@ -288,6 +312,8 @@ cli
 
     const contracts = options.contract as string[] | undefined;
     const force = options.force as boolean || false;
+    const shouldVerify = options.verify as boolean || false;
+    const apiKey = options["api-key"] as string | undefined;
     const scriptDir = join(cwd(), "script");
 
     // 如果使用强制部署，需要用户确认
@@ -303,11 +329,8 @@ cli
       }
     }
 
-    logger.info("------------------------------------------");
     logger.info("🚀 开始部署");
-    logger.info("------------------------------------------");
     logger.info("网络:", finalNetwork);
-    logger.info("------------------------------------------");
     logger.info("");
 
     // 加载网络配置
@@ -389,7 +412,7 @@ cli
     }
 
     logger.info("");
-
+    logger.info("------------------------------------------");
     // 执行部署
     try {
       await deploy({
@@ -401,16 +424,98 @@ cli
       });
 
       logger.info("");
-      logger.info("------------------------------------------");
       logger.info("✅ 所有部署脚本执行完成！");
-      logger.info("------------------------------------------");
-      logger.info("");
-      logger.info("下一步:");
-      logger.info(`  验证合约: foundry verify --network ${finalNetwork} --contract <合约名>`);
-      logger.info(`  或: foundry verify --network ${finalNetwork} --contract <合约名> --api-key <API_KEY>`);
-      logger.info(`  注意: 如果设置了环境变量 ETH_API_KEY，可以省略 --api-key 参数`);
+
+      // 如果启用了验证，自动验证所有部署的合约
+      if (shouldVerify) {
+        logger.info("");
+        logger.info("------------------------------------------");
+        logger.info("🔍 开始验证合约...");
+        logger.info("------------------------------------------");
+
+        // 获取 API Key
+        let finalApiKey = apiKey;
+        if (!finalApiKey) {
+          try {
+            const env = await loadEnv();
+            finalApiKey = env.ETH_API_KEY || getEnv("ETH_API_KEY");
+          } catch {
+            finalApiKey = getEnv("ETH_API_KEY");
+          }
+        }
+
+        if (!finalApiKey) {
+          logger.error("❌ 未指定 API Key");
+          logger.error("   请使用 --api-key 参数提供 API Key，或在 .env 文件中设置 ETH_API_KEY");
+          logger.error("   示例: foundry deploy --network testnet --verify --api-key YOUR_API_KEY");
+          Deno.exit(1);
+        }
+
+        // 确定要验证的合约列表
+        const contractsToVerify: string[] = [];
+        if (contracts && contracts.length > 0) {
+          // 如果指定了合约，验证这些合约
+          for (const contract of contracts) {
+            const targetScript = findContractScript(contract, scripts);
+            if (targetScript) {
+              const match = targetScript.match(/^\d+-(.+)\.ts$/);
+              if (match) {
+                contractsToVerify.push(match[1]);
+              }
+            }
+          }
+        } else {
+          // 如果没有指定合约，验证所有部署脚本对应的合约
+          for (const script of scripts) {
+            const match = script.match(/^\d+-(.+)\.ts$/);
+            if (match) {
+              contractsToVerify.push(match[1]);
+            }
+          }
+        }
+
+        // 导入 loadContract 函数
+        const { loadContract } = await import("./utils/deploy-utils.ts");
+
+        // 验证每个合约
+        for (let i = 0; i < contractsToVerify.length; i++) {
+          const contractName = contractsToVerify[i];
+          logger.info(`[${i + 1}/${contractsToVerify.length}] 验证合约: ${contractName}`);
+
+          try {
+            // 读取已部署的合约信息
+            const contractInfo = loadContract(contractName, finalNetwork);
+
+            if (!contractInfo || !contractInfo.address) {
+              logger.warn(`⚠️  合约 ${contractName} 未找到部署信息，跳过验证`);
+              continue;
+            }
+
+            // 调用验证函数
+            await verify({
+              address: contractInfo.address,
+              contractName: contractName,
+              network: finalNetwork,
+              apiKey: finalApiKey,
+              rpcUrl: config.rpcUrl,
+              constructorArgs: contractInfo.args,
+              chainId: config.chainId,
+            });
+
+            logger.info(`✅ ${contractName} 验证成功`);
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            logger.error(`❌ ${contractName} 验证失败: ${errorMessage}`);
+            // 验证失败不中断流程，继续验证其他合约
+          }
+        }
+
+        logger.info("");
+        logger.info("✅ 所有合约验证完成！");
+      }
     } catch (error) {
-      logger.error("❌ 部署失败:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error("❌ 部署失败:", errorMessage);
       Deno.exit(1);
     }
   });
@@ -435,12 +540,6 @@ cli
     required: true,
   })
   .option({
-    name: "api-key",
-    description: "Etherscan/BSCScan API Key（可选，如果不提供则从环境变量 ETH_API_KEY 读取）",
-    requiresValue: true,
-    type: "string",
-  })
-  .option({
     name: "address",
     alias: "a",
     description: "合约地址（可选，如果不提供则从 build/abi/{network}/{contract}.json 读取）",
@@ -454,16 +553,16 @@ cli
     type: "string",
   })
   .option({
+    name: "api-key",
+    description: "Etherscan/BSCScan API Key（可选，如果不提供则从环境变量 ETH_API_KEY 读取）",
+    requiresValue: true,
+    type: "string",
+  })
+  .option({
     name: "chain-id",
     description: "链 ID（可选，如果不提供则从配置中读取）",
     requiresValue: true,
     type: "number",
-  })
-  .option({
-    name: "constructor-args",
-    description: "构造函数参数（可选，多个参数用空格分隔）",
-    requiresValue: true,
-    type: "array",
   })
   .action(async (_args, options) => {
     // 如果未指定网络，尝试从 .env 文件读取 WEB3_ENV
@@ -496,7 +595,6 @@ cli
     const address = options.address as string | undefined;
     const rpcUrl = options["rpc-url"] as string | undefined;
     const chainId = options["chain-id"] as number | undefined;
-    const constructorArgs = options["constructor-args"] as string[] | undefined;
 
     // 如果未提供 API Key，尝试从环境变量读取
     if (!apiKey) {
@@ -526,15 +624,33 @@ cli
 
     // 确定合约地址
     let contractAddress = address;
+    let contractInfo: any = null;
     if (!contractAddress) {
       try {
         const { loadContract } = await import("./utils/deploy-utils.ts");
-        const contract = loadContract(contractName, finalNetwork);
-        contractAddress = contract.address;
+        contractInfo = loadContract(contractName, finalNetwork);
+        contractAddress = contractInfo.address;
         logger.info("从部署记录读取合约地址:", contractAddress);
       } catch {
         logger.error("❌ 无法读取合约地址，请使用 --address 参数指定");
         Deno.exit(1);
+      }
+    } else {
+      // 如果提供了地址，也尝试加载合约信息以获取构造函数参数
+      try {
+        const { loadContract } = await import("./utils/deploy-utils.ts");
+        contractInfo = loadContract(contractName, finalNetwork);
+      } catch {
+        // 如果加载失败，忽略，使用命令行参数
+      }
+    }
+
+    // 如果没有提供构造函数参数，尝试从合约信息中读取
+    let finalConstructorArgs: string[] | undefined;
+    if (contractInfo && contractInfo.args) {
+      finalConstructorArgs = contractInfo.args;
+      if (finalConstructorArgs && finalConstructorArgs.length > 0) {
+        logger.info("从部署记录读取构造函数参数:", finalConstructorArgs.join(", "));
       }
     }
 
@@ -565,8 +681,8 @@ cli
     logger.info("合约地址:", contractAddress);
     logger.info("RPC URL:", finalRpcUrl);
     logger.info("链 ID:", finalChainId);
-    if (constructorArgs && constructorArgs.length > 0) {
-      logger.info("构造函数参数:", constructorArgs.join(", "));
+    if (finalConstructorArgs && finalConstructorArgs.length > 0) {
+      logger.info("构造函数参数:", finalConstructorArgs.join(", "));
     }
     logger.info("");
 
@@ -579,7 +695,7 @@ cli
         apiKey: apiKey!,
         rpcUrl: finalRpcUrl!,
         chainId: finalChainId,
-        constructorArgs,
+        constructorArgs: finalConstructorArgs || undefined,
       });
 
       logger.info("");

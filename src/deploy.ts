@@ -103,7 +103,12 @@ export function createDeployer(
       constructorArgs: string[] | Record<string, any> = [],
       options?: DeployOptions,
     ) => {
-      const address = await forgeDeploy(contractName, config, constructorArgs, options);
+      // 合并 force 参数到 options
+      const deployOptions = {
+        ...options,
+        force: options?.force ?? force,
+      };
+      const address = await forgeDeploy(contractName, config, constructorArgs, deployOptions);
       // 返回简化的合约实例
       return { address };
     },
@@ -200,12 +205,6 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
     });
   }
 
-  logger.info("------------------------------------------");
-  logger.info("🚀 Deployment");
-  logger.info("------------------------------------------");
-  logger.info("Network:", options.network);
-  logger.info("RPC URL:", options.config.rpcUrl);
-  logger.info("------------------------------------------");
   logger.info("");
 
   const deployer = createDeployer(
@@ -230,13 +229,12 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
       await scriptModule.deploy(deployer);
       logger.info(`✅ ${script} completed successfully`);
     } catch (error) {
-      logger.error(`❌ Error executing ${script}:`, error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`❌ Error executing ${script}: ${errorMessage}`);
       throw error;
     }
   }
 
   logger.info("");
-  logger.info("------------------------------------------");
   logger.info("✅ All Deployment Scripts Completed!");
-  logger.info("------------------------------------------");
 }
