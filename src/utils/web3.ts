@@ -13,6 +13,7 @@ import {
   platform,
   readTextFileSync,
 } from "@dreamer/runtime-adapter";
+import { ConfigurationError } from "../errors/index.ts";
 import {
   addHexPrefix,
   bytesToHex,
@@ -73,8 +74,8 @@ export {
  */
 interface NetworkConfig {
   chainId: number;
-  host: string;
-  wss: string;
+  rpcUrl: string;
+  wssUrl: string;
   accounts: Array<{
     address: string;
     privateKey: string;
@@ -152,33 +153,28 @@ export function loadWeb3ConfigSync(projectRoot?: string): NetworkConfig | null {
     const web3Env = getEnv("WEB3_ENV") || "local";
 
     // 从配置中获取对应环境的配置
-    // 新格式：支持 chain + network 结构
     // 格式：{ "chain": "bsc", "network": { "local": {...}, "testnet": {...}, "mainnet": {...} } }
     let config: NetworkConfig | null = null;
 
     if (jsonConfig.chain && jsonConfig.network) {
-      // 新格式：chain + network 结构
+      // chain + network 结构
       if (jsonConfig.network[web3Env]) {
         config = jsonConfig.network[web3Env];
       } else if (jsonConfig.network.local) {
         // 默认使用 local
         config = jsonConfig.network.local;
       }
-    } else if (jsonConfig[web3Env]) {
-      // 向后兼容：直接使用网络名称作为顶级 key（旧格式）
-      config = jsonConfig[web3Env];
-    } else if (jsonConfig.local) {
-      // 向后兼容：默认使用 local（旧格式）
-      config = jsonConfig.local;
-    } else if (jsonConfig.Web3Config && jsonConfig.Web3Config[web3Env]) {
-      // 向后兼容：支持 Web3Config 包装（旧格式）
-      config = jsonConfig.Web3Config[web3Env];
-    } else if (jsonConfig.Web3Config && jsonConfig.Web3Config.local) {
-      // 向后兼容：默认使用 local（旧格式）
-      config = jsonConfig.Web3Config.local;
-    } else if (jsonConfig.web3Config) {
-      // 兼容其他可能的格式
-      config = jsonConfig.web3Config;
+    } else {
+      throw new ConfigurationError(
+        `配置文件格式无效：config/web3.json 必须包含 "chain" 和 "network" 字段`,
+        {
+          configPath: jsonConfigPath,
+          projectRoot: configDir,
+          web3Env,
+          hasChain: !!jsonConfig.chain,
+          hasNetwork: !!jsonConfig.network,
+        }
+      );
     }
 
     if (config) {
@@ -186,8 +182,22 @@ export function loadWeb3ConfigSync(projectRoot?: string): NetworkConfig | null {
       return config;
     }
 
-    return null;
-  } catch {
+    // 如果配置格式正确但没有找到对应环境的配置
+    throw new ConfigurationError(
+      `未找到网络配置：环境变量 WEB3_ENV=${web3Env} 对应的配置不存在，且没有默认的 local 配置`,
+      {
+        configPath: jsonConfigPath,
+        projectRoot: configDir,
+        web3Env,
+        availableNetworks: jsonConfig.network ? Object.keys(jsonConfig.network) : [],
+      }
+    );
+  } catch (error) {
+    // 如果是 ConfigurationError，直接抛出
+    if (error instanceof ConfigurationError) {
+      throw error;
+    }
+    // 其他错误（如 JSON 解析错误、文件读取错误等）返回 null
     return null;
   }
 }
@@ -204,8 +214,8 @@ function getWeb3ConfigSync(projectRoot?: string): NetworkConfig | null {
 }
 
 /**
- * 预加载 Web3 配置（为了保持 API 兼容性）
- * 现在配置文件是 JSON 格式，会同步加载
+ * 预加载 Web3 配置
+ * 配置文件是 JSON 格式，会同步加载
  * @param projectRoot - 可选的项目根目录，如果不提供则从当前工作目录向上查找
  */
 export function preloadWeb3Config(projectRoot?: string): void {
@@ -418,8 +428,8 @@ export class Web3 {
         account?: string;
       } = {
         rpcUrl: options?.rpcUrl ||
-          (finalConfig?.host || "http://127.0.0.1:8545"),
-        wssUrl: options?.wssUrl || (finalConfig?.wss || "ws://127.0.0.1:8545"),
+          (finalConfig?.rpcUrl || "http://127.0.0.1:8545"),
+        wssUrl: options?.wssUrl || (finalConfig?.wssUrl || "ws://127.0.0.1:8545"),
         chainId: options?.chainId || (finalConfig?.chainId || 31337),
         privateKey: this.account.privateKey,
       };
@@ -1333,8 +1343,8 @@ export function createWeb3(
   // 合并配置：options 优先，然后使用 config 中的值作为默认值
   const mergedOptions: Web3Options = {
     // 如果提供了 options，使用 options 的值，否则使用 config 中的值
-    rpcUrl: options?.rpcUrl || config?.host,
-    wssUrl: options?.wssUrl || config?.wss,
+    rpcUrl: options?.rpcUrl || config?.rpcUrl,
+    wssUrl: options?.wssUrl || config?.wssUrl,
     chainId: options?.chainId || config?.chainId,
     // 账户相关参数：如果提供了 options，使用 options，否则使用 config
     privateKey: options?.privateKey,

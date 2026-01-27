@@ -94,7 +94,7 @@ describe("Init 项目初始化测试", () => {
     // 项目已在 beforeAll 中创建，直接验证
     const expectedDirs = [
       "src",
-      "script",
+      "deploy",
       "tests",
       "build",
       "build/abi",
@@ -162,12 +162,23 @@ describe("Init 项目初始化测试", () => {
     expect(content).toContain("testnet");
     expect(content).toContain("mainnet");
     expect(content).toContain("chainId");
-    expect(content).toContain("host");
+    expect(content).toContain("rpcUrl");
     // 验证是有效的 JSON 并包含必要的网络配置
     const jsonConfig = JSON.parse(content);
-    expect(jsonConfig.local).toBeDefined();
-    expect(jsonConfig.testnet).toBeDefined();
-    expect(jsonConfig.mainnet).toBeDefined();
+    // 新格式：{ chain, network: { local, testnet, mainnet } }
+    if (jsonConfig.network) {
+      expect(jsonConfig.network.local).toBeDefined();
+      expect(jsonConfig.network.testnet).toBeDefined();
+      expect(jsonConfig.network.mainnet).toBeDefined();
+      // 验证新格式使用 rpcUrl 和 wssUrl
+      expect(jsonConfig.network.local.rpcUrl).toBeDefined();
+      expect(jsonConfig.network.local.wssUrl).toBeDefined();
+    } else {
+      // 向后兼容：旧格式 { local, testnet, mainnet }
+      expect(jsonConfig.local).toBeDefined();
+      expect(jsonConfig.testnet).toBeDefined();
+      expect(jsonConfig.mainnet).toBeDefined();
+    }
   });
 
   // 示例文件创建测试
@@ -183,7 +194,7 @@ describe("Init 项目初始化测试", () => {
 
   it("应该能够创建示例部署脚本", async () => {
     // 项目已在 beforeAll 中创建，直接验证
-    const scriptPath = join(testProjectRoot, "script", "1-mytoken.ts");
+    const scriptPath = join(testProjectRoot, "deploy", "1-mytoken.ts");
     expect(existsSync(scriptPath)).toBe(true);
 
     const content = await readTextFile(scriptPath);
@@ -301,7 +312,7 @@ describe("Init 项目初始化测试", () => {
 
   it("部署脚本应该包含正确的导入", async () => {
     // 项目已在 beforeAll 中创建，直接验证
-    const content = await readTextFile(join(testProjectRoot, "script", "1-mytoken.ts"));
+    const content = await readTextFile(join(testProjectRoot, "deploy", "1-mytoken.ts"));
 
     expect(content).toContain("@dreamer/foundry");
     expect(content).toContain("Deployer");

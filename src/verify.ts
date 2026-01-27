@@ -114,18 +114,6 @@ const NETWORK_MAP: Record<string, {
       explorerUrl: "https://optimistic.etherscan.io/address",
     },
   },
-  zkSync: {
-    // 注意：zkSync Era 不使用标准的 Etherscan API，可能需要特殊处理
-    // 这里保留配置，但验证时可能需要使用不同的方法
-    testnet: {
-      apiUrl: "https://api-sepolia-era.zksync.network/api",
-      explorerUrl: "https://sepolia.explorer.zksync.io/address",
-    },
-    mainnet: {
-      apiUrl: "https://api-era.zksync.network/api",
-      explorerUrl: "https://explorer.zksync.io/address",
-    },
-  },
   avalanche: {
     testnet: {
       // Avalanche Fuji 测试网

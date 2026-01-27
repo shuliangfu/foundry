@@ -21,3 +21,4 @@
 
 // 导出部署功能
 export * from "./deploy.ts";
+export * from "./utils/mod.ts";

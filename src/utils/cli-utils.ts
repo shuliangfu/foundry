@@ -308,7 +308,7 @@ export async function loadNetworkConfig(_network?: string): Promise<{
     if (web3Config && web3Config.accounts && web3Config.accounts.length > 0) {
       const account = web3Config.accounts[0];
       return {
-        rpcUrl: web3Config.host,
+        rpcUrl: web3Config.rpcUrl,
         privateKey: account.privateKey,
         address: account.address,
         chainId: web3Config.chainId,
@@ -343,8 +343,8 @@ export function getNetworkName(
   networkFromOption?: string,
   requireNetwork: boolean = false,
 ): string | null {
-  // 如果命令行提供了网络名称，直接使用
-  if (networkFromOption) {
+  // 如果命令行提供了网络名称，直接使用（空字符串视为无效）
+  if (networkFromOption && networkFromOption.trim() !== "") {
     return networkFromOption;
   }
 

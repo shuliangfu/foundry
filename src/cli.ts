@@ -359,7 +359,7 @@ function loadNetworkConfig(_network: string): NetworkConfig {
     if (web3Config && web3Config.accounts && web3Config.accounts.length > 0) {
       const account = web3Config.accounts[0];
       return {
-        rpcUrl: web3Config.host,
+        rpcUrl: web3Config.rpcUrl,
         privateKey: account.privateKey,
         address: account.address,
         chainId: web3Config.chainId,
@@ -532,7 +532,7 @@ cli
     const force = options.force as boolean || false;
     const shouldVerify = options.verify as boolean || false;
     const apiKey = options["api-key"] as string | undefined;
-    const scriptDir = join(cwd(), "script");
+    const scriptDir = join(cwd(), "deploy");
 
     // 如果使用强制部署，需要用户确认
     if (force) {

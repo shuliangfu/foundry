@@ -31,7 +31,7 @@ const FOUNDRY_TOML = `[profile.default]
 # 目录配置
 src = "src"
 test = "test"
-script = "script"
+script = "deploy"
 out = "build/out"
 cache_path = "build/cache"
 broadcast = "broadcast"
@@ -408,7 +408,7 @@ function getDenoJsonTemplate(version: string): string {
       "exclude": ["no-explicit-any"]
     },
     "files": {
-      "include": ["scripts/**/*.ts"]
+      "include": ["deploy/**/*.ts"]
     }
   },
   "compilerOptions": {
@@ -488,8 +488,8 @@ const CONFIG_WEB3_JSON = `{
   "network": {
     "local": {
       "chainId": 31337,
-      "host": "http://127.0.0.1:8545",
-      "wss": "ws://127.0.0.1:8545",
+      "rpcUrl": "http://127.0.0.1:8545",
+      "wssUrl": "ws://127.0.0.1:8545",
       "accounts": [
         {
           "address": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
@@ -499,8 +499,8 @@ const CONFIG_WEB3_JSON = `{
     },
     "testnet": {
       "chainId": 97,
-      "host": "https://bsc-testnet.nodereal.io/v1/your-api-key",
-      "wss": "wss://bsc-testnet.nodereal.io/ws/v1/your-api-key",
+      "rpcUrl": "https://bsc-testnet.nodereal.io/v1/your-api-key",
+      "wssUrl": "wss://bsc-testnet.nodereal.io/ws/v1/your-api-key",
       "accounts": [
         {
           "address": "your-testnet-address-here",
@@ -510,8 +510,8 @@ const CONFIG_WEB3_JSON = `{
     },
     "mainnet": {
       "chainId": 56,
-      "host": "https://go.getblock.io/your-api-key",
-      "wss": "wss://go.getblock.io/your-api-key",
+      "rpcUrl": "https://go.getblock.io/your-api-key",
+      "wssUrl": "wss://go.getblock.io/your-api-key",
       "accounts": [
         {
           "address": "your-mainnet-address-here",
@@ -716,7 +716,7 @@ describe("MyToken 合约测试", () => {
 async function createDirectories(projectRoot: string): Promise<void> {
   const directories = [
     "src",
-    "script",
+    "deploy",
     "tests",
     "build",
     "build/abi",
@@ -822,7 +822,7 @@ async function createExampleFiles(projectRoot: string): Promise<void> {
 
   const exampleFiles = [
     { path: "src/MyToken.sol", content: EXAMPLE_CONTRACT_SOL },
-    { path: "script/1-mytoken.ts", content: EXAMPLE_DEPLOY_SCRIPT },
+    { path: "deploy/1-mytoken.ts", content: EXAMPLE_DEPLOY_SCRIPT },
     { path: "tests/01-mytoken.test.ts", content: EXAMPLE_TEST_SCRIPT },
   ];
 
@@ -911,7 +911,7 @@ async function createREADME(projectRoot: string): Promise<void> {
 \`\`\`
 .
 ├── src/              # Solidity 合约源码
-├── script/          # 部署脚本
+├── deploy/          # 部署脚本
 ├── tests/           # 测试文件
 ├── config/          # 配置文件
 │   └── web3.ts      # Web3 网络配置

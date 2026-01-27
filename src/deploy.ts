@@ -174,7 +174,7 @@ function findContractScript(contractName: string, scripts: string[]): string | n
  * 执行部署
  */
 export async function deploy(options: DeployScriptOptions): Promise<void> {
-  const scriptDir = options.scriptDir || join(cwd(), "script");
+  const scriptDir = options.scriptDir || join(cwd(), "deploy");
   let scripts = await scanDeployScripts(scriptDir);
 
   if (scripts.length === 0) {
@@ -337,7 +337,7 @@ async function main() {
   // 执行部署
   try {
     await deploy({
-      scriptDir: join(cwd(), "script"),
+      scriptDir: join(cwd(), "deploy"),
       network,
       config,
       force,
