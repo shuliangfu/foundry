@@ -62,7 +62,7 @@ import { findFoundryPath } from "./setup.ts";
 async function confirm(message: string): Promise<boolean> {
   console.warn(message);
   // 使用 process.stdout.write 在同一行显示输入提示（不换行）
-  const prompt = "请输入 'yes' 或 'y' 确认，其他任何输入将取消操作：";
+  const prompt = "请输入 'yes' 或 'y' 确认：";
   if (typeof Deno.stdout.write === "function") {
     // Deno 环境
     const encoder = new TextEncoder();
