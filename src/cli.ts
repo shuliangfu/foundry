@@ -386,6 +386,24 @@ function loadNetworkConfig(_network: string): NetworkConfig {
 }
 
 /**
+ * 从 argv 中解析 -c/--contract 后的多个合约名称（直到下一个以 - 开头的参数）
+ * 用于 deploy 和 verify 命令支持 -c store uniswap main 这种写法
+ */
+function parseContractNamesFromArgv(argv: string[]): string[] {
+  const names: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "-c" || argv[i] === "--contract") {
+      while (i + 1 < argv.length && !argv[i + 1].startsWith("-")) {
+        i++;
+        names.push(argv[i].trim());
+      }
+      break;
+    }
+  }
+  return names.filter(Boolean);
+}
+
+/**
  * 扫描部署脚本目录，获取可用的脚本文件列表
  */
 async function scanScripts(scriptDir: string): Promise<string[]> {
@@ -531,7 +549,12 @@ cli
       logger.info(`从 .env 文件读取网络配置: ${network}`);
     }
 
-    const contracts = options.contract as string[] | undefined;
+    const contractsFromArgv = parseContractNamesFromArgv(Deno.args);
+    const contracts = contractsFromArgv.length > 0
+      ? contractsFromArgv
+      : (options.contract != null
+        ? (Array.isArray(options.contract) ? options.contract : [options.contract as string])
+        : undefined);
     const force = options.force as boolean || false;
     const shouldVerify = options.verify as boolean || false;
     const apiKey = options["api-key"] as string | undefined;
@@ -783,9 +806,9 @@ cli
   .option({
     name: "contract",
     alias: "c",
-    description: "合约名称",
+    description: "合约名称（可多个，例如: -c store uniswap main）",
     requiresValue: true,
-    type: "string",
+    type: "array",
     required: true,
   })
   .option({
@@ -833,7 +856,15 @@ cli
       logger.info(`从 .env 文件读取网络配置: ${network}`);
     }
 
-    const contractName = options.contract as string;
+    const contractsFromArgv = parseContractNamesFromArgv(Deno.args);
+    const contractNames = contractsFromArgv.length > 0
+      ? contractsFromArgv
+      : (Array.isArray(options.contract) ? options.contract : options.contract != null ? [options.contract as string] : []);
+    if (contractNames.length === 0) {
+      logger.error("❌ 未指定合约名称");
+      logger.error("   请使用 --contract (-c) 参数指定合约名称，可指定多个，例如: -c MyToken Store");
+      Deno.exit(1);
+    }
     const address = options.address as string | undefined;
     const rpcUrl = options["rpc-url"] as string | undefined;
     const chainId = options["chain-id"] as number | undefined;
@@ -851,7 +882,7 @@ cli
     logger.info("🔍 开始验证合约");
     logger.info("------------------------------------------");
     logger.info("网络:", finalNetwork);
-    logger.info("合约名称:", contractName);
+    logger.info("合约名称:", contractNames.join(", "));
     logger.info("------------------------------------------");
     logger.info("");
 
@@ -865,12 +896,12 @@ cli
     // 获取 verify.ts 脚本的路径（使用缓存）
     const verifyScriptPath = getScriptPath("verify");
 
-    // 构建命令行参数
+    // 构建命令行参数，支持多合约：--contract a b c
     const verifyArgs: string[] = [
       "--network",
       finalNetwork,
       "--contract",
-      contractName,
+      ...contractNames,
       "--api-key",
       apiKey!,
     ];

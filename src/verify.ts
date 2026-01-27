@@ -618,7 +618,7 @@ export function verifyContract(
  */
 function parseArgs(): {
   network?: string;
-  contract?: string;
+  contracts?: string[];
   address?: string;
   rpcUrl?: string;
   apiKey?: string;
@@ -627,7 +627,7 @@ function parseArgs(): {
 } {
   const args = Deno.args;
   let network: string | undefined;
-  let contract: string | undefined;
+  const contracts: string[] = [];
   let address: string | undefined;
   let rpcUrl: string | undefined;
   let apiKey: string | undefined;
@@ -643,9 +643,10 @@ function parseArgs(): {
         i++;
       }
     } else if (arg === "--contract" || arg === "-c") {
-      if (i + 1 < args.length) {
-        contract = args[i + 1];
+      // 收集所有后续的非选项参数作为合约名称
+      while (i + 1 < args.length && !args[i + 1].startsWith("-")) {
         i++;
+        contracts.push(args[i].trim());
       }
     } else if (arg === "--address" || arg === "-a") {
       if (i + 1 < args.length) {
@@ -678,7 +679,7 @@ function parseArgs(): {
 
   return {
     network,
-    contract,
+    contracts: contracts.length > 0 ? contracts : undefined,
     address,
     rpcUrl,
     apiKey,
@@ -694,7 +695,7 @@ async function main() {
   // 解析命令行参数
   const {
     network: networkArg,
-    contract: contractName,
+    contracts: contractNames,
     address,
     rpcUrl,
     apiKey,
@@ -707,9 +708,9 @@ async function main() {
 
   setEnv("WEB3_ENV", network);
 
-  if (!contractName) {
+  if (!contractNames || contractNames.length === 0) {
     logger.error("❌ 未指定合约名称");
-    logger.error("   请使用 --contract (-c) 参数指定合约名称");
+    logger.error("   请使用 --contract (-c) 参数指定合约名称，可指定多个，例如: -c MyToken Store");
     Deno.exit(1);
   }
 
@@ -721,37 +722,9 @@ async function main() {
     Deno.exit(1);
   }
 
-  // 确定合约地址
-  let contractAddress = address;
-  let contractInfo: ContractInfo | null = null;
-  if (!contractAddress) {
-    try {
-      contractInfo = loadContract(contractName, network);
-      contractAddress = contractInfo.address;
-    } catch {
-      logger.error("❌ 无法读取合约地址，请使用 --address 参数指定");
-      Deno.exit(1);
-    }
-  } else {
-    // 如果提供了地址，也尝试加载合约信息以获取构造函数参数
-    try {
-      contractInfo = loadContract(contractName, network);
-    } catch {
-      // 如果加载失败，忽略，使用命令行参数
-    }
-  }
-
-  // 如果没有提供构造函数参数，尝试从合约信息中读取
-  let finalConstructorArgs: string[] | undefined = constructorArgs;
-  if (!finalConstructorArgs && contractInfo && contractInfo.args) {
-    // 将 unknown[] 转换为 string[]
-    finalConstructorArgs = contractInfo.args.map(String);
-  }
-
-  // 确定 RPC URL 和链 ID
+  // 确定 RPC URL 和链 ID（多合约共用）
   let finalRpcUrl = rpcUrl;
   let finalChainId = chainId;
-
   if (!finalRpcUrl || !finalChainId) {
     try {
       const config = await loadNetworkConfig();
@@ -761,42 +734,68 @@ async function main() {
       logger.warn("无法从配置加载 RPC URL 和链 ID，请使用 --rpc-url 和 --chain-id 参数指定");
     }
   }
-
   if (!finalRpcUrl) {
     logger.error("❌ 未指定 RPC URL，请使用 --rpc-url 参数或配置环境变量");
     Deno.exit(1);
   }
-
   if (!finalChainId) {
     logger.error("❌ 未指定链 ID，请使用 --chain-id 参数或配置环境变量");
     Deno.exit(1);
   }
 
-  // 查找实际的文件名（大小写不敏感）
-  // 这样可以确保使用正确的合约名称（保持原始大小写）
-  const actualFileName = findContractFileName(contractName, network);
-  const actualContractName = actualFileName ? actualFileName.replace(/\.json$/, "") : contractName;
+  // 多合约时 --address 仅对第一个有效，其余从 build/abi 读取
+  for (let idx = 0; idx < contractNames.length; idx++) {
+    const contractName = contractNames[idx];
+    const useAddress = contractNames.length === 1 ? address : undefined;
 
-  // 如果实际文件名与输入不同，提示用户
-  if (actualFileName && actualFileName !== `${contractName}.json`) {
-    logger.info(`ℹ️  合约名称已自动匹配为: ${actualContractName}`);
-  }
+    let contractAddress = useAddress;
+    let contractInfo: ContractInfo | null = null;
+    if (!contractAddress) {
+      try {
+        contractInfo = loadContract(contractName, network);
+        contractAddress = contractInfo.address;
+      } catch {
+        logger.error(`❌ 合约 ${contractName} 无法读取地址，请使用 --address 指定或确保已部署并存在 build/abi/${network}/${contractName}.json`);
+        Deno.exit(1);
+      }
+    } else {
+      try {
+        contractInfo = loadContract(contractName, network);
+      } catch {
+        // 忽略
+      }
+    }
 
-  // 执行验证（使用实际的合约名称，因为 forge verify-contract 需要匹配 Solidity 文件中的合约名称）
-  try {
-    await verify({
-      address: contractAddress!,
-      contractName: actualContractName, // 使用实际的文件名（保持原始大小写）
-      network,
-      apiKey: finalApiKey!,
-      rpcUrl: finalRpcUrl!,
-      chainId: finalChainId,
-      constructorArgs: finalConstructorArgs,
-    });
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error("❌ 验证失败:", errorMessage);
-    Deno.exit(1);
+    let finalConstructorArgs: string[] | undefined = contractNames.length === 1 ? constructorArgs : undefined;
+    if (!finalConstructorArgs && contractInfo && contractInfo.args) {
+      finalConstructorArgs = contractInfo.args.map(String);
+    }
+
+    const actualFileName = findContractFileName(contractName, network);
+    const actualContractName = actualFileName ? actualFileName.replace(/\.json$/, "") : contractName;
+    if (actualFileName && actualFileName !== `${contractName}.json`) {
+      logger.info(`ℹ️  合约名称已自动匹配为: ${actualContractName}`);
+    }
+
+    if (contractNames.length > 1) {
+      logger.info(`[${idx + 1}/${contractNames.length}] 验证合约: ${actualContractName}`);
+    }
+
+    try {
+      await verify({
+        address: contractAddress!,
+        contractName: actualContractName,
+        network,
+        apiKey: finalApiKey!,
+        rpcUrl: finalRpcUrl!,
+        chainId: finalChainId,
+        constructorArgs: finalConstructorArgs,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`❌ 合约 ${actualContractName} 验证失败: ${errorMessage}`);
+      Deno.exit(1);
+    }
   }
 }
 

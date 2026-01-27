@@ -27,7 +27,7 @@ deno run -A jsr:@dreamer/foundry/setup
 # 安装后使用
 foundry init [项目名]
 foundry deploy --network testnet
-foundry verify --network testnet --contract MyToken
+foundry verify --network testnet -c <合约名> --api-key YOUR_API_KEY
 ```
 
 **卸载全局 CLI**：
@@ -118,17 +118,17 @@ foundry init /path/to/project
 
 #### `foundry deploy` — 部署合约
 
-扫描 `deploy/` 目录下的脚本并按顺序执行部署。
+扫描 `deploy/` 目录下的脚本并按顺序执行部署。合约名对应 `deploy/数字-<合约名>.ts` 中的「合约名」部分，由项目自行定义。
 
 ```bash
 # 部署所有合约到指定网络
 foundry deploy --network testnet
 
-# 部署指定合约
-foundry deploy --network testnet --contract MyToken
+# 部署单个合约（-c 后接一个合约名）
+foundry deploy --network testnet -c <MyToken>
 
-# 部署多个合约
-foundry deploy --network testnet --contract MyToken MyContract
+# 部署多个合约（-c 后接多个合约名，空格分隔）
+foundry deploy --network testnet -c <合约名1> <合约名2> <合约名3>
 
 # 强制重新部署（覆盖已存在合约，会提示确认）
 foundry deploy --network testnet --force
@@ -139,14 +139,14 @@ foundry deploy --network testnet --verify --api-key YOUR_API_KEY
 # 使用环境变量 ETH_API_KEY 时可不写 --api-key
 foundry deploy --network testnet --verify
 
-# 部署指定合约并验证
-foundry deploy --network testnet --contract MyToken --verify --api-key YOUR_API_KEY
+# 部署指定多个合约并验证
+foundry deploy --network testnet -c <合约名1> <合约名2> --verify --api-key YOUR_API_KEY
 ```
 
 | 选项 | 简写 | 说明 |
 |------|------|------|
 | `--network` | `-n` | 网络名称：`local`、`testnet`、`mainnet`。不指定时从 `.env` 的 `WEB3_ENV` 读取 |
-| `--contract` | `-c` | 要部署的合约名，可写多个。不指定则按脚本部署全部 |
+| `--contract` | `-c` | 要部署的合约名，可写多个（空格分隔）。不指定则按脚本顺序部署全部 |
 | `--force` | `-f` | 强制重新部署已存在的合约 |
 | `--verify` | - | 部署完成后自动在区块浏览器上验证 |
 | `--api-key` | - | Etherscan/BSCScan 等 API Key。验证时也可用环境变量 `ETH_API_KEY` |
@@ -155,27 +155,27 @@ foundry deploy --network testnet --contract MyToken --verify --api-key YOUR_API_
 
 #### `foundry verify` — 验证合约
 
-在区块浏览器上提交合约验证（源码与链上字节码一致）。
+在区块浏览器上提交合约验证（源码与链上字节码一致）。支持一次验证多个合约。
 
 ```bash
-# 使用 .env 中的 ETH_API_KEY
-foundry verify --network testnet --contract MyToken
+# 验证单个合约（使用 .env 中的 ETH_API_KEY）
+foundry verify --network testnet -c <合约名>
 
-# 显式传入 API Key
-foundry verify --network testnet --contract MyToken --api-key YOUR_API_KEY
+# 验证多个合约（-c 后接多个合约名，空格分隔）
+foundry verify --network testnet -c <合约名1> <合约名2> --api-key YOUR_API_KEY
 
-# 指定合约地址（不指定则从 build/abi/{network}/{contract}.json 读）
-foundry verify --network testnet --contract MyToken --address 0x1234...
+# 指定合约地址（仅单合约时有效；不指定则从 build/abi/{network}/{合约名}.json 读）
+foundry verify --network testnet -c <合约名> --address 0x... --api-key YOUR_API_KEY
 
 # 指定 RPC 和链 ID（不指定则从 config/web3.json 读）
-foundry verify --network testnet --contract MyToken --rpc-url https://... --chain-id 97
+foundry verify --network testnet -c <合约名> --rpc-url https://... --chain-id 97 --api-key YOUR_API_KEY
 ```
 
 | 选项 | 简写 | 必填 | 说明 |
 |------|------|------|------|
 | `--network` | `-n` | 否 | 网络名称。不指定时从 `WEB3_ENV` 读取 |
-| `--contract` | `-c` | **是** | 合约名称 |
-| `--address` | `-a` | 否 | 合约地址。不传则从 `build/abi/{network}/{contract}.json` 读 |
+| `--contract` | `-c` | **是** | 合约名称，可写多个（空格分隔），一次验证多份合约 |
+| `--address` | `-a` | 否 | 合约地址（仅验证单合约时有效）。不传则从 `build/abi/{network}/{合约名}.json` 读 |
 | `--api-key` | - | 否 | 区块浏览器 API Key。不传则用环境变量 `ETH_API_KEY` |
 | `--rpc-url` | - | 否 | RPC URL。不传则从 `config/web3.json` 读 |
 | `--chain-id` | - | 否 | 链 ID。不传则从配置读 |
@@ -220,6 +220,8 @@ foundry uninstall
 
 ### 示例 1：使用工具函数
 
+以下示例中的合约名可替换为项目 `deploy/`、`build/abi/` 中对应的实际合约名。
+
 ```typescript
 import { logger, loadEnv, loadContract, Web3 } from "@dreamer/foundry/utils";
 
@@ -248,6 +250,8 @@ const balance = await web3.read("balanceOf", ["0x..."]);
 
 ### 示例 2：使用配置文件创建 Web3 实例
 
+合约名使用项目中的实际合约名（对应 `build/abi/{network}/<合约名>.json`）。
+
 ```typescript
 import { createWeb3 } from "@dreamer/foundry/utils";
 
@@ -272,7 +276,7 @@ const web3 = createWeb3("MyContract", {
 
 ### 示例 3：部署脚本
 
-部署脚本放在 `deploy/` 目录，文件名为 `数字-合约名.ts`（如 `1-mytoken.ts`）。脚本需导出 `deploy(deployer)`，框架会注入部署器并执行。
+部署脚本放在 `deploy/` 目录，文件名为 `数字-合约名.ts`（如 `1-mytoken.ts`、`2-store.ts` 等，合约名由项目自定）。脚本需导出 `deploy(deployer)`，框架会注入部署器并执行。以下以 init 生成的代币合约为例，实际项目中可将合约名、文件名替换为你的合约。
 
 ```typescript
 // deploy/1-mytoken.ts
@@ -297,7 +301,7 @@ export async function deploy(deployer: Deployer) {
 
 ### 示例 4：测试脚本
 
-测试脚本放在 `tests/` 目录，使用 `@dreamer/test` 与 `@dreamer/foundry` 的 `createWeb3`、`Web3` 等与链上合约交互。
+测试脚本放在 `tests/` 目录，使用 `@dreamer/test` 与 `@dreamer/foundry` 的 `createWeb3`、`Web3` 等与链上合约交互。以下以 init 生成的 MyToken 为例，合约名替换为项目中实际部署的合约名即可。
 
 ```typescript
 // tests/01-mytoken.test.ts
