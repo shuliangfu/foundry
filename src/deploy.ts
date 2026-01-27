@@ -253,9 +253,9 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
         // 执行部署脚本（进度条继续显示）
         await scriptModule.deploy(deployer);
         logger.info(`✅ ${script} completed successfully \n`);
-        // 当前脚本完成后、下一个脚本开始前等待 2 秒，避免 RPC/链上状态未就绪
+        // 当前脚本完成后、下一个脚本开始前等待 3 秒，避免 RPC/链上状态未就绪
         if (i < scripts.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 2000));
+          await new Promise((resolve) => setTimeout(resolve, 3000));
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
