@@ -287,7 +287,6 @@ export async function forgeDeploy(
   }
 
   logger.info(`正在部署合约 ${contractName}...`);
-  logger.info(`RPC URL: ${config.rpcUrl}`);
 
   // 显示进度条
   const progressBar = createLoadingProgressBar("正在部署中...");
@@ -353,6 +352,21 @@ export async function forgeDeploy(
               );
             }
             if (!stillAlreadyKnown) {
+              // 区分网络/RPC 连接异常（可重试）与其它错误
+              const isConnectionError = /connection error|TLS|close_notify|eof|sendrequest|connection reset|timed out/i.test(replaceStderr);
+              if (isConnectionError) {
+                logger.warn(`替换交易时 RPC 连接异常（第 ${r + 1} 次），将重试: ${replaceStderr.slice(0, 120)}...`);
+                replaceProgressBar.stop(replaceInterval);
+                if (r < ALREADY_KNOWN_REPLACE_RETRIES - 1) {
+                  await new Promise((resolve) => setTimeout(resolve, 3000));
+                  continue;
+                }
+                logger.error("❌ 替换时 RPC 多次连接失败，请稍后重试或更换 config 中的 rpcUrl");
+                throw new DeploymentError(
+                  "替换 mempool 交易时 RPC 连接失败，请稍后重试或更换 RPC 节点。",
+                  { contractName, network, rpcUrl: config.rpcUrl }
+                );
+              }
               logger.error("替换交易时发生其他错误:", replaceStderr);
               throw new DeploymentError(
                 `替换 mempool 交易时失败: ${replaceStderr}`,
