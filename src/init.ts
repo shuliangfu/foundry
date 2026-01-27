@@ -407,9 +407,7 @@ function getDenoJsonTemplate(version: string): string {
       "tags": ["recommended"],
       "exclude": ["no-explicit-any"]
     },
-    "files": {
-      "include": ["deploy/**/*.ts"]
-    }
+    "include": ["deploy/**/*.ts", "tests/**/*.ts"]
   },
   "compilerOptions": {
     "lib": ["deno.window"],
