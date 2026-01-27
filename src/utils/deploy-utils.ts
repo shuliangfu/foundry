@@ -31,7 +31,12 @@ import { logger } from "./logger.ts";
 import { createLoadingProgressBar } from "./cli-utils.ts";
 import type { ContractInfo, AbiItem } from "../types/index.ts";
 import { DeploymentError } from "../errors/index.ts";
-import { DEFAULT_RETRY_ATTEMPTS, DEFAULT_RETRY_DELAY } from "../constants/index.ts";
+import {
+  DEFAULT_RETRY_ATTEMPTS,
+  DEFAULT_RETRY_DELAY,
+  ALREADY_KNOWN_REPLACE_RETRIES,
+  GAS_BUMP_MULTIPLIERS,
+} from "../constants/index.ts";
 
 
 /**
@@ -120,6 +125,29 @@ async function cleanBroadcastDir(_network: string): Promise<void> {
   } catch (error) {
     // 清理失败不影响部署，只记录警告
     logger.warn(`清理 broadcast 目录时出错: ${error}`);
+  }
+}
+
+/**
+ * 通过 cast gas-price 获取当前链上 gas 价格（wei）
+ * @param rpcUrl RPC URL
+ * @returns 当前 gas 价格（wei），失败返回 null
+ */
+async function getCurrentGasPriceWei(rpcUrl: string): Promise<number | null> {
+  try {
+    const cmd = createCommand("cast", {
+      args: ["gas-price", "--rpc-url", rpcUrl],
+      stdout: "piped",
+      stderr: "piped",
+      cwd: cwd(),
+    });
+    const output = await cmd.output();
+    const text = new TextDecoder().decode(output.stdout).trim();
+    if (!output.success || !text) return null;
+    const parsed = parseInt(text, 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  } catch {
+    return null;
   }
 }
 
@@ -289,14 +317,61 @@ export async function forgeDeploy(
     stderrText.toLowerCase().includes("already known");
 
   if (!output.success) {
-    // 如果是 "already known" 错误，给出提示
+    // 如果是 "already known" 错误，尝试用更高 gas 替换 mempool 中的交易
     if (isAlreadyKnown) {
+      const baseGasWei = await getCurrentGasPriceWei(config.rpcUrl);
+      if (baseGasWei != null && baseGasWei > 0) {
+        for (let r = 0; r < ALREADY_KNOWN_REPLACE_RETRIES; r++) {
+          if (r > 0) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
+          const mult = GAS_BUMP_MULTIPLIERS[r] ?? 1.5;
+          const gasWei = Math.ceil(baseGasWei * mult);
+          logger.info(`尝试使用更高 gas 替换 mempool 中的交易 (${mult}x, gas-price=${gasWei} wei)...`);
+          const replaceArgs = [...forgeArgs, "--gas-price", String(gasWei)];
+          const replaceProgressBar = createLoadingProgressBar("正在部署中...");
+          const replaceInterval = replaceProgressBar.start();
+          try {
+            const replaceCmd = createCommand("forge", {
+              args: replaceArgs,
+              stdout: "piped",
+              stderr: "piped",
+              cwd: cwd(),
+            });
+            const replaceOutput = await replaceCmd.output();
+            replaceProgressBar.stop(replaceInterval);
+            const replaceStderr = new TextDecoder().decode(replaceOutput.stderr);
+            const replaceStdout = new TextDecoder().decode(replaceOutput.stdout);
+            const stillAlreadyKnown = replaceStderr.includes("error code -32000") ||
+              replaceStderr.toLowerCase().includes("already known");
+            if (replaceOutput.success) {
+              return await extractAddressFromOutput(
+                replaceStdout,
+                replaceStderr,
+                contractName,
+                options,
+                constructorArgs as string[],
+              );
+            }
+            if (!stillAlreadyKnown) {
+              logger.error("替换交易时发生其他错误:", replaceStderr);
+              throw new DeploymentError(
+                `替换 mempool 交易时失败: ${replaceStderr}`,
+                { contractName, network, rpcUrl: config.rpcUrl }
+              );
+            }
+          } catch (e) {
+            replaceProgressBar.stop(replaceInterval);
+            if (e instanceof DeploymentError) throw e;
+          }
+        }
+      }
       logger.error("❌ 部署失败：交易已在 mempool 中");
       logger.error("");
       logger.error("💡 解决方案：");
       logger.error("  1. 等待更长时间后再部署（建议等待 5-10 分钟）");
       logger.error("  2. 使用不同的账户地址进行部署");
-      logger.error("  3. 如果使用本地节点，请重启节点清除交易缓存");
+      logger.error("  3. 若已尝试用更高 gas 替换仍失败，可稍后重试或联系节点服务商");
       logger.error("");
       throw new DeploymentError(
         "交易已在 mempool 中 (already known)。请等待更长时间或更换部署地址。",

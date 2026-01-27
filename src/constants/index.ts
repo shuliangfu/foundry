@@ -9,6 +9,11 @@
 export const DEFAULT_RETRY_ATTEMPTS = 3;
 export const DEFAULT_RETRY_DELAY = 2000; // 毫秒
 
+/** “already known” 时用更高 gas 替换 mempool 交易的重试次数 */
+export const ALREADY_KNOWN_REPLACE_RETRIES = 2;
+/** 每次替换重试的 gas 涨幅倍数（相对当前链上 gas price） */
+export const GAS_BUMP_MULTIPLIERS = [1.2, 1.5] as const;
+
 /**
  * 缓存 TTL（毫秒）
  */
