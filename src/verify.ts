@@ -34,6 +34,7 @@ import { loadWeb3ConfigSync } from "./utils/web3.ts";
 import type { ContractInfo } from "./types/index.ts";
 import { VerificationError, NetworkError, ConfigurationError } from "./errors/index.ts";
 import type { AbiItem, AbiConstructor } from "./types/index.ts";
+import { DEFAULT_NETWORK } from "./constants/index.ts";
 
 
 /**
@@ -703,8 +704,8 @@ async function main() {
     constructorArgs,
   } = parseArgs();
 
-  // 确定网络：优先使用命令行参数，其次使用环境变量
-  const network = getNetworkName(networkArg, false) || "local";
+  // 确定网络：优先使用命令行参数，其次使用环境变量（getNetworkName 内部已读 WEB3_ENV），否则使用默认网络常量
+  const network = getNetworkName(networkArg, false) ?? DEFAULT_NETWORK;
 
   setEnv("WEB3_ENV", network);
 

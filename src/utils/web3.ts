@@ -13,6 +13,7 @@ import {
   platform,
   readTextFileSync,
 } from "@dreamer/runtime-adapter";
+import { DEFAULT_NETWORK } from "../constants/index.ts";
 import { ConfigurationError } from "../errors/index.ts";
 import {
   addHexPrefix,
@@ -149,8 +150,8 @@ export function loadWeb3ConfigSync(projectRoot?: string): NetworkConfig | null {
     const jsonText = readTextFileSync(jsonConfigPath);
     const jsonConfig = JSON.parse(jsonText);
 
-    // 获取环境变量
-    const web3Env = getEnv("WEB3_ENV") || "local";
+    // 网络未设置时从环境变量读取，否则使用默认网络常量
+    const web3Env = getEnv("WEB3_ENV") ?? DEFAULT_NETWORK;
 
     // 从配置中获取对应环境的配置
     // 格式：{ "chain": "bsc", "network": { "local": {...}, "testnet": {...}, "mainnet": {...} } }
@@ -460,7 +461,7 @@ export class Web3 {
    */
   private initContract(): void {
     try {
-      const network = getEnv("WEB3_ENV") || "local";
+      const network = getEnv("WEB3_ENV") ?? DEFAULT_NETWORK;
       this.contract = loadContract(this.contractName!, network);
     } catch (error) {
       throw new Error(`Failed to load contract ${this.contractName}: ${error}`);

@@ -8,7 +8,7 @@ import { logger } from "./logger.ts";
 import { parseJsrPackageFromUrl } from "./jsr.ts";
 import { loadEnv } from "./env.ts";
 import type { GlobalCache, CommandStatus } from "../types/index.ts";
-import { PROGRESS_BAR_INTERVAL, PROGRESS_BAR_CLEAR_LENGTH } from "../constants/index.ts";
+import { DEFAULT_NETWORK, PROGRESS_BAR_INTERVAL, PROGRESS_BAR_CLEAR_LENGTH } from "../constants/index.ts";
 
 /**
  * 获取项目根目录和 deno.json 路径
@@ -363,8 +363,8 @@ export function getNetworkName(
     return null;
   }
 
-  // 返回网络名称或默认值
-  return network || "local";
+  // 返回网络名称，未设置时已从环境变量读取；仍为空则使用默认网络常量
+  return network || DEFAULT_NETWORK;
 }
 
 /**

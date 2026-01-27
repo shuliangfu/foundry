@@ -4,7 +4,8 @@
  * 使用 @dreamer/runtime-adapter 兼容 Deno 和 Bun
  */
 
-import { existsSync, readdirSync, readTextFileSync, cwd, join } from "@dreamer/runtime-adapter";
+import { existsSync, readdirSync, readTextFileSync, cwd, join, getEnv } from "@dreamer/runtime-adapter";
+import { DEFAULT_NETWORK } from "../constants/index.ts";
 
 /**
  * 合约接口
@@ -17,9 +18,11 @@ export interface Contract {
 
 /**
  * 加载指定环境的所有合约 ABI
+ * @param env 网络名，未传入时从环境变量 WEB3_ENV 读取，仍无则使用默认网络常量
  */
-export function loadContracts(env: string = "local"): Record<string, Contract> {
-  const abiDir = join(cwd(), "build", "abi", env);
+export function loadContracts(env?: string): Record<string, Contract> {
+  const network = env ?? getEnv("WEB3_ENV") ?? DEFAULT_NETWORK;
+  const abiDir = join(cwd(), "build", "abi", network);
   const contracts: Record<string, Contract> = {};
 
   try {

@@ -27,6 +27,7 @@ import { logger } from "./utils/logger.ts";
 import type { Logger } from "@dreamer/logger";
 import { createWeb3, type Web3, type Web3Options } from "./utils/web3.ts";
 import { getNetworkName, loadNetworkConfig as loadNetworkConfigUtil } from "./utils/cli-utils.ts";
+import { DEFAULT_NETWORK } from "./constants/index.ts";
 
 /**
  * 部署器接口
@@ -329,8 +330,8 @@ async function main() {
   // 解析命令行参数
   const { network: networkArg, contracts, force } = parseArgs();
 
-  // 确定网络：优先使用命令行参数，其次使用环境变量，最后使用默认值 local
-  const network = getNetworkName(networkArg, false) || "local";
+  // 确定网络：优先使用命令行参数，其次使用环境变量（getNetworkName 内部已读 WEB3_ENV），否则使用默认网络常量
+  const network = getNetworkName(networkArg, false) ?? DEFAULT_NETWORK;
 
   setEnv("WEB3_ENV", network);
 

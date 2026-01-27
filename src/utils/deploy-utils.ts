@@ -19,6 +19,7 @@ import {
   createCommand,
   cwd,
   existsSync,
+  getEnv,
   join,
   mkdir,
   readdir,
@@ -34,6 +35,7 @@ import { DeploymentError } from "../errors/index.ts";
 import {
   DEFAULT_RETRY_ATTEMPTS,
   DEFAULT_RETRY_DELAY,
+  DEFAULT_NETWORK,
   ALREADY_KNOWN_REPLACE_RETRIES,
   GAS_BUMP_MULTIPLIERS,
 } from "../constants/index.ts";
@@ -215,18 +217,15 @@ export async function forgeDeploy(
   constructorArgs: string[] | Record<string, unknown> = [],
   options: DeployOptions = {},
 ): Promise<string> {
-  // 从 abiDir 中提取网络名称，如果没有提供 abiDir，则使用默认值 "local"
-  // abiDir 格式通常是: build/abi/{network} 或完整路径
-  // 提取网络名称的辅助函数
+  // 从 abiDir 中提取网络名称，未提供或无法解析时使用环境变量 WEB3_ENV，否则用默认网络常量
   function extractNetworkFromAbiDir(abiDir?: string): string {
-    if (!abiDir) return "local";
+    if (!abiDir) return getEnv("WEB3_ENV") ?? DEFAULT_NETWORK;
     const parts = abiDir.split(/[/\\]/);
     const networkIndex = parts.indexOf("abi");
     if (networkIndex >= 0 && networkIndex < parts.length - 1) {
       return parts[networkIndex + 1];
     }
-    // 如果没有找到 "abi" 目录，使用路径的最后一个部分
-    return parts[parts.length - 1] || "local";
+    return parts[parts.length - 1] ?? getEnv("WEB3_ENV") ?? DEFAULT_NETWORK;
   }
 
   const network = extractNetworkFromAbiDir(options.abiDir);
@@ -398,7 +397,7 @@ export async function forgeDeploy(
       const networkIndex = parts.indexOf("abi");
       const network = (networkIndex >= 0 && networkIndex < parts.length - 1)
         ? parts[networkIndex + 1]
-        : (parts[parts.length - 1] || "local");
+        : (parts[parts.length - 1] ?? getEnv("WEB3_ENV") ?? DEFAULT_NETWORK);
       const maxRetries = DEFAULT_RETRY_ATTEMPTS;
       let lastError: string | null = null;
 
@@ -500,7 +499,7 @@ export async function forgeDeploy(
         const networkIndex = parts.indexOf("abi");
         const network = (networkIndex >= 0 && networkIndex < parts.length - 1)
           ? parts[networkIndex + 1]
-          : (parts[parts.length - 1] || "local");
+          : (parts[parts.length - 1] ?? getEnv("WEB3_ENV") ?? DEFAULT_NETWORK);
         const existingAddress = checkContractExists(contractName, network, options.abiDir);
         if (existingAddress) {
           logger.info(`   当前合约地址: ${existingAddress}`);
@@ -614,13 +613,12 @@ async function extractAddressFromOutput(
     );
   }
 
-  // 保存合约信息
-  // 从 abiDir 中提取网络名称
+  // 保存合约信息，从 abiDir 中提取网络名称，无法解析时从环境变量或默认网络常量取
   const parts = options.abiDir?.split(/[/\\]/) || [];
   const networkIndex = parts.indexOf("abi");
   const network = (networkIndex >= 0 && networkIndex < parts.length - 1)
     ? parts[networkIndex + 1]
-    : (parts[parts.length - 1] || "local");
+    : (parts[parts.length - 1] ?? getEnv("WEB3_ENV") ?? DEFAULT_NETWORK);
   await saveContract(
     contractName,
     address,
@@ -714,9 +712,15 @@ async function saveContract(
  */
 export function loadContract(
   contractName: string,
-  network: string = "local",
+  network?: string,
   abiDir?: string,
 ): ContractInfo {
+
+  // 网络未传入时优先从环境变量 WEB3_ENV 读取，否则使用默认网络常量
+  if (network == null || network === "") {
+    network = getEnv("WEB3_ENV") ?? DEFAULT_NETWORK;
+  }
+
   const buildDir = abiDir || join(cwd(), "build", "abi", network);
 
   // 首先尝试直接使用提供的合约名称
