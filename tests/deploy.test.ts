@@ -31,8 +31,9 @@ describe("部署功能测试", () => {
     it("应该能够创建部署器", () => {
       const deployer = createDeployer("testnet", testConfig, false);
       expect(deployer.network).toBe("testnet");
-      expect(deployer.force).toBe(false);
       expect(deployer.accounts).toBeDefined();
+      expect(deployer.deploy).toBeDefined();
+      expect(deployer.logger).toBeDefined();
     });
   });
 

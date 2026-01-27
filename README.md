@@ -270,30 +270,84 @@ const web3 = createWeb3("MyContract", {
 });
 ```
 
-### 示例 3：部署单个合约
+### 示例 3：部署脚本
+
+部署脚本放在 `deploy/` 目录，文件名为 `数字-合约名.ts`（如 `1-mytoken.ts`）。脚本需导出 `deploy(deployer)`，框架会注入部署器并执行。
 
 ```typescript
-import { deployContract } from "@dreamer/foundry/utils";
+// deploy/1-mytoken.ts
+import type { Deployer } from "@dreamer/foundry";
+import { logger } from "@dreamer/foundry";
 
-const address = await deployContract(
-  "MyContract",
-  {
-    rpcUrl: "https://rpc.example.com",
-    privateKey: "0x...",
-    address: "0x...",
-    chainId: 97,
-  },
-  ["arg1", "arg2"],
-  {
-    verify: true,
-    etherscanApiKey: "your-api-key",
-  }
-);
+export async function deploy(deployer: Deployer) {
+  logger.info("开始部署 MyToken 合约\n");
+
+  // 构造函数参数: name, symbol, decimals, initialSupply
+  const args = ["MyToken", "MTK", "18", "1000000"];
+
+  const myToken = await deployer.deploy("MyToken", args);
+  logger.info(`✅ MyToken deployed at: ${myToken.address}`);
+
+  // 也可用 deployer.logger
+  deployer.logger.info("\n✅ Deployment completed!");
+}
 ```
+
+执行方式：使用 CLI `foundry deploy --network local`，或在代码中调用 `deploy({ network, config, ... })`。
+
+### 示例 4：测试脚本
+
+测试脚本放在 `tests/` 目录，使用 `@dreamer/test` 与 `@dreamer/foundry` 的 `createWeb3`、`Web3` 等与链上合约交互。
+
+```typescript
+// tests/01-mytoken.test.ts
+import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
+import { createWeb3, logger, type Web3 } from "@dreamer/foundry";
+
+describe("MyToken 合约测试", () => {
+  let web3: Web3;
+  let deployerAddress: string;
+
+  beforeAll(() => {
+    web3 = createWeb3("MyToken");
+    deployerAddress = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+  });
+
+  afterAll(() => {
+    logger.info("测试完成");
+  });
+
+  describe("合约基本信息", () => {
+    it("应该能够读取代币名称", async () => {
+      const name = await web3.read("name");
+      expect(name).toBe("MyToken");
+    });
+
+    it("应该能够读取代币符号", async () => {
+      const symbol = await web3.read("symbol");
+      expect(symbol).toBe("MTK");
+    });
+  });
+
+  describe("余额查询", () => {
+    it("应该能够查询部署者余额", async () => {
+      const balance = await web3.read("balanceOf", [deployerAddress]);
+      expect(balance).toBeDefined();
+      expect(Number(balance)).toBeGreaterThan(0);
+    });
+  });
+});
+```
+
+执行方式：`WEB3_ENV=local deno test -A tests/01-mytoken.test.ts`，或配置好环境后直接 `deno test -A tests/`。
+
+更多测试相关的文档与用法，请查看 [@dreamer/test](https://jsr.io/@dreamer/test)。
 
 ---
 
 ## 📚 API 文档
+
+以下为通过 `import` 调用的程序化 API，供在脚本或应用中直接使用。CLI 子命令用法见上文「使用 CLI 命令」。
 
 ### `init(projectRoot?: string)`
 
@@ -335,15 +389,15 @@ await init("/path/to/project");
 - `constructorArgs?: string[]` - 构造函数参数
 - `chainId?: number` - 链 ID
 
-### `createDeployer(network, config, force, accountIndex)`
+### `createDeployer(network, config, force?)`
 
-创建部署器实例，用于部署脚本中。
+创建部署器实例，供部署脚本中调用（如 `deploy/1-mytoken.ts`
+由框架注入的 `Deployer` 即由此构建）。注入的 `Deployer` 包含 `network`、`accounts`、`deploy`、`logger`、`web3`、`loadContract`。
 
 **参数**:
 - `network: string` - 网络名称
 - `config: NetworkConfig` - 网络配置（包含 rpcUrl, wssUrl, chainId, accounts）
-- `force?: boolean` - 是否强制重新部署
-- `accountIndex?: number` - 账户索引（默认: 0）
+- `force?: boolean` - 是否强制重新部署（默认: `false`）
 
 ### `loadContract(contractName, network)`
 
@@ -354,16 +408,6 @@ await init("/path/to/project");
 - `network: string` - 网络名称
 
 **返回**: `ContractInfo | null`
-
-### `deployContract(contractName, config, constructorArgs, options)`
-
-部署单个合约。
-
-**参数**:
-- `contractName: string` - 合约名称
-- `config: NetworkConfig` - 网络配置
-- `constructorArgs?: string[] | Record<string, unknown>` - 构造函数参数
-- `options?: DeployOptions` - 部署选项
 
 ### `loadWeb3ConfigSync(projectRoot?: string)`
 

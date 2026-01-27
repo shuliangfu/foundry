@@ -24,21 +24,23 @@ import type { ContractInfo, DeployOptions, NetworkConfig } from "./utils/deploy-
 import { createLoadingProgressBar } from "./utils/cli-utils.ts";
 import { forgeDeploy, loadContract } from "./utils/deploy-utils.ts";
 import { logger } from "./utils/logger.ts";
+import type { Logger } from "@dreamer/logger";
 import { createWeb3, type Web3, type Web3Options } from "./utils/web3.ts";
 import { getNetworkName, loadNetworkConfig as loadNetworkConfigUtil } from "./utils/cli-utils.ts";
 
 /**
  * 部署器接口
+ * force 由框架在 deploy() 内部使用，不暴露给脚本。
  */
 export interface Deployer {
   network: string;
   accounts: string[];
-  force: boolean;
   deploy: (
     contractName: string,
     constructorArgs?: string[] | Record<string, unknown>,
     options?: DeployOptions,
   ) => Promise<Web3>;
+  logger: Logger;
   web3: (contractName?: string) => Web3;
   loadContract: (contractName: string, network: string, force: boolean) => ContractInfo | null;
 }
@@ -99,7 +101,7 @@ export function createDeployer(
   return {
     network,
     accounts: [config.rpcUrl], // 简化处理
-    force,
+    logger,
     deploy: async (
       contractName: string,
       constructorArgs: string[] | Record<string, unknown> = [],
