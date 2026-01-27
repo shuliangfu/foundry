@@ -94,20 +94,6 @@ deno run -A jsr:@dreamer/foundry/setup --uninstall
 
 ## 🚀 快速开始
 
-### 安装全局 CLI 命令
-
-```bash
-# 克隆或下载项目后，运行安装脚本
-deno run -A src/setup.ts
-
-# 安装后可以在任何地方使用 foundry 命令
-```
-
-**卸载全局 CLI**：
-```bash
-deno run -A src/setup.ts --uninstall
-```
-
 ### 使用 CLI 命令
 
 安装后可使用 `foundry` 命令，包含以下子命令：`init`、`deploy`、`verify`、`upgrade`、`uninstall`。
