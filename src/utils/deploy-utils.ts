@@ -311,7 +311,7 @@ export async function forgeDeploy(
   // 检查是否是 "transaction already imported" 错误
   const isTransactionAlreadyImported = stderrText.includes("transaction already imported") ||
     stderrText.includes("error code -32003");
-  
+
   // 检查是否是 "already known" 错误（交易已在 mempool 中）
   const isAlreadyKnown = stderrText.includes("error code -32000") ||
     stderrText.toLowerCase().includes("already known");
@@ -327,7 +327,6 @@ export async function forgeDeploy(
           }
           const mult = GAS_BUMP_MULTIPLIERS[r] ?? 1.5;
           const gasWei = Math.ceil(baseGasWei * mult);
-          logger.info(`尝试使用更高 gas 替换 mempool 中的交易 (${mult}x, gas-price=${gasWei} wei)...`);
           const replaceArgs = [...forgeArgs, "--gas-price", String(gasWei)];
           const replaceProgressBar = createLoadingProgressBar("正在部署中...");
           const replaceInterval = replaceProgressBar.start();
@@ -465,12 +464,12 @@ export async function forgeDeploy(
       logger.error("  3. 或者使用不同的 nonce 或账户进行部署");
       throw new DeploymentError(
         `重试 ${maxRetries} 次后仍然失败，可能是 RPC 节点缓存了交易`,
-        { 
-          contractName, 
-          network, 
-          maxRetries, 
+        {
+          contractName,
+          network,
+          maxRetries,
           lastError: lastError || stderrText,
-          rpcUrl: config.rpcUrl 
+          rpcUrl: config.rpcUrl
         }
       );
     }
