@@ -100,7 +100,8 @@ export function createDeployer(
 ): Deployer {
   return {
     network,
-    accounts: [config.rpcUrl], // 简化处理
+    /** 当前网络的账户地址列表，accounts[0] 为部署者地址（对应 config.address） */
+    accounts: [config.address],
     logger,
     deploy: async (
       contractName: string,
