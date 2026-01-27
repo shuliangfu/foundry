@@ -4,8 +4,10 @@
  * 使用 @dreamer/runtime-adapter 兼容 Deno 和 Bun
  */
 
-import { existsSync, readTextFileSync, join, cwd, setEnv, exit } from "@dreamer/runtime-adapter";
+import { existsSync, readTextFileSync, join, cwd, setEnv, exit, getEnv } from "@dreamer/runtime-adapter";
 import { logger } from "./logger.ts";
+
+export { getEnv, setEnv, exit };
 
 /**
  * 加载环境变量
@@ -24,7 +26,7 @@ export function loadEnv(envPath?: string): Record<string, string> {
     // 直接读取 .env 文件内容，手动解析
     const envText = readTextFileSync(targetPath);
     const env: Record<string, string> = {};
-    
+
     for (const line of envText.split("\n")) {
       const trimmed = line.trim();
       // 跳过空行和注释
@@ -42,7 +44,7 @@ export function loadEnv(envPath?: string): Record<string, string> {
 				setEnv(key, cleanValue);
       }
     }
-    
+
     return env;
   } catch (error) {
     logger.error("❌ Error reading .env file:", error);

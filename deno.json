@@ -1,5 +1,5 @@
 {
-  "version": "1.3.1",
+  "version": "1.3.2",
   "name": "@dreamer/foundry",
   "description": "Foundry deployment and verification utilities for Deno and Bun",
   "license": "MIT",
@@ -13,7 +13,7 @@
     "./utils/env": "./src/utils/env.ts",
     "./utils/web3": "./src/utils/web3.ts",
     "./utils/logger": "./src/utils/logger.ts",
-    "./utils/time-sync": "./src/utils/time-sync.ts"
+    "./utils/time": "./src/utils/time.ts"
   },
   "publish": {
     "exclude": [

@@ -248,7 +248,28 @@ const web3 = new Web3("MyContract", {
 const balance = await web3.read("balanceOf", ["0x..."]);
 ```
 
-### 示例 2：使用配置文件创建 Web3 实例
+### 示例 2：使用时间工具（Anvil 本地链）
+
+在本地 Anvil 网络中推进或同步区块链时间（需 `WEB3_ENV=local`）：
+
+```typescript
+import { getAnvilTimestamp, syncAnvilTime, advanceTime } from "@dreamer/foundry/utils";
+
+// 获取当前链上时间戳
+const ts = await getAnvilTimestamp();
+if (ts) console.log("当前区块时间戳:", ts.toString());
+
+// 将链时间同步到系统时间（东 8 区）
+await syncAnvilTime();
+
+// 按天推进时间（内部会 evm_increaseTime + evm_mine）
+await advanceTime(1);   // 推进 1 天
+await advanceTime(7);   // 推进 1 周
+```
+
+推进链上时间后，合约内依赖 `block.timestamp` 的逻辑会在下次调用时使用新的区块时间。
+
+### 示例 3：使用配置文件创建 Web3 实例
 
 合约名使用项目中的实际合约名（对应 `build/abi/{network}/<合约名>.json`）。
 
@@ -274,7 +295,7 @@ const web3 = createWeb3("MyContract", {
 });
 ```
 
-### 示例 3：部署脚本
+### 示例 4：部署脚本
 
 部署脚本放在 `deploy/` 目录，文件名为 `数字-合约名.ts`（如 `1-mytoken.ts`、`2-store.ts` 等，合约名由项目自定）。脚本需导出 `deploy(deployer)`，框架会注入部署器并执行。以下以 init 生成的代币合约为例，实际项目中可将合约名、文件名替换为你的合约。
 
@@ -299,7 +320,7 @@ export async function deploy(deployer: Deployer) {
 
 执行方式：使用 CLI `foundry deploy --network local`，或在代码中调用 `deploy({ network, config, ... })`。
 
-### 示例 4：测试脚本
+### 示例 5：测试脚本
 
 测试脚本放在 `tests/` 目录，使用 `@dreamer/test` 与 `@dreamer/foundry` 的 `createWeb3`、`Web3` 等与链上合约交互。以下以 init 生成的 MyToken 为例，合约名替换为项目中实际部署的合约名即可。
 
@@ -441,6 +462,81 @@ await init("/path/to/project");
 - `privateKey?: string` - 私钥
 - `address?: string` - 地址
 - `account?: number` - 账户索引
+
+### utils/time — 时间工具（Anvil 本地链）
+
+用于在本地 Anvil 网络中推进或同步区块链时间，无需改系统时间或重启容器。合约内依赖 `block.timestamp` 的逻辑会在推进后下次调用时读到新的区块时间。**仅当 `WEB3_ENV=local` 时生效**，网络配置与 RPC 来自 `loadWeb3ConfigSync()`（即项目中的 `config/web3.json`）。
+
+**引入方式**：
+```typescript
+import { getAnvilTimestamp, syncAnvilTime, advanceAnvilTime, advanceTime } from "@dreamer/foundry/utils";
+// 或按子路径
+import { getAnvilTimestamp, syncAnvilTime, advanceAnvilTime, advanceTime } from "@dreamer/foundry/utils/time";
+```
+
+#### `getAnvilTimestamp(): Promise<bigint | null>`
+
+获取当前 Anvil 链上最新区块的时间戳（秒）。
+
+**返回**：时间戳（秒）的 `bigint`，失败时为 `null`。
+
+**示例**：
+```typescript
+const ts = await getAnvilTimestamp();
+if (ts) console.log("区块时间戳(秒):", ts.toString());
+```
+
+#### `syncAnvilTime(silent?: boolean): Promise<boolean>`
+
+将 Anvil 链时间设置为「当前系统时间（东 8 区 UTC+8）」；内部会调 `evm_setTime` 并 `evm_mine` 一次使时间生效。
+
+**参数**：
+- `silent?: boolean` - 为 `true` 时不打 info 日志，仅保留错误信息，默认 `false`。
+
+**返回**：成功为 `true`，失败或非 local 网络为 `false`。
+
+**示例**：
+```typescript
+await syncAnvilTime();           // 同步并输出日志
+await syncAnvilTime(true);       // 静默同步
+```
+
+#### `advanceAnvilTime(seconds: number, silent?: boolean): Promise<boolean>`
+
+按秒数推进 Anvil 链时间（内部使用 `evm_increaseTime` + `evm_mine`）。
+
+**参数**：
+- `seconds: number` - 要推进的秒数（建议用合理间隔，如天、周、月）。
+- `silent?: boolean` - 为 `true` 时不输出「推进中」「已推进」等 info 日志，默认 `false`。
+
+**返回**：成功为 `true`，否则为 `false`。
+
+**示例**：
+```typescript
+await advanceAnvilTime(86400);        // 推进 1 天
+await advanceAnvilTime(86400, true); // 推进 1 天且静默（适合循环里逐日推进）
+```
+
+#### `advanceTime(days?: number): Promise<boolean>`
+
+按「天」推进链时间，内部换算为秒后调用 `advanceAnvilTime`。
+
+**参数**：
+- `days?: number` - 要推进的天数，可为小数（如 `0.5` 表示 12 小时），默认 `1`。
+
+**返回**：成功为 `true`，否则为 `false`。
+
+**示例**：
+```typescript
+await advanceTime(1);    // 推进 1 天
+await advanceTime(7);    // 推进 1 周
+await advanceTime(30);   // 推进约 1 个月
+await advanceTime(365);  // 推进 1 年
+```
+
+**使用说明**：
+- 仅在 `WEB3_ENV=local` 且对应 RPC 为 Anvil 时有意义；testnet/mainnet 下会直接返回 `false` 并打警告。
+- 推进链上时间后，合约内依赖 `block.timestamp` 的逻辑会在下次调用时使用新的区块时间。
 
 ---
 
