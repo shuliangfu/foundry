@@ -328,6 +328,8 @@ async function main() {
   // 确定网络：优先使用命令行参数，其次使用环境变量，最后使用默认值 local
   const network = getNetworkName(networkArg, false) || "local";
 
+  setEnv("WEB3_ENV", network);
+
   // 加载网络配置
   let config: NetworkConfig;
   try {

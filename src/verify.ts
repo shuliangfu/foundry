@@ -23,6 +23,7 @@ import {
   cwd,
   existsSync,
   join,
+  setEnv,
   readdirSync,
   readTextFileSync,
 } from "@dreamer/runtime-adapter";
@@ -213,7 +214,7 @@ export async function verify(options: VerifyOptions): Promise<void> {
 
   // 根据 chain 和 network 查找网络配置
   let networkConfig: { apiUrl: string; explorerUrl: string } | null = null;
-  
+
   if (chain && NETWORK_MAP[chain]) {
     // 如果找到了 chain，从 NETWORK_MAP 中查找对应的 network
     const chainConfig = NETWORK_MAP[chain];
@@ -322,10 +323,10 @@ export async function verify(options: VerifyOptions): Promise<void> {
     logger.error("  - 如果刚刚部署，请等待几个区块确认");
     throw new NetworkError(
       `链上未找到合约，地址: ${options.address}`,
-      { 
-        address: options.address, 
-        network: options.network, 
-        chainId: options.chainId 
+      {
+        address: options.address,
+        network: options.network,
+        chainId: options.chainId
       }
     );
   }
@@ -348,7 +349,7 @@ export async function verify(options: VerifyOptions): Promise<void> {
 
   // 使用 spawn 来实时读取输出
   const child = cmd.spawn();
-  
+
   // 使用通用流式输出函数
   const result = await executeCommandWithStream(child);
 
@@ -376,12 +377,12 @@ export async function verify(options: VerifyOptions): Promise<void> {
     const isApiKeyError = stderrText.includes("Invalid API Key") || stderrText.includes("API key");
     throw new VerificationError(
       `验证失败: ${stderrText}`,
-      { 
-        address: options.address, 
-        contractName: options.contractName, 
+      {
+        address: options.address,
+        contractName: options.contractName,
         network: options.network,
         isApiKeyError,
-        stderrText 
+        stderrText
       }
     );
   }
@@ -703,6 +704,8 @@ async function main() {
 
   // 确定网络：优先使用命令行参数，其次使用环境变量
   const network = getNetworkName(networkArg, false) || "local";
+
+  setEnv("WEB3_ENV", network);
 
   if (!contractName) {
     logger.error("❌ 未指定合约名称");

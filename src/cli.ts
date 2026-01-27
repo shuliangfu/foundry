@@ -33,6 +33,7 @@ import {
   readTextFileSync,
   createCommand,
   remove,
+  setEnv
 } from "@dreamer/runtime-adapter";
 import { init } from "./init.ts";
 import { readCache, writeCache, getInstalledVersion, setInstalledVersion } from "./utils/cache.ts";
@@ -523,6 +524,8 @@ cli
 
     const finalNetwork: string = network;
 
+    setEnv("WEB3_ENV", finalNetwork);
+
     // 如果未从命令行指定网络，且从环境变量读取到了，显示提示
     if (!options.network && network !== "local") {
       logger.info(`从 .env 文件读取网络配置: ${network}`);
@@ -822,6 +825,8 @@ cli
     }
 
     const finalNetwork: string = network;
+
+    setEnv("WEB3_ENV", finalNetwork);
 
     // 如果未从命令行指定网络，且从环境变量读取到了，显示提示
     if (!options.network && network !== "local") {
