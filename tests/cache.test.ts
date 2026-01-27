@@ -11,7 +11,6 @@ import {
   getInstalledVersion,
   setInstalledVersion,
 } from "../src/utils/cache.ts";
-import { existsSync, remove, join, getEnv, cwd } from "@dreamer/runtime-adapter";
 
 describe("缓存功能测试", () => {
   const testKey = "test_cache_key";

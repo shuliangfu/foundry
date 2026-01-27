@@ -380,6 +380,77 @@ async function install(): Promise<void> {
 }
 
 /**
+ * 检测 forge 是否可用（Foundry 工具链是否已安装）
+ * @returns 若 forge 在 PATH 中且可执行则返回 true
+ */
+async function isForgeAvailable(): Promise<boolean> {
+  try {
+    const plat = platform();
+    const cmd = createCommand(plat === "windows" ? "where" : "which", {
+      args: ["forge"],
+      stdout: "piped",
+      stderr: "piped",
+    });
+    const out = await cmd.output();
+    const text = new TextDecoder().decode(out.stdout).trim();
+    return out.success && text.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 自动安装 Foundry 工具链（forge/cast/anvil）：执行 curl -L https://foundry.paradigm.xyz | bash 后运行 foundryup
+ * 仅在未检测到 forge 时执行，Windows 下建议使用 Git BASH 或 WSL
+ */
+export async function ensureFoundryInstalled(): Promise<void> {
+  if (await isForgeAvailable()) {
+    return;
+  }
+
+  logger.info("未检测到 Foundry (forge)，正在自动安装...");
+  const plat = platform();
+  if (plat === "windows") {
+    logger.warn("Windows 下自动安装可能失败，请使用 Git BASH 或 WSL 执行，或手动安装: https://book.getfoundry.sh/getting-started/installation");
+  }
+
+  try {
+    const installScript = "curl -L https://foundry.paradigm.xyz | bash";
+    const installCmd = createCommand("bash", {
+      args: ["-c", installScript],
+      stdout: "inherit",
+      stderr: "inherit",
+    });
+    const installOut = await installCmd.output();
+    if (!installOut.success) {
+      throw new Error("Foundry 安装脚本执行失败");
+    }
+
+    const homeDir = getEnv("HOME") || getEnv("USERPROFILE") || "";
+    const foundryupPath = homeDir ? join(homeDir, ".foundry", "bin", "foundryup") : "foundryup";
+    if (existsSync(foundryupPath)) {
+      logger.info("正在运行 foundryup 安装 forge/cast/anvil...");
+      const foundryupCmd = createCommand(foundryupPath, {
+        args: [],
+        stdout: "inherit",
+        stderr: "inherit",
+      });
+      const foundryupOut = await foundryupCmd.output();
+      if (!foundryupOut.success) {
+        logger.warn("foundryup 执行未成功，请在新终端中执行 foundryup 后重试");
+      }
+    } else {
+      logger.info("请在新终端中执行 foundryup 完成安装，或将 ~/.foundry/bin 加入 PATH 后重试");
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error(`自动安装 Foundry 失败: ${msg}`);
+    logger.info("请手动安装: curl -L https://foundry.paradigm.xyz | bash，然后执行 foundryup");
+    throw err;
+  }
+}
+
+/**
  * 查找 foundry 可执行文件的实际路径
  * @returns foundry 的完整路径，如果未找到则返回 null
  */

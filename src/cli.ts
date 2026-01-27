@@ -52,7 +52,7 @@ import { parseJsrPackageFromUrl, parseJsrVersionFromUrl } from "./utils/jsr.ts";
 import { logger } from "./utils/logger.ts";
 import { loadWeb3ConfigSync } from "./utils/web3.ts";
 import type { JsrMetaData, JsrDenoJson } from "./types/index.ts";
-import { findFoundryPath } from "./setup.ts";
+import { findFoundryPath, ensureFoundryInstalled } from "./setup.ts";
 
 /**
  * 提示用户确认
@@ -530,6 +530,13 @@ cli
     type: "string",
   })
   .action(async (_args, options) => {
+    // 部署依赖 forge，执行前检测并在未安装时自动安装 Foundry
+    try {
+      await ensureFoundryInstalled();
+    } catch {
+      Deno.exit(1);
+    }
+
     // 获取网络名称（从命令行参数或环境变量）
     const network = getNetworkName(options.network as string | undefined, false);
     if (!network) {
@@ -837,6 +844,13 @@ cli
     type: "number",
   })
   .action(async (_args, options) => {
+    // verify 依赖 forge/cast，执行前检测并在未安装时自动安装 Foundry
+    try {
+      await ensureFoundryInstalled();
+    } catch {
+      Deno.exit(1);
+    }
+
     // 获取网络名称（从命令行参数或环境变量）
     const network = getNetworkName(options.network as string | undefined, false);
     if (!network) {

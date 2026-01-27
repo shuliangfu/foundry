@@ -5,7 +5,7 @@
 
 import { describe, expect, it, beforeAll, afterAll } from "@dreamer/test";
 import { validateEnv } from "../src/utils/env.ts";
-import { writeTextFile, remove, join, cwd, existsSync, setEnv } from "@dreamer/runtime-adapter";
+import { writeTextFile, remove, join, cwd, existsSync } from "@dreamer/runtime-adapter";
 
 describe("环境变量工具扩展测试", () => {
   const testEnvPath = join(cwd(), "tests", "data", ".env.test");
@@ -46,11 +46,11 @@ CHAIN_ID=97
     });
 
     it("应该能够检测缺失的必需环境变量", () => {
-      const env = {
+      const _env = {
         WEB3_ENV: "testnet",
         // ETH_API_KEY 缺失
       };
-      const required = ["WEB3_ENV", "ETH_API_KEY"];
+      const _required = ["WEB3_ENV", "ETH_API_KEY"];
 
       // 应该抛出错误或退出（取决于实现）
       // 由于 validateEnv 会调用 exit(1)，这里主要测试函数存在
@@ -68,11 +68,11 @@ CHAIN_ID=97
     });
 
     it("应该能够处理空字符串值", () => {
-      const env = {
+      const _env = {
         WEB3_ENV: "",
         ETH_API_KEY: "test-key",
       };
-      const required = ["WEB3_ENV", "ETH_API_KEY"];
+      const _required = ["WEB3_ENV", "ETH_API_KEY"];
 
       // 空字符串应该被视为缺失
       // 由于 validateEnv 会调用 exit(1)，这里主要测试函数存在

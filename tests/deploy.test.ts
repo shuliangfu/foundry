@@ -4,15 +4,15 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "@dreamer/test";
-import { deploy, createDeployer } from "../src/deploy.ts";
-import { verify } from "../src/verify.ts";
-import { logger, loadEnv, deployContract, loadContract } from "../src/utils/mod.ts";
+import { deploy as _deploy, createDeployer } from "../src/deploy.ts";
+import { verify as _verify } from "../src/verify.ts";
+import { logger, loadEnv, deployContract as _deployContract, loadContract } from "../src/utils/mod.ts";
 import type { NetworkConfig } from "../src/utils/deploy-utils.ts";
 
 describe("部署功能测试", () => {
   let testConfig: NetworkConfig;
 
-  beforeAll(async () => {
+  beforeAll(() => {
     logger.info("初始化测试配置...");
     // 测试配置（使用本地网络）
     testConfig = {
@@ -43,7 +43,7 @@ describe("部署功能测试", () => {
         const env = await loadEnv();
         expect(env).toBeDefined();
         expect(typeof env).toBe("object");
-      } catch (error) {
+      } catch (_error) {
         // .env 文件不存在时跳过测试
         logger.warn("跳过环境变量测试：.env 文件不存在");
       }

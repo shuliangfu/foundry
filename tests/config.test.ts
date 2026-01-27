@@ -5,7 +5,7 @@
 
 import { describe, expect, it, beforeAll, afterAll } from "@dreamer/test";
 import { ConfigManager } from "../src/config/manager.ts";
-import { ConfigurationError } from "../src/errors/index.ts";
+import { ConfigurationError as _ConfigurationError } from "../src/errors/index.ts";
 import { writeTextFile, remove, join, cwd, existsSync, mkdir } from "@dreamer/runtime-adapter";
 
 describe("配置管理器测试", () => {
