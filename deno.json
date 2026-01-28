@@ -1,5 +1,5 @@
 {
-  "version": "1.3.4",
+  "version": "1.3.5",
   "name": "@dreamer/foundry",
   "description": "Foundry deployment and verification utilities for Deno and Bun",
   "license": "MIT",
@@ -7,6 +7,8 @@
     ".": "./src/mod.ts",
     "./cli": "./src/cli.ts",
     "./setup": "./src/setup.ts",
+    "./deploy": "./src/deploy.ts",
+    "./verify": "./src/verify.ts",
     "./utils": "./src/utils/mod.ts",
     "./utils/env": "./src/utils/env.ts",
     "./utils/web3": "./src/utils/web3.ts",
