@@ -19,6 +19,7 @@
  * ```
  */
 
-// 导出部署功能
+// 导出部署与验证功能（统一从主入口 @dreamer/foundry 使用，无需子路径）
 export * from "./deploy.ts";
 export * from "./utils/mod.ts";
+export * from "./verify.ts";

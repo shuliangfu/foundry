@@ -28,18 +28,17 @@ import {
   remove,
   writeTextFileSync,
 } from "@dreamer/runtime-adapter";
-import { logger } from "./logger.ts";
-import { createLoadingProgressBar } from "./cli-utils.ts";
-import type { ContractInfo, AbiItem } from "../types/index.ts";
-import { DeploymentError } from "../errors/index.ts";
 import {
+  ALREADY_KNOWN_REPLACE_RETRIES,
+  DEFAULT_NETWORK,
   DEFAULT_RETRY_ATTEMPTS,
   DEFAULT_RETRY_DELAY,
-  DEFAULT_NETWORK,
-  ALREADY_KNOWN_REPLACE_RETRIES,
   GAS_BUMP_MULTIPLIERS,
 } from "../constants/index.ts";
-
+import { DeploymentError } from "../errors/index.ts";
+import type { AbiItem, ContractInfo } from "../types/index.ts";
+import { createLoadingProgressBar } from "./cli-utils.ts";
+import { logger } from "./logger.ts";
 
 /**
  * 网络配置接口
@@ -352,9 +351,15 @@ export async function forgeDeploy(
             }
             if (!stillAlreadyKnown) {
               // 区分网络/RPC 连接异常（可重试）与其它错误
-              const isConnectionError = /connection error|TLS|close_notify|eof|sendrequest|connection reset|timed out/i.test(replaceStderr);
+              const isConnectionError =
+                /connection error|TLS|close_notify|eof|sendrequest|connection reset|timed out/i
+                  .test(replaceStderr);
               if (isConnectionError) {
-                logger.warn(`替换交易时 RPC 连接异常（第 ${r + 1} 次），将重试: ${replaceStderr.slice(0, 120)}...`);
+                logger.warn(
+                  `替换交易时 RPC 连接异常（第 ${r + 1} 次），将重试: ${
+                    replaceStderr.slice(0, 120)
+                  }...`,
+                );
                 replaceProgressBar.stop(replaceInterval);
                 if (r < ALREADY_KNOWN_REPLACE_RETRIES - 1) {
                   await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -363,13 +368,13 @@ export async function forgeDeploy(
                 logger.error("❌ 替换时 RPC 多次连接失败，请稍后重试或更换 config 中的 rpcUrl");
                 throw new DeploymentError(
                   "替换 mempool 交易时 RPC 连接失败，请稍后重试或更换 RPC 节点。",
-                  { contractName, network, rpcUrl: config.rpcUrl }
+                  { contractName, network, rpcUrl: config.rpcUrl },
                 );
               }
               logger.error("替换交易时发生其他错误:", replaceStderr);
               throw new DeploymentError(
                 `替换 mempool 交易时失败: ${replaceStderr}`,
-                { contractName, network, rpcUrl: config.rpcUrl }
+                { contractName, network, rpcUrl: config.rpcUrl },
               );
             }
           } catch (e) {
@@ -387,7 +392,7 @@ export async function forgeDeploy(
       logger.error("");
       throw new DeploymentError(
         "交易已在 mempool 中 (already known)。请等待更长时间或更换部署地址。",
-        { contractName, network, rpcUrl: config.rpcUrl }
+        { contractName, network, rpcUrl: config.rpcUrl },
       );
     }
     // 如果是 "transaction already imported" 错误且 force 为 true，清理后重试
@@ -451,7 +456,7 @@ export async function forgeDeploy(
             logger.error(retryStderrText);
             throw new DeploymentError(
               `重试部署失败: ${retryStderrText}`,
-              { contractName, network, retryCount, rpcUrl: config.rpcUrl }
+              { contractName, network, retryCount, rpcUrl: config.rpcUrl },
             );
           }
 
@@ -482,8 +487,8 @@ export async function forgeDeploy(
           network,
           maxRetries,
           lastError: lastError || stderrText,
-          rpcUrl: config.rpcUrl
-        }
+          rpcUrl: config.rpcUrl,
+        },
       );
     }
 
@@ -527,11 +532,10 @@ export async function forgeDeploy(
       }
     }
 
-    logger.error("Deployment failed:");
-    logger.error(stderrText);
+    // 仅抛出错误，由上层统一打印（避免与流式输出重复）
     throw new DeploymentError(
       `部署失败: ${stderrText}`,
-      { contractName, network, rpcUrl: config.rpcUrl, stderrText }
+      { contractName, network, rpcUrl: config.rpcUrl, stderrText },
     );
   }
 
@@ -609,7 +613,7 @@ async function extractAddressFromOutput(
     logger.error("错误:", stderrText);
     throw new DeploymentError(
       "无法提取合约地址",
-      { contractName, stdoutText, stderrText }
+      { contractName, stdoutText, stderrText },
     );
   }
 
@@ -715,7 +719,6 @@ export function loadContract(
   network?: string,
   abiDir?: string,
 ): ContractInfo {
-
   // 网络未传入时优先从环境变量 WEB3_ENV 读取，否则使用默认网络常量
   if (network == null || network === "") {
     network = getEnv("WEB3_ENV") ?? DEFAULT_NETWORK;

@@ -6,7 +6,7 @@
  *
  * @example
  * ```typescript
- * import { verify } from "@dreamer/foundry/verify";
+ * import { verify } from "@dreamer/foundry";
  *
  * await verify({
  *   address: "0x...",
@@ -23,19 +23,23 @@ import {
   cwd,
   existsSync,
   join,
-  setEnv,
   readdirSync,
   readTextFileSync,
+  setEnv,
 } from "@dreamer/runtime-adapter";
-import { logger } from "./utils/logger.ts";
-import { loadContract } from "./utils/deploy-utils.ts";
-import { getApiKey, getNetworkName, loadNetworkConfig, executeCommandWithStream, createLoadingProgressBar } from "./utils/cli-utils.ts";
-import { loadWeb3ConfigSync } from "./utils/web3.ts";
-import type { ContractInfo } from "./types/index.ts";
-import { VerificationError, NetworkError, ConfigurationError } from "./errors/index.ts";
-import type { AbiItem, AbiConstructor } from "./types/index.ts";
 import { DEFAULT_NETWORK } from "./constants/index.ts";
-
+import { ConfigurationError, NetworkError, VerificationError } from "./errors/index.ts";
+import type { AbiConstructor, AbiItem, ContractInfo } from "./types/index.ts";
+import {
+  createLoadingProgressBar,
+  executeCommandWithStream,
+  getApiKey,
+  getNetworkName,
+  loadNetworkConfig,
+} from "./utils/cli-utils.ts";
+import { loadContract } from "./utils/deploy-utils.ts";
+import { logger } from "./utils/logger.ts";
+import { loadWeb3ConfigSync } from "./utils/web3.ts";
 
 /**
  * 网络配置映射
@@ -240,8 +244,10 @@ export async function verify(options: VerifyOptions): Promise<void> {
 
   if (!networkConfig) {
     throw new ConfigurationError(
-      `不支持的网络: ${options.network}${chain ? ` (chain: ${chain})` : ""}。请检查 config/web3.json 文件。`,
-      { network: options.network, chain }
+      `不支持的网络: ${options.network}${
+        chain ? ` (chain: ${chain})` : ""
+      }。请检查 config/web3.json 文件。`,
+      { network: options.network, chain },
     );
   }
 
@@ -327,8 +333,8 @@ export async function verify(options: VerifyOptions): Promise<void> {
       {
         address: options.address,
         network: options.network,
-        chainId: options.chainId
-      }
+        chainId: options.chainId,
+      },
     );
   }
 
@@ -383,8 +389,8 @@ export async function verify(options: VerifyOptions): Promise<void> {
         contractName: options.contractName,
         network: options.network,
         isApiKeyError,
-        stderrText
-      }
+        stderrText,
+      },
     );
   }
 
@@ -756,7 +762,9 @@ async function main() {
         contractInfo = loadContract(contractName, network);
         contractAddress = contractInfo.address;
       } catch {
-        logger.error(`❌ 合约 ${contractName} 无法读取地址，请使用 --address 指定或确保已部署并存在 build/abi/${network}/${contractName}.json`);
+        logger.error(
+          `❌ 合约 ${contractName} 无法读取地址，请使用 --address 指定或确保已部署并存在 build/abi/${network}/${contractName}.json`,
+        );
         Deno.exit(1);
       }
     } else {
@@ -767,13 +775,17 @@ async function main() {
       }
     }
 
-    let finalConstructorArgs: string[] | undefined = contractNames.length === 1 ? constructorArgs : undefined;
+    let finalConstructorArgs: string[] | undefined = contractNames.length === 1
+      ? constructorArgs
+      : undefined;
     if (!finalConstructorArgs && contractInfo && contractInfo.args) {
       finalConstructorArgs = contractInfo.args.map(String);
     }
 
     const actualFileName = findContractFileName(contractName, network);
-    const actualContractName = actualFileName ? actualFileName.replace(/\.json$/, "") : contractName;
+    const actualContractName = actualFileName
+      ? actualFileName.replace(/\.json$/, "")
+      : contractName;
     if (actualFileName && actualFileName !== `${contractName}.json`) {
       logger.info(`ℹ️  合约名称已自动匹配为: ${actualContractName}`);
     }

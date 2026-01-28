@@ -6,7 +6,7 @@
  *
  * @example
  * ```typescript
- * import { deploy } from "@dreamer/foundry/deploy";
+ * import { deploy } from "@dreamer/foundry";
  *
  * await deploy({
  *   scriptDir: "./script",
@@ -19,15 +19,18 @@
  * ```
  */
 
+import type { Logger } from "@dreamer/logger";
 import { cwd, existsSync, join, readdir, setEnv } from "@dreamer/runtime-adapter";
+import { DEFAULT_NETWORK } from "./constants/index.ts";
 import type { ContractInfo, DeployOptions, NetworkConfig } from "./utils/deploy-utils.ts";
-import { createLoadingProgressBar } from "./utils/cli-utils.ts";
 import { forgeDeploy, loadContract } from "./utils/deploy-utils.ts";
 import { logger } from "./utils/logger.ts";
-import type { Logger } from "@dreamer/logger";
 import { createWeb3, type Web3, type Web3Options } from "./utils/web3.ts";
-import { getNetworkName, loadNetworkConfig as loadNetworkConfigUtil } from "./utils/cli-utils.ts";
-import { DEFAULT_NETWORK } from "./constants/index.ts";
+import {
+  createLoadingProgressBar,
+  getNetworkName,
+  loadNetworkConfig as loadNetworkConfigUtil,
+} from "./utils/cli-utils.ts";
 
 /**
  * 部署器接口

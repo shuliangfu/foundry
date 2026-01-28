@@ -3,12 +3,24 @@
  * @description CLI 相关的工具函数，用于减少代码重复
  */
 
-import { cwd, dirname, existsSync, join, getEnv, platform, writeStdoutSync } from "@dreamer/runtime-adapter";
-import { logger } from "./logger.ts";
-import { parseJsrPackageFromUrl } from "./jsr.ts";
+import {
+  cwd,
+  dirname,
+  existsSync,
+  getEnv,
+  join,
+  platform,
+  writeStdoutSync,
+} from "@dreamer/runtime-adapter";
+import {
+  DEFAULT_NETWORK,
+  PROGRESS_BAR_CLEAR_LENGTH,
+  PROGRESS_BAR_INTERVAL,
+} from "../constants/index.ts";
+import type { CommandStatus, GlobalCache } from "../types/index.ts";
 import { loadEnv } from "./env.ts";
-import type { GlobalCache, CommandStatus } from "../types/index.ts";
-import { DEFAULT_NETWORK, PROGRESS_BAR_INTERVAL, PROGRESS_BAR_CLEAR_LENGTH } from "../constants/index.ts";
+import { parseJsrPackageFromUrl } from "./jsr.ts";
+import { logger } from "./logger.ts";
 
 /**
  * 获取项目根目录和 deno.json 路径
@@ -68,17 +80,18 @@ function findProjectRoot(startDir: string): string | null {
  */
 export function getScriptPath(scriptName: "deploy" | "verify"): string {
   const currentFileUrl = import.meta.url;
-  
+
   // 使用全局缓存对象（如果存在）
-  const globalCache = ((globalThis as { __foundryCache?: GlobalCache }).__foundryCache || {}) as GlobalCache;
+  const globalCache =
+    ((globalThis as { __foundryCache?: GlobalCache }).__foundryCache || {}) as GlobalCache;
   const cacheKey = `${scriptName}ScriptPath_${currentFileUrl}`;
-  
+
   if (globalCache[cacheKey]) {
     return globalCache[cacheKey] as string;
   }
 
   let scriptPath: string;
-  
+
   // 如果是从 JSR 包运行的，使用 JSR URL；否则使用文件路径
   if (currentFileUrl.startsWith("https://jsr.io/") || currentFileUrl.startsWith("jsr:")) {
     // 使用工具函数解析 JSR 包信息（不会请求网络）
@@ -95,11 +108,11 @@ export function getScriptPath(scriptName: "deploy" | "verify"): string {
     const currentDir = dirname(currentFileUrl.replace(/^file:\/\//, ""));
     scriptPath = join(currentDir, `${scriptName}.ts`);
   }
-  
+
   // 缓存结果（基于当前文件 URL，因为它在运行时是固定的）
   globalCache[cacheKey] = scriptPath;
   (globalThis as { __foundryCache?: GlobalCache }).__foundryCache = globalCache;
-  
+
   return scriptPath;
 }
 
@@ -110,9 +123,9 @@ export function getScriptPath(scriptName: "deploy" | "verify"): string {
  * @returns 执行结果，包含 stdout 和 stderr
  */
 export async function executeCommandWithStream(
-  child: { 
-    stdout: ReadableStream<Uint8Array> | null; 
-    stderr: ReadableStream<Uint8Array> | null; 
+  child: {
+    stdout: ReadableStream<Uint8Array> | null;
+    stderr: ReadableStream<Uint8Array> | null;
     status: Promise<CommandStatus> | (() => Promise<CommandStatus>);
   },
 ): Promise<{ stdout: string; stderr: string; success: boolean }> {
@@ -120,11 +133,11 @@ export async function executeCommandWithStream(
   if (!child.stdout || !child.stderr) {
     throw new Error("Command stdout or stderr is null");
   }
-  
+
   // 收集输出的缓冲区
   const stdoutChunks: Uint8Array[] = [];
   const stderrChunks: Uint8Array[] = [];
-  
+
   // 实时读取并输出 stdout
   const stdoutReader = child.stdout.getReader();
   const readStdout = async () => {
@@ -133,7 +146,7 @@ export async function executeCommandWithStream(
       while (true) {
         const { done, value } = await stdoutReader.read();
         if (done) break;
-        
+
         stdoutChunks.push(value);
         // 实时输出到控制台（使用 runtime-adapter 的 writeStdoutSync 方法，兼容 Deno 和 Bun）
         const text = decoder.decode(value, { stream: true });
@@ -145,7 +158,7 @@ export async function executeCommandWithStream(
       stdoutReader.releaseLock();
     }
   };
-  
+
   // 实时读取并输出 stderr
   const stderrReader = child.stderr.getReader();
   const readStderr = async () => {
@@ -154,7 +167,7 @@ export async function executeCommandWithStream(
       while (true) {
         const { done, value } = await stderrReader.read();
         if (done) break;
-        
+
         stderrChunks.push(value);
         // 实时输出到控制台（使用 runtime-adapter 的 writeStdoutSync 方法，兼容 Deno 和 Bun）
         // 注意：runtime-adapter 没有提供 writeStderrSync，使用 writeStdoutSync 输出 stderr
@@ -167,39 +180,39 @@ export async function executeCommandWithStream(
       stderrReader.releaseLock();
     }
   };
-  
+
   // 并行读取 stdout 和 stderr
   await Promise.all([readStdout(), readStderr()]);
-  
+
   // 等待进程完成
-  const statusResult = typeof child.status === "function" 
-    ? await child.status() 
+  const statusResult = typeof child.status === "function"
+    ? await child.status()
     : await child.status;
-  
+
   // 合并所有输出块
   const decoder = new TextDecoder();
-  
+
   // 计算总长度
   const stdoutTotalLength = stdoutChunks.reduce((sum, chunk) => sum + chunk.length, 0);
   const stderrTotalLength = stderrChunks.reduce((sum, chunk) => sum + chunk.length, 0);
-  
+
   // 创建合并后的数组
   const mergedStdout = new Uint8Array(stdoutTotalLength);
   const mergedStderr = new Uint8Array(stderrTotalLength);
-  
+
   // 复制数据到合并后的数组
   let stdoutOffset = 0;
   for (const chunk of stdoutChunks) {
     mergedStdout.set(chunk, stdoutOffset);
     stdoutOffset += chunk.length;
   }
-  
+
   let stderrOffset = 0;
   for (const chunk of stderrChunks) {
     mergedStderr.set(chunk, stderrOffset);
     stderrOffset += chunk.length;
   }
-  
+
   // 解码为文本
   const finalStdout = decoder.decode(mergedStdout);
   const finalStderr = decoder.decode(mergedStderr);
@@ -247,7 +260,7 @@ export async function executeDenoCommand(
 
   // 使用 spawn 来实时读取输出
   const child = cmd.spawn();
-  
+
   // 使用通用流式输出函数
   const result = await executeCommandWithStream(child);
 
@@ -371,19 +384,21 @@ export function getNetworkName(
  * 处理 Deno 命令执行结果
  * @param result - 执行结果
  * @param successMessage - 成功消息（可选）
+ * @param streamed - 是否已实时流式输出过（为 true 时不再重复打印 stdout/stderr，避免重复）
  */
 export function handleCommandResult(
   result: { stdout: string; stderr: string; success: boolean },
   successMessage?: string,
+  streamed?: boolean,
 ): void {
-  // 输出脚本的标准输出
-  if (result.stdout) {
+  // 未流式输出时才打印 stdout（流式时子进程输出已实时显示，避免重复）
+  if (!streamed && result.stdout) {
     console.log(result.stdout);
   }
 
   if (!result.success) {
-    // 输出错误信息
-    if (result.stderr) {
+    // 未流式输出时才打印 stderr（流式时已实时显示，避免重复）
+    if (!streamed && result.stderr) {
       logger.error(result.stderr);
     }
     Deno.exit(1);

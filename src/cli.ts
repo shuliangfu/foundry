@@ -22,6 +22,7 @@
 
 import { Command } from "@dreamer/console";
 import {
+  createCommand,
   cwd,
   dirname,
   existsSync,
@@ -31,18 +32,19 @@ import {
   readdir,
   readStdin,
   readTextFileSync,
-  createCommand,
   remove,
-  setEnv
+  setEnv,
 } from "@dreamer/runtime-adapter";
 import { init } from "./init.ts";
-import { readCache, writeCache, getInstalledVersion, setInstalledVersion } from "./utils/cache.ts";
+import { ensureFoundryInstalled, findFoundryPath } from "./setup.ts";
+import type { JsrDenoJson, JsrMetaData } from "./types/index.ts";
+import { getInstalledVersion, readCache, setInstalledVersion, writeCache } from "./utils/cache.ts";
 import {
+  createLoadingProgressBar,
   executeDenoCommand,
   getApiKey,
   getNetworkName,
   getProjectConfig,
-  createLoadingProgressBar,
   getScriptPath,
   handleCommandResult,
 } from "./utils/cli-utils.ts";
@@ -51,8 +53,6 @@ import { loadEnv } from "./utils/env.ts";
 import { parseJsrPackageFromUrl, parseJsrVersionFromUrl } from "./utils/jsr.ts";
 import { logger } from "./utils/logger.ts";
 import { loadWeb3ConfigSync } from "./utils/web3.ts";
-import type { JsrMetaData, JsrDenoJson } from "./types/index.ts";
-import { findFoundryPath, ensureFoundryInstalled } from "./setup.ts";
 
 /**
  * 提示用户确认
@@ -154,14 +154,19 @@ function findFrameworkRoot(): string | null {
  * @param forceRefresh 是否强制刷新缓存，默认为 false
  * @returns 最新版本号字符串，如果获取失败则返回 null
  */
-async function getLatestVersion(includeBeta: boolean = false, forceRefresh: boolean = false): Promise<string | null> {
+async function getLatestVersion(
+  includeBeta: boolean = false,
+  forceRefresh: boolean = false,
+): Promise<string | null> {
   try {
     const packageInfo = parseJsrPackageFromUrl();
     const packageName = packageInfo?.packageName || "@dreamer/foundry";
 
     // 尝试从缓存读取 meta.json（如果不需要强制刷新）
     const cacheKey = `meta_${packageName.replace(/[^a-zA-Z0-9]/g, "_")}`;
-    let metaData: JsrMetaData | null = forceRefresh ? null : (readCache(cacheKey, "latest") as JsrMetaData | null);
+    let metaData: JsrMetaData | null = forceRefresh
+      ? null
+      : (readCache(cacheKey, "latest") as JsrMetaData | null);
 
     if (!metaData) {
       // 缓存未命中或强制刷新，从网络获取
@@ -294,7 +299,9 @@ async function getVersion(): Promise<string | undefined> {
 
     // 尝试从缓存读取 deno.json
     const denoJsonCacheKey = `deno_json_${packageName.replace(/[^a-zA-Z0-9]/g, "_")}`;
-    let denoJson: JsrDenoJson | null = readCache(denoJsonCacheKey, latestVersion) as JsrDenoJson | null;
+    let denoJson: JsrDenoJson | null = readCache(denoJsonCacheKey, latestVersion) as
+      | JsrDenoJson
+      | null;
 
     if (!denoJson) {
       // 缓存未命中，从网络获取
@@ -695,8 +702,8 @@ cli
         deployArgs,
       );
 
-      // 处理执行结果
-      handleCommandResult(result, "✅ 所有部署脚本执行完成！");
+      // 处理执行结果（output 已通过 executeCommandWithStream 实时输出，不再重复打印）
+      handleCommandResult(result, "✅ 所有部署脚本执行完成！", true);
 
       // 如果启用了验证，自动验证所有部署的合约
       if (shouldVerify) {
@@ -751,7 +758,9 @@ cli
 
             // 查找实际的合约文件名（大小写不敏感）
             const actualFileName = findContractFileName(contractName, finalNetwork);
-            const actualContractName = actualFileName ? actualFileName.replace(/\.json$/, "") : contractName;
+            const actualContractName = actualFileName
+              ? actualFileName.replace(/\.json$/, "")
+              : contractName;
 
             // 如果实际文件名与输入不同，提示用户
             if (actualFileName && actualFileName !== `${contractName}.json`) {
@@ -873,10 +882,16 @@ cli
     const contractsFromArgv = parseContractNamesFromArgv(Deno.args);
     const contractNames = contractsFromArgv.length > 0
       ? contractsFromArgv
-      : (Array.isArray(options.contract) ? options.contract : options.contract != null ? [options.contract as string] : []);
+      : (Array.isArray(options.contract)
+        ? options.contract
+        : options.contract != null
+        ? [options.contract as string]
+        : []);
     if (contractNames.length === 0) {
       logger.error("❌ 未指定合约名称");
-      logger.error("   请使用 --contract (-c) 参数指定合约名称，可指定多个，例如: -c MyToken Store");
+      logger.error(
+        "   请使用 --contract (-c) 参数指定合约名称，可指定多个，例如: -c MyToken Store",
+      );
       Deno.exit(1);
     }
     const address = options.address as string | undefined;
@@ -944,8 +959,8 @@ cli
         verifyArgs,
       );
 
-      // 处理执行结果
-      handleCommandResult(result);
+      // 处理执行结果（output 已实时流式输出，不再重复打印）
+      handleCommandResult(result, undefined, true);
 
       logger.info("");
       logger.info("------------------------------------------");
