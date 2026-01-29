@@ -160,6 +160,73 @@ async function getCurrentGasPriceWei(rpcUrl: string): Promise<number | null> {
 }
 
 /**
+ * 等待交易达到指定的区块确认数
+ * @param txHash - 交易哈希
+ * @param rpcUrl - RPC URL
+ * @param confirmations - 需要等待的区块确认数
+ * @param timeoutMs - 超时时间（毫秒），默认 120 秒
+ */
+async function waitForConfirmations(
+  txHash: string,
+  rpcUrl: string,
+  confirmations: number,
+  timeoutMs: number = 120000,
+): Promise<void> {
+  const startTime = Date.now();
+  const pollInterval = 2000; // 每 2 秒检查一次
+
+  while (Date.now() - startTime < timeoutMs) {
+    try {
+      // 使用 cast receipt 获取交易收据
+      const receiptCmd = createCommand("cast", {
+        args: ["receipt", txHash, "--rpc-url", rpcUrl, "--json"],
+        stdout: "piped",
+        stderr: "piped",
+        cwd: cwd(),
+      });
+      const receiptOutput = await receiptCmd.output();
+
+      if (!receiptOutput.success) {
+        // 交易可能还未被打包，继续等待
+        await new Promise((resolve) => setTimeout(resolve, pollInterval));
+        continue;
+      }
+
+      const receiptText = new TextDecoder().decode(receiptOutput.stdout);
+      const receipt = JSON.parse(receiptText);
+      const txBlockNumber = parseInt(receipt.blockNumber, 16);
+
+      // 获取当前区块号
+      const blockCmd = createCommand("cast", {
+        args: ["block-number", "--rpc-url", rpcUrl],
+        stdout: "piped",
+        stderr: "piped",
+        cwd: cwd(),
+      });
+      const blockOutput = await blockCmd.output();
+
+      if (blockOutput.success) {
+        const currentBlockText = new TextDecoder().decode(blockOutput.stdout).trim();
+        const currentBlockNumber = parseInt(currentBlockText, 10);
+        const currentConfirmations = currentBlockNumber - txBlockNumber;
+
+        if (currentConfirmations >= confirmations) {
+          return; // 已达到所需确认数
+        }
+      }
+
+      // 继续等待
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    } catch {
+      // 出错时继续等待
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    }
+  }
+
+  throw new Error(`等待区块确认超时（${timeoutMs / 1000}秒）`);
+}
+
+/**
  * 检查合约是否已部署
  * @param contractName 合约名称
  * @param network 网络名称
@@ -269,14 +336,11 @@ export async function forgeDeploy(
     "--broadcast",
   ];
 
-  // 添加区块确认数参数
+  // 计算需要等待的区块确认数（部署成功后使用）
   // local 网络默认不等待确认（0），其他网络默认等待 2 个区块确认
   const isLocalNetwork = network === "local" || config.rpcUrl.includes("127.0.0.1") ||
     config.rpcUrl.includes("localhost");
   const confirmations = options.confirmations ?? (isLocalNetwork ? 0 : 2);
-  if (confirmations > 0) {
-    forgeArgs.push("--confirmations", String(confirmations));
-  }
 
   if (argsArray.length > 0) {
     forgeArgs.push("--constructor-args");
@@ -353,6 +417,8 @@ export async function forgeDeploy(
                 contractName,
                 options,
                 constructorArgs as string[],
+                config.rpcUrl,
+                confirmations,
               );
             }
             if (!stillAlreadyKnown) {
@@ -443,6 +509,8 @@ export async function forgeDeploy(
               contractName,
               options,
               constructorArgs as string[],
+              config.rpcUrl,
+              confirmations,
             );
           }
 
@@ -543,11 +611,20 @@ export async function forgeDeploy(
     contractName,
     options,
     constructorArgs as string[],
+    config.rpcUrl,
+    confirmations,
   );
 }
 
 /**
  * 从部署输出中提取合约地址并保存
+ * @param stdoutText - 标准输出
+ * @param stderrText - 标准错误
+ * @param contractName - 合约名称
+ * @param options - 部署选项
+ * @param constructorArgs - 构造函数参数
+ * @param rpcUrl - RPC URL（用于等待区块确认）
+ * @param confirmations - 等待的区块确认数
  */
 async function extractAddressFromOutput(
   stdoutText: string,
@@ -555,6 +632,8 @@ async function extractAddressFromOutput(
   contractName: string,
   options: DeployOptions,
   constructorArgs: string[],
+  rpcUrl: string,
+  confirmations: number,
 ): Promise<string> {
   // 尝试从 JSON 输出中提取地址和交易哈希
   let address: string | null = null;
@@ -616,6 +695,17 @@ async function extractAddressFromOutput(
       "无法提取合约地址",
       { contractName },
     );
+  }
+
+  // 等待区块确认（如果需要）
+  if (confirmations > 0 && txHash) {
+    logger.info(`⏳ 等待 ${confirmations} 个区块确认...`);
+    try {
+      await waitForConfirmations(txHash, rpcUrl, confirmations);
+      logger.info(`✅ 已确认 ${confirmations} 个区块`);
+    } catch {
+      logger.warn(`⚠️  等待区块确认超时，但合约可能已部署成功`);
+    }
   }
 
   // 保存合约信息
