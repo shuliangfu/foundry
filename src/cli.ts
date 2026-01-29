@@ -1284,7 +1284,9 @@ cli
       // 比较版本
       const comparison = compareVersions(latestVersion, currentVersion);
       if (comparison <= 0) {
-        logger.info(`\n✅ 当前已经是最新${includeBeta ? "（包括 beta）" : "正式"}版本，无需更新！\n`);
+        logger.info(
+          `\n✅ 当前已经是最新${includeBeta ? "（包括 beta）" : "正式"}版本，无需更新！\n`,
+        );
         return;
       }
 
