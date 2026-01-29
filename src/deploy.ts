@@ -256,6 +256,9 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
 
         // 执行部署脚本（进度条继续显示）
         await scriptModule.deploy(deployer);
+
+        // 所有脚本执行完成后停止进度条
+        progressBar.stop(progressInterval);
         logger.info(`✅ ${script} completed successfully \n`);
         // 当前脚本完成后、下一个脚本开始前等待 3 秒，避免 RPC/链上状态未就绪
         if (i < scripts.length - 1) {
@@ -272,8 +275,6 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
       }
     }
 
-    // 所有脚本执行完成后停止进度条
-    progressBar.stop(progressInterval);
     logger.info("");
     logger.info("✅ All Deployment Scripts Completed!");
   } catch (error) {
