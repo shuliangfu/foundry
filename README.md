@@ -3,7 +3,7 @@
 > 一个 Foundry 智能合约部署和验证工具，基于 Deno 运行时，提供完整的项目初始化和自动化部署能力
 
 [![JSR](https://jsr.io/badges/@dreamer/foundry)](https://jsr.io/@dreamer/foundry)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE.md)
 [![Tests](https://img.shields.io/badge/tests-104%20passed-brightgreen)](./TEST_REPORT.md)
 
 ---

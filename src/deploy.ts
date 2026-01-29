@@ -259,7 +259,11 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
         logger.info(`✅ ${script} completed successfully \n`);
         // 当前脚本完成后、下一个脚本开始前等待 3 秒，避免 RPC/链上状态未就绪
         if (i < scripts.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 3000));
+          // 这里写一个 loading 进度条，等待 5 秒
+          const loadingProgressBar = createLoadingProgressBar("等待 RPC/链上状态就绪...");
+          const loadingProgressInterval = loadingProgressBar.start();
+          await new Promise((resolve) => setTimeout(resolve, 5000));
+          loadingProgressBar.stop(loadingProgressInterval);
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
