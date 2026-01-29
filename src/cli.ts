@@ -1082,6 +1082,7 @@ cli
         exit(1);
       }
 
+      logger.info("");
       logger.info("------------------------------------------");
       logger.info("✅ 脚本执行完成！");
       logger.info("");
@@ -1330,7 +1331,6 @@ cli
 
         // 停止进度条
         installProgressBar.stop(installProgressInterval);
-        logger.info("");
 
         if (output.success) {
           // 安装成功后，更新版本缓存
