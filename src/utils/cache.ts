@@ -4,16 +4,16 @@
  */
 
 import {
-  existsSync,
-  join,
-  readTextFileSync,
-  writeTextFileSync,
-  ensureDir,
-  getEnv,
-  removeSync,
-  readdir,
-  remove,
   cwd,
+  ensureDir,
+  existsSync,
+  getEnv,
+  join,
+  readdir,
+  readTextFileSync,
+  remove,
+  removeSync,
+  writeTextFileSync,
 } from "@dreamer/runtime-adapter";
 import { CACHE_TTL } from "../constants/index.ts";
 
@@ -36,11 +36,11 @@ export function getInstalledVersion(packageName: string = "@dreamer/foundry"): s
   try {
     const versionCacheKey = `installed_version_${packageName.replace(/[^a-zA-Z0-9]/g, "_")}`;
     const installedVersionCache = readCache<{ version: string }>(versionCacheKey, "installed");
-    
+
     if (installedVersionCache && installedVersionCache.version) {
       return installedVersionCache.version;
     }
-    
+
     return null;
   } catch {
     return null;
@@ -52,7 +52,10 @@ export function getInstalledVersion(packageName: string = "@dreamer/foundry"): s
  * @param version - 版本号
  * @param packageName - 包名（可选，默认为 "@dreamer/foundry"）
  */
-export async function setInstalledVersion(version: string, packageName: string = "@dreamer/foundry"): Promise<void> {
+export async function setInstalledVersion(
+  version: string,
+  packageName: string = "@dreamer/foundry",
+): Promise<void> {
   const versionCacheKey = `installed_version_${packageName.replace(/[^a-zA-Z0-9]/g, "_")}`;
   await writeCache(versionCacheKey, "installed", { version });
 }
@@ -102,7 +105,7 @@ function getCacheTTL(key: string): number {
  * - "installed" - 读取安装时缓存的版本号
  * - "latest" - 读取最新版本信息
  * - 实际版本号（如 "1.1.0-beta.32"）- 读取特定版本的缓存
- * 
+ *
  * 重要：读取时使用的 version 必须与写入时使用的 version 一致，否则无法读取到缓存
  */
 export function readCache<T>(key: string, version: string): T | null {
@@ -114,7 +117,7 @@ export function readCache<T>(key: string, version: string): T | null {
 
     const cacheContent = readTextFileSync(cachePath);
     const cache = JSON.parse(cacheContent);
-    
+
     // 检查缓存是否过期
     const ttl = getCacheTTL(key);
     if (ttl !== Infinity && cache.timestamp) {
@@ -198,7 +201,7 @@ export async function clearCache(version?: string): Promise<void> {
       // 清除指定版本的缓存
       const safeVersion = version.replace(/[^a-zA-Z0-9.-]/g, "_");
       const pattern = new RegExp(`_${safeVersion.replace(/\./g, "\\.")}\\.json$`);
-      
+
       const entries = await readdir(cacheDir);
       for (const entry of entries) {
         if (entry.isFile && pattern.test(entry.name)) {

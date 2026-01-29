@@ -21,9 +21,8 @@
  */
 
 import { logger } from "./logger.ts";
-import { loadEnv, getEnv } from "./env.ts";
+import { getEnv, loadEnv } from "./env.ts";
 import { loadWeb3ConfigSync } from "./web3.ts";
-
 
 /**
  * 获取当前系统时间戳（秒，东8区 UTC+8）
@@ -202,7 +201,6 @@ export async function syncAnvilTime(silent: boolean = false): Promise<boolean> {
     return false;
   }
 }
-
 
 /**
  * 使用 Anvil RPC 推进区块链时间

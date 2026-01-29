@@ -3,9 +3,9 @@
  * @description 环境变量工具扩展测试
  */
 
-import { describe, expect, it, beforeAll, afterAll } from "@dreamer/test";
+import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
 import { validateEnv } from "../src/utils/env.ts";
-import { writeTextFile, remove, join, cwd, existsSync } from "@dreamer/runtime-adapter";
+import { cwd, existsSync, join, remove, writeTextFile } from "@dreamer/runtime-adapter";
 
 describe("环境变量工具扩展测试", () => {
   const testEnvPath = join(cwd(), "tests", "data", ".env.test");

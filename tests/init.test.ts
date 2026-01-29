@@ -3,8 +3,17 @@
  * @description 测试 init 项目初始化功能
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "@dreamer/test";
-import { existsSync, mkdir, readTextFile, writeTextFile, join, cwd, stat, remove } from "@dreamer/runtime-adapter";
+import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
+import {
+  cwd,
+  existsSync,
+  join,
+  mkdir,
+  readTextFile,
+  remove,
+  stat,
+  writeTextFile,
+} from "@dreamer/runtime-adapter";
 import { init } from "../src/init.ts";
 import { logger } from "../src/utils/logger.ts";
 
@@ -30,10 +39,10 @@ describe("Init 项目初始化测试", () => {
         // 忽略删除错误，继续执行
       }
     }
-    
+
     // 确保测试数据目录存在
     await mkdir(join(cwd(), "tests", "data"), { recursive: true });
-    
+
     // 再次检查并清理可能存在的目录形式的配置文件（在创建项目前）
     // 这些文件应该是文件，如果存在为目录则删除
     const configFiles = [
@@ -44,7 +53,7 @@ describe("Init 项目初始化测试", () => {
       ".cursorignore",
       "deno.json",
     ];
-    
+
     for (const file of configFiles) {
       const filePath = join(testProjectRoot, file);
       try {
@@ -59,7 +68,7 @@ describe("Init 项目初始化测试", () => {
         // 忽略检查错误，继续执行
       }
     }
-    
+
     // 创建一次项目，供所有测试使用
     logger.info("创建测试项目...");
     await init(testProjectRoot);
@@ -67,14 +76,14 @@ describe("Init 项目初始化测试", () => {
 
   afterAll(async () => {
     logger.info("测试完成，清理测试项目...");
-    
+
     // 清理所有测试项目目录
     const testDirs = [
       testProjectRoot,
       join(cwd(), "tests", "data", "current-dir-test"),
       join(cwd(), "tests", "data", "nested-deep-path-test"),
     ];
-    
+
     for (const dir of testDirs) {
       try {
         if (existsSync(dir)) {
@@ -85,7 +94,7 @@ describe("Init 项目初始化测试", () => {
         logger.warn(`删除测试项目失败: ${dir} (${error})`);
       }
     }
-    
+
     logger.info("测试清理完成");
   });
 
@@ -135,7 +144,7 @@ describe("Init 项目初始化测试", () => {
     expect(content).toContain("[profile.default]");
     expect(content).toContain('src = "src"');
     expect(content).toContain('solc_version = "0.8.18"');
-    expect(content).toContain("# libs = [\"lib\"]");
+    expect(content).toContain('# libs = ["lib"]');
   });
 
   it(".gitignore 应该包含正确的忽略规则", async () => {
@@ -270,7 +279,7 @@ describe("Init 项目初始化测试", () => {
       // 验证文件已创建
       expect(existsSync(join(currentDir, "foundry.toml"))).toBe(true);
       expect(existsSync(join(currentDir, "README.md"))).toBe(true);
-      
+
       logger.info(`默认目录测试完成，项目保留在: ${currentDir}`);
       // 项目将在 afterAll 中统一清理
     } catch (error) {
@@ -282,17 +291,17 @@ describe("Init 项目初始化测试", () => {
   it("应该能够处理无效路径", async () => {
     // 测试不存在的父目录（应该自动创建）
     const invalidPath = join(cwd(), "tests", "data", "nested-deep-path-test");
-    
+
     // 测试前完全清理（如果存在）
     if (existsSync(invalidPath)) {
       await remove(invalidPath, { recursive: true });
     }
-    
+
     await init(invalidPath);
 
     // 应该成功创建
     expect(existsSync(join(invalidPath, "foundry.toml"))).toBe(true);
-    
+
     logger.info(`错误处理测试完成，项目保留在: ${invalidPath}`);
     // 项目将在 afterAll 中统一清理
   });

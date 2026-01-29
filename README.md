@@ -10,7 +10,9 @@
 
 ## 🎯 功能
 
-`@dreamer/foundry` 是一个专为 Foundry 项目设计的现代化智能合约部署和验证工具库。它提供了完整的项目初始化、自动化部署、合约验证等功能，基于 Deno 运行时，让智能合约开发更加高效便捷。
+`@dreamer/foundry` 是一个专为 Foundry
+项目设计的现代化智能合约部署和验证工具库。它提供了完整的项目初始化、自动化部署、合约验证等功能，基于
+Deno 运行时，让智能合约开发更加高效便捷。
 
 ---
 
@@ -31,6 +33,7 @@ foundry verify --network testnet -c <合约名> --api-key YOUR_API_KEY
 ```
 
 **卸载全局 CLI**：
+
 ```bash
 deno run -A jsr:@dreamer/foundry/setup --uninstall
 ```
@@ -39,10 +42,10 @@ deno run -A jsr:@dreamer/foundry/setup --uninstall
 
 ## 🌍 环境兼容性
 
-| 环境 | 版本要求 | 状态 |
-|------|---------|------|
-| **Deno** | 2.5.0+ | ✅ 完全支持 |
-| **服务端** | - | ✅ 支持（基于 Deno 运行时） |
+| 环境       | 版本要求 | 状态                        |
+| ---------- | -------- | --------------------------- |
+| **Deno**   | 2.5.0+   | ✅ 完全支持                 |
+| **服务端** | -        | ✅ 支持（基于 Deno 运行时） |
 
 ---
 
@@ -78,14 +81,17 @@ deno run -A jsr:@dreamer/foundry/setup --uninstall
 ### 部署功能支持
 
 **部署功能支持所有 EVM 兼容链**，包括但不限于：
+
 - 上述 11 条链（完整支持）
 - 其他 EVM 兼容链（如 Fantom、Gnosis、Celo、Moonbeam、Metis、Boba、Fuse、Cronos、Kava、Evmos 等）
 
 对于未在验证支持列表中的链，你可以：
+
 1. 正常部署合约（只需提供正确的 RPC URL 和 chainId）
 2. 手动在对应的区块浏览器上验证合约
 
 **注意事项**：
+
 - 验证功能需要对应的区块浏览器 API Key（如 Etherscan、BSCScan 等）
 - 配置文件中的 `chain` 字段应使用上述标识符（如 `"bsc"`, `"eth"` 等）
 - 对于未列出的链，`chain` 字段可以使用任意标识符，但验证功能将不可用
@@ -110,15 +116,16 @@ foundry init
 foundry init /path/to/project
 ```
 
-| 参数 | 说明 |
-|------|------|
+| 参数                  | 说明                                                       |
+| --------------------- | ---------------------------------------------------------- |
 | `projectRoot`（可选） | 项目目录。不传则在当前目录初始化；传入则创建该目录并初始化 |
 
 ---
 
 #### `foundry deploy` — 部署合约
 
-扫描 `deploy/` 目录下的脚本并按顺序执行部署。合约名对应 `deploy/数字-<合约名>.ts` 中的「合约名」部分，由项目自行定义。
+扫描 `deploy/` 目录下的脚本并按顺序执行部署。合约名对应 `deploy/数字-<合约名>.ts`
+中的「合约名」部分，由项目自行定义。
 
 ```bash
 # 部署所有合约到指定网络
@@ -143,13 +150,13 @@ foundry deploy --network testnet --verify
 foundry deploy --network testnet -c <合约名1> <合约名2> --verify --api-key YOUR_API_KEY
 ```
 
-| 选项 | 简写 | 说明 |
-|------|------|------|
-| `--network` | `-n` | 网络名称：`local`、`testnet`、`mainnet`。不指定时从 `.env` 的 `WEB3_ENV` 读取 |
-| `--contract` | `-c` | 要部署的合约名，可写多个（空格分隔）。不指定则按脚本顺序部署全部 |
-| `--force` | `-f` | 强制重新部署已存在的合约 |
-| `--verify` | - | 部署完成后自动在区块浏览器上验证 |
-| `--api-key` | - | Etherscan/BSCScan 等 API Key。验证时也可用环境变量 `ETH_API_KEY` |
+| 选项         | 简写 | 说明                                                                          |
+| ------------ | ---- | ----------------------------------------------------------------------------- |
+| `--network`  | `-n` | 网络名称：`local`、`testnet`、`mainnet`。不指定时从 `.env` 的 `WEB3_ENV` 读取 |
+| `--contract` | `-c` | 要部署的合约名，可写多个（空格分隔）。不指定则按脚本顺序部署全部              |
+| `--force`    | `-f` | 强制重新部署已存在的合约                                                      |
+| `--verify`   | -    | 部署完成后自动在区块浏览器上验证                                              |
+| `--api-key`  | -    | Etherscan/BSCScan 等 API Key。验证时也可用环境变量 `ETH_API_KEY`              |
 
 ---
 
@@ -171,14 +178,14 @@ foundry verify --network testnet -c <合约名> --address 0x... --api-key YOUR_A
 foundry verify --network testnet -c <合约名> --rpc-url https://... --chain-id 97 --api-key YOUR_API_KEY
 ```
 
-| 选项 | 简写 | 必填 | 说明 |
-|------|------|------|------|
-| `--network` | `-n` | 否 | 网络名称。不指定时从 `WEB3_ENV` 读取 |
-| `--contract` | `-c` | **是** | 合约名称，可写多个（空格分隔），一次验证多份合约 |
-| `--address` | `-a` | 否 | 合约地址（仅验证单合约时有效）。不传则从 `build/abi/{network}/{合约名}.json` 读 |
-| `--api-key` | - | 否 | 区块浏览器 API Key。不传则用环境变量 `ETH_API_KEY` |
-| `--rpc-url` | - | 否 | RPC URL。不传则从 `config/web3.json` 读 |
-| `--chain-id` | - | 否 | 链 ID。不传则从配置读 |
+| 选项         | 简写 | 必填   | 说明                                                                            |
+| ------------ | ---- | ------ | ------------------------------------------------------------------------------- |
+| `--network`  | `-n` | 否     | 网络名称。不指定时从 `WEB3_ENV` 读取                                            |
+| `--contract` | `-c` | **是** | 合约名称，可写多个（空格分隔），一次验证多份合约                                |
+| `--address`  | `-a` | 否     | 合约地址（仅验证单合约时有效）。不传则从 `build/abi/{network}/{合约名}.json` 读 |
+| `--api-key`  | -    | 否     | 区块浏览器 API Key。不传则用环境变量 `ETH_API_KEY`                              |
+| `--rpc-url`  | -    | 否     | RPC URL。不传则从 `config/web3.json` 读                                         |
+| `--chain-id` | -    | 否     | 链 ID。不传则从配置读                                                           |
 
 ---
 
@@ -197,9 +204,9 @@ foundry upgrade --beta
 foundry upgrade --force
 ```
 
-| 选项 | 简写 | 说明 |
-|------|------|------|
-| `--beta` | - | 包含 beta，升级到“最新正式版或 beta”中更高的版本 |
+| 选项      | 简写 | 说明                                              |
+| --------- | ---- | ------------------------------------------------- |
+| `--beta`  | -    | 包含 beta，升级到“最新正式版或 beta”中更高的版本  |
 | `--force` | `-f` | 强制刷新版本缓存，从 JSR 重新拉取版本再比较与升级 |
 
 ---
@@ -223,7 +230,7 @@ foundry uninstall
 以下示例中的合约名可替换为项目 `deploy/`、`build/abi/` 中对应的实际合约名。
 
 ```typescript
-import { logger, loadEnv, loadContract, Web3 } from "@dreamer/foundry/utils";
+import { loadContract, loadEnv, logger, Web3 } from "@dreamer/foundry/utils";
 
 // 日志工具
 logger.info("正在部署合约...");
@@ -253,7 +260,7 @@ const balance = await web3.read("balanceOf", ["0x..."]);
 在本地 Anvil 网络中推进或同步区块链时间（需 `WEB3_ENV=local`）：
 
 ```typescript
-import { getAnvilTimestamp, syncAnvilTime, advanceTime } from "@dreamer/foundry/utils";
+import { advanceTime, getAnvilTimestamp, syncAnvilTime } from "@dreamer/foundry/utils";
 
 // 获取当前链上时间戳
 const ts = await getAnvilTimestamp();
@@ -263,8 +270,8 @@ if (ts) console.log("当前区块时间戳:", ts.toString());
 await syncAnvilTime();
 
 // 按天推进时间（内部会 evm_increaseTime + evm_mine）
-await advanceTime(1);   // 推进 1 天
-await advanceTime(7);   // 推进 1 周
+await advanceTime(1); // 推进 1 天
+await advanceTime(7); // 推进 1 周
 ```
 
 推进链上时间后，合约内依赖 `block.timestamp` 的逻辑会在下次调用时使用新的区块时间。
@@ -297,7 +304,9 @@ const web3 = createWeb3("MyContract", {
 
 ### 示例 4：部署脚本
 
-部署脚本放在 `deploy/` 目录，文件名为 `数字-合约名.ts`（如 `1-mytoken.ts`、`2-store.ts` 等，合约名由项目自定）。脚本需导出 `deploy(deployer)`，框架会注入部署器并执行。以下以 init 生成的代币合约为例，实际项目中可将合约名、文件名替换为你的合约。
+部署脚本放在 `deploy/` 目录，文件名为 `数字-合约名.ts`（如 `1-mytoken.ts`、`2-store.ts`
+等，合约名由项目自定）。脚本需导出 `deploy(deployer)`，框架会注入部署器并执行。以下以 init
+生成的代币合约为例，实际项目中可将合约名、文件名替换为你的合约。
 
 ```typescript
 // deploy/1-mytoken.ts
@@ -318,11 +327,13 @@ export async function deploy(deployer: Deployer) {
 }
 ```
 
-执行方式：使用 CLI `foundry deploy --network local`，或在代码中调用 `deploy({ network, config, ... })`。
+执行方式：使用 CLI `foundry deploy --network local`，或在代码中调用
+`deploy({ network, config, ... })`。
 
 ### 示例 5：测试脚本
 
-测试脚本放在 `tests/` 目录，使用 `@dreamer/test` 与 `@dreamer/foundry` 的 `createWeb3`、`Web3` 等与链上合约交互。以下以 init 生成的 MyToken 为例，合约名替换为项目中实际部署的合约名即可。
+测试脚本放在 `tests/` 目录，使用 `@dreamer/test` 与 `@dreamer/foundry` 的 `createWeb3`、`Web3`
+等与链上合约交互。以下以 init 生成的 MyToken 为例，合约名替换为项目中实际部署的合约名即可。
 
 ```typescript
 // tests/01-mytoken.test.ts
@@ -364,7 +375,8 @@ describe("MyToken 合约测试", () => {
 });
 ```
 
-执行方式：`WEB3_ENV=local deno test -A tests/01-mytoken.test.ts`，或配置好环境后直接 `deno test -A tests/`。
+执行方式：`WEB3_ENV=local deno test -A tests/01-mytoken.test.ts`，或配置好环境后直接
+`deno test -A tests/`。
 
 更多测试相关的文档与用法，请查看 [@dreamer/test](https://jsr.io/@dreamer/test)。
 
@@ -372,16 +384,19 @@ describe("MyToken 合约测试", () => {
 
 ## 📚 API 文档
 
-以下为通过 `import` 调用的程序化 API，供在脚本或应用中直接使用。CLI 子命令用法见上文「使用 CLI 命令」。
+以下为通过 `import` 调用的程序化 API，供在脚本或应用中直接使用。CLI 子命令用法见上文「使用 CLI
+命令」。
 
 ### `init(projectRoot?: string)`
 
 初始化一个新的 Foundry 项目。
 
 **参数**:
+
 - `projectRoot?: string` - 项目根目录，默认为当前工作目录
 
 **示例**:
+
 ```typescript
 await init();
 await init("/path/to/project");
@@ -392,6 +407,7 @@ await init("/path/to/project");
 主部署函数，扫描并执行部署脚本。
 
 **选项**:
+
 - `scriptDir?: string` - 部署脚本目录（默认: `./deploy`）
 - `network: string` - 网络名称
 - `config: NetworkConfig` - 网络配置
@@ -406,6 +422,7 @@ await init("/path/to/project");
 在 Etherscan/BSCScan 上验证已部署的合约。
 
 **选项**:
+
 - `address: string` - 合约地址
 - `contractName: string` - 合约名称
 - `network: string` - 网络名称（sepolia, mainnet, testnet, bsc_testnet, bsc）
@@ -416,10 +433,12 @@ await init("/path/to/project");
 
 ### `createDeployer(network, config, force?)`
 
-创建部署器实例，供部署脚本中调用（如 `deploy/1-mytoken.ts`
-由框架注入的 `Deployer` 即由此构建）。注入的 `Deployer` 包含 `network`、`accounts`、`deploy`、`logger`、`web3`、`loadContract`。
+创建部署器实例，供部署脚本中调用（如 `deploy/1-mytoken.ts` 由框架注入的 `Deployer`
+即由此构建）。注入的 `Deployer` 包含
+`network`、`accounts`、`deploy`、`logger`、`web3`、`loadContract`。
 
 **参数**:
+
 - `network: string` - 网络名称
 - `config: NetworkConfig` - 网络配置（包含 rpcUrl, wssUrl, chainId, accounts）
 - `force?: boolean` - 是否强制重新部署（默认: `false`）
@@ -429,6 +448,7 @@ await init("/path/to/project");
 从 JSON 文件加载已部署的合约信息。
 
 **参数**:
+
 - `contractName: string` - 合约名称
 - `network: string` - 网络名称
 
@@ -439,6 +459,7 @@ await init("/path/to/project");
 同步加载 Web3 配置文件。
 
 **参数**:
+
 - `projectRoot?: string` - 项目根目录（可选，默认从当前目录向上查找）
 
 **返回**: `NetworkConfig | null`
@@ -450,12 +471,14 @@ await init("/path/to/project");
 创建 Web3 实例的工厂函数，自动合并配置文件和 options 参数。
 
 **参数**:
+
 - `contractName?: string` - 合约名称（可选）
 - `options?: Web3Options` - Web3 配置选项（可选，会与配置文件中的参数合并）
 
 **返回**: `Web3` 实例
 
 **Web3Options**:
+
 - `rpcUrl?: string` - RPC URL
 - `wssUrl?: string` - WebSocket RPC URL
 - `chainId?: number` - 链 ID
@@ -465,13 +488,26 @@ await init("/path/to/project");
 
 ### utils/time — 时间工具（Anvil 本地链）
 
-用于在本地 Anvil 网络中推进或同步区块链时间，无需改系统时间或重启容器。合约内依赖 `block.timestamp` 的逻辑会在推进后下次调用时读到新的区块时间。**仅当 `WEB3_ENV=local` 时生效**，网络配置与 RPC 来自 `loadWeb3ConfigSync()`（即项目中的 `config/web3.json`）。
+用于在本地 Anvil 网络中推进或同步区块链时间，无需改系统时间或重启容器。合约内依赖 `block.timestamp`
+的逻辑会在推进后下次调用时读到新的区块时间。**仅当 `WEB3_ENV=local` 时生效**，网络配置与 RPC 来自
+`loadWeb3ConfigSync()`（即项目中的 `config/web3.json`）。
 
 **引入方式**：
+
 ```typescript
-import { getAnvilTimestamp, syncAnvilTime, advanceAnvilTime, advanceTime } from "@dreamer/foundry/utils";
+import {
+  advanceAnvilTime,
+  advanceTime,
+  getAnvilTimestamp,
+  syncAnvilTime,
+} from "@dreamer/foundry/utils";
 // 或按子路径
-import { getAnvilTimestamp, syncAnvilTime, advanceAnvilTime, advanceTime } from "@dreamer/foundry/utils/time";
+import {
+  advanceAnvilTime,
+  advanceTime,
+  getAnvilTimestamp,
+  syncAnvilTime,
+} from "@dreamer/foundry/utils/time";
 ```
 
 #### `getAnvilTimestamp(): Promise<bigint | null>`
@@ -481,6 +517,7 @@ import { getAnvilTimestamp, syncAnvilTime, advanceAnvilTime, advanceTime } from 
 **返回**：时间戳（秒）的 `bigint`，失败时为 `null`。
 
 **示例**：
+
 ```typescript
 const ts = await getAnvilTimestamp();
 if (ts) console.log("区块时间戳(秒):", ts.toString());
@@ -488,17 +525,20 @@ if (ts) console.log("区块时间戳(秒):", ts.toString());
 
 #### `syncAnvilTime(silent?: boolean): Promise<boolean>`
 
-将 Anvil 链时间设置为「当前系统时间（东 8 区 UTC+8）」；内部会调 `evm_setTime` 并 `evm_mine` 一次使时间生效。
+将 Anvil 链时间设置为「当前系统时间（东 8 区 UTC+8）」；内部会调 `evm_setTime` 并 `evm_mine`
+一次使时间生效。
 
 **参数**：
+
 - `silent?: boolean` - 为 `true` 时不打 info 日志，仅保留错误信息，默认 `false`。
 
 **返回**：成功为 `true`，失败或非 local 网络为 `false`。
 
 **示例**：
+
 ```typescript
-await syncAnvilTime();           // 同步并输出日志
-await syncAnvilTime(true);       // 静默同步
+await syncAnvilTime(); // 同步并输出日志
+await syncAnvilTime(true); // 静默同步
 ```
 
 #### `advanceAnvilTime(seconds: number, silent?: boolean): Promise<boolean>`
@@ -506,14 +546,16 @@ await syncAnvilTime(true);       // 静默同步
 按秒数推进 Anvil 链时间（内部使用 `evm_increaseTime` + `evm_mine`）。
 
 **参数**：
+
 - `seconds: number` - 要推进的秒数（建议用合理间隔，如天、周、月）。
 - `silent?: boolean` - 为 `true` 时不输出「推进中」「已推进」等 info 日志，默认 `false`。
 
 **返回**：成功为 `true`，否则为 `false`。
 
 **示例**：
+
 ```typescript
-await advanceAnvilTime(86400);        // 推进 1 天
+await advanceAnvilTime(86400); // 推进 1 天
 await advanceAnvilTime(86400, true); // 推进 1 天且静默（适合循环里逐日推进）
 ```
 
@@ -522,20 +564,24 @@ await advanceAnvilTime(86400, true); // 推进 1 天且静默（适合循环里�
 按「天」推进链时间，内部换算为秒后调用 `advanceAnvilTime`。
 
 **参数**：
+
 - `days?: number` - 要推进的天数，可为小数（如 `0.5` 表示 12 小时），默认 `1`。
 
 **返回**：成功为 `true`，否则为 `false`。
 
 **示例**：
+
 ```typescript
-await advanceTime(1);    // 推进 1 天
-await advanceTime(7);    // 推进 1 周
-await advanceTime(30);   // 推进约 1 个月
-await advanceTime(365);  // 推进 1 年
+await advanceTime(1); // 推进 1 天
+await advanceTime(7); // 推进 1 周
+await advanceTime(30); // 推进约 1 个月
+await advanceTime(365); // 推进 1 年
 ```
 
 **使用说明**：
-- 仅在 `WEB3_ENV=local` 且对应 RPC 为 Anvil 时有意义；testnet/mainnet 下会直接返回 `false` 并打警告。
+
+- 仅在 `WEB3_ENV=local` 且对应 RPC 为 Anvil 时有意义；testnet/mainnet 下会直接返回 `false`
+  并打警告。
 - 推进链上时间后，合约内依赖 `block.timestamp` 的逻辑会在下次调用时使用新的区块时间。
 
 ---
@@ -546,27 +592,29 @@ await advanceTime(365);  // 推进 1 年
 
 以下网络支持完整的合约验证功能（testnet 和 mainnet）：
 
-| 链名称 | 标识符 | 测试网 | 主网 | 说明 |
-|--------|--------|--------|------|------|
-| **Binance Smart Chain** | `bsc` | ✅ BSC Testnet | ✅ BSC Mainnet | 币安智能链 |
-| **Ethereum** | `eth` | ✅ Sepolia | ✅ Ethereum Mainnet | 以太坊主网 |
-| **Polygon** | `polygon` | ✅ Amoy | ✅ Polygon Mainnet | Polygon 网络 |
-| **Arbitrum** | `arbitrum` | ✅ Arbitrum Sepolia | ✅ Arbitrum One | Arbitrum L2 |
-| **Base** | `base` | ✅ Base Sepolia | ✅ Base Mainnet | Coinbase L2 |
-| **Optimism** | `optimism` | ✅ OP Sepolia | ✅ Optimism Mainnet | Optimism L2 |
-| **Avalanche** | `avalanche` | ✅ Fuji | ✅ Avalanche C-Chain | Avalanche 网络 |
-| **Linea** | `linea` | ✅ Linea Sepolia | ✅ Linea Mainnet | ConsenSys L2 |
-| **Scroll** | `scroll` | ✅ Scroll Sepolia | ✅ Scroll Mainnet | Scroll L2 |
-| **Mantle** | `mantle` | ✅ Mantle Testnet | ✅ Mantle Mainnet | Mantle L2 |
-| **Blast** | `blast` | ✅ Blast Sepolia | ✅ Blast Mainnet | Blast L2 |
+| 链名称                  | 标识符      | 测试网              | 主网                 | 说明           |
+| ----------------------- | ----------- | ------------------- | -------------------- | -------------- |
+| **Binance Smart Chain** | `bsc`       | ✅ BSC Testnet      | ✅ BSC Mainnet       | 币安智能链     |
+| **Ethereum**            | `eth`       | ✅ Sepolia          | ✅ Ethereum Mainnet  | 以太坊主网     |
+| **Polygon**             | `polygon`   | ✅ Amoy             | ✅ Polygon Mainnet   | Polygon 网络   |
+| **Arbitrum**            | `arbitrum`  | ✅ Arbitrum Sepolia | ✅ Arbitrum One      | Arbitrum L2    |
+| **Base**                | `base`      | ✅ Base Sepolia     | ✅ Base Mainnet      | Coinbase L2    |
+| **Optimism**            | `optimism`  | ✅ OP Sepolia       | ✅ Optimism Mainnet  | Optimism L2    |
+| **Avalanche**           | `avalanche` | ✅ Fuji             | ✅ Avalanche C-Chain | Avalanche 网络 |
+| **Linea**               | `linea`     | ✅ Linea Sepolia    | ✅ Linea Mainnet     | ConsenSys L2   |
+| **Scroll**              | `scroll`    | ✅ Scroll Sepolia   | ✅ Scroll Mainnet    | Scroll L2      |
+| **Mantle**              | `mantle`    | ✅ Mantle Testnet   | ✅ Mantle Mainnet    | Mantle L2      |
+| **Blast**               | `blast`     | ✅ Blast Sepolia    | ✅ Blast Mainnet     | Blast L2       |
 
 ---
 
 ## 📊 测试报告
 
-本库经过全面测试，所有 104 个测试用例均已通过，测试覆盖率达到约 50-60%。详细测试报告请查看 [TEST_REPORT.md](./TEST_REPORT.md)。
+本库经过全面测试，所有 104 个测试用例均已通过，测试覆盖率达到约 50-60%。详细测试报告请查看
+[TEST_REPORT.md](./TEST_REPORT.md)。
 
 **测试统计**：
+
 - **总测试数**: 104
 - **通过**: 104 ✅
 - **失败**: 0
@@ -577,12 +625,14 @@ await advanceTime(365);  // 推进 1 年
 - **测试环境**: Deno 2.6.6+
 
 **测试类型**：
+
 - ✅ 单元测试（97 个）
 - ✅ 集成测试（18 个）
 - ✅ 边界情况和错误处理测试（13 个）
 - ✅ 工具函数测试（76 个）
 
 **测试模块**：
+
 - ✅ 项目初始化功能（18 个测试）
 - ✅ 部署功能（6 个测试）
 - ✅ 错误类型系统（13 个测试）
@@ -595,6 +645,7 @@ await advanceTime(365);  // 推进 1 年
 - ✅ 部署工具函数（4 个测试）
 
 **测试亮点**：
+
 - ✅ 所有功能、边界情况、错误处理都有完整的测试覆盖
 - ✅ 集成测试验证了端到端的完整流程
 - ✅ 基于 Deno 运行时，稳定可靠
@@ -607,12 +658,15 @@ await advanceTime(365);  // 推进 1 年
 ## 📝 注意事项
 
 - **网络配置**：使用 `init` 创建项目后，需要编辑 `config/web3.json` 配置网络和账户信息
-- **配置文件格式**：配置文件使用 JSON 格式，必须包含 `chain` 和 `network` 字段，网络配置使用 `rpcUrl` 和 `wssUrl` 字段
-- **环境变量**：建议复制 `.env.example` 到 `.env` 并配置必要的环境变量（如 `WEB3_ENV`、`ETH_API_KEY`）
+- **配置文件格式**：配置文件使用 JSON 格式，必须包含 `chain` 和 `network` 字段，网络配置使用
+  `rpcUrl` 和 `wssUrl` 字段
+- **环境变量**：建议复制 `.env.example` 到 `.env` 并配置必要的环境变量（如
+  `WEB3_ENV`、`ETH_API_KEY`）
 - **私钥安全**：不要在代码中硬编码私钥，使用环境变量或配置文件
 - **合约验证**：验证合约需要提供 Etherscan/BSCScan API Key
 - **部署脚本目录**：部署脚本位于 `deploy/` 目录（不再是 `script/`）
-- **错误处理**：项目使用统一的错误处理系统（`ConfigurationError`、`NetworkError` 等），提供详细的错误信息和上下文
+- **错误处理**：项目使用统一的错误处理系统（`ConfigurationError`、`NetworkError`
+  等），提供详细的错误信息和上下文
 - **Deno 原生**：基于 Deno 运行时，充分利用 Deno 的特性
 
 ## 📋 配置文件格式
@@ -663,8 +717,10 @@ await advanceTime(365);  // 推进 1 年
 ```
 
 **字段说明**：
+
 - `chain`: 链标识符，支持的链见上方 [支持的区块链网络](#-支持的区块链网络) 列表
-  - 支持的标识符：`bsc`, `eth`, `polygon`, `arbitrum`, `base`, `optimism`, `avalanche`, `linea`, `scroll`, `mantle`, `blast`
+  - 支持的标识符：`bsc`, `eth`, `polygon`, `arbitrum`, `base`, `optimism`, `avalanche`, `linea`,
+    `scroll`, `mantle`, `blast`
 - `network`: 网络配置对象，key 为网络名称（local, testnet, mainnet）
   - `chainId`: 链 ID（如 BSC Testnet: 97, BSC Mainnet: 56, Ethereum Mainnet: 1）
   - `rpcUrl`: RPC 节点 URL（HTTP）
@@ -672,9 +728,11 @@ await advanceTime(365);  // 推进 1 年
   - `accounts`: 账户列表，包含地址和私钥
 
 **环境变量**：
+
 - `WEB3_ENV`: 指定使用的网络环境（local, testnet, mainnet），默认为 "local"
 
 **常用链 ID 参考**：
+
 - Local (Anvil): 31337
 - BSC Testnet: 97
 - BSC Mainnet: 56

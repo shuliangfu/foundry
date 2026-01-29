@@ -3,13 +3,13 @@
  * @description 缓存功能测试
  */
 
-import { describe, expect, it, beforeAll, afterAll } from "@dreamer/test";
+import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
 import {
-  readCache,
-  writeCache,
   clearCache,
   getInstalledVersion,
+  readCache,
   setInstalledVersion,
+  writeCache,
 } from "../src/utils/cache.ts";
 
 describe("缓存功能测试", () => {

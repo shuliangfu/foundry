@@ -3,13 +3,17 @@
  * @description Web3 配置加载测试
  */
 
-import { describe, expect, it, beforeAll, afterAll } from "@dreamer/test";
+import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
+import { createWeb3, loadWeb3ConfigSync, preloadWeb3Config } from "../src/utils/web3.ts";
 import {
-  loadWeb3ConfigSync,
-  preloadWeb3Config,
-  createWeb3,
-} from "../src/utils/web3.ts";
-import { writeTextFile, remove, join, cwd, existsSync, mkdir, setEnv } from "@dreamer/runtime-adapter";
+  cwd,
+  existsSync,
+  join,
+  mkdir,
+  remove,
+  setEnv,
+  writeTextFile,
+} from "@dreamer/runtime-adapter";
 
 describe("Web3 配置加载测试", () => {
   const testProjectRoot = join(cwd(), "tests", "data", "test-web3-project");
@@ -49,7 +53,7 @@ describe("Web3 配置加载测试", () => {
 
     await writeTextFile(
       join(testProjectRoot, "config", "web3.json"),
-      JSON.stringify(web3Config, null, 2)
+      JSON.stringify(web3Config, null, 2),
     );
   });
 
@@ -78,7 +82,7 @@ describe("Web3 配置加载测试", () => {
       // 这里主要测试函数存在且可调用
       // 设置环境变量为 testnet
       setEnv("WEB3_ENV", "testnet");
-      
+
       // 由于缓存机制，这里可能返回缓存的配置
       // 实际测试中，需要清除缓存或使用不同的项目根目录
       const config = loadWeb3ConfigSync(testProjectRoot);
@@ -112,7 +116,6 @@ describe("Web3 配置加载测试", () => {
       const config2 = loadWeb3ConfigSync(testProjectRoot);
       expect(config1).toBe(config2);
     });
-
   });
 
   describe("preloadWeb3Config 函数", () => {

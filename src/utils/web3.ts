@@ -174,7 +174,7 @@ export function loadWeb3ConfigSync(projectRoot?: string): NetworkConfig | null {
           web3Env,
           hasChain: !!jsonConfig.chain,
           hasNetwork: !!jsonConfig.network,
-        }
+        },
       );
     }
 
@@ -191,7 +191,7 @@ export function loadWeb3ConfigSync(projectRoot?: string): NetworkConfig | null {
         projectRoot: configDir,
         web3Env,
         availableNetworks: jsonConfig.network ? Object.keys(jsonConfig.network) : [],
-      }
+      },
     );
   } catch (error) {
     // 如果是 ConfigurationError，直接抛出
@@ -1018,8 +1018,7 @@ export class Web3 {
    */
   toWei(
     value: string,
-    unit: "wei" | "kwei" | "mwei" | "gwei" | "szabo" | "finney" | "ether" =
-      "ether",
+    unit: "wei" | "kwei" | "mwei" | "gwei" | "szabo" | "finney" | "ether" = "ether",
   ): string {
     return toWei(value, unit);
   }

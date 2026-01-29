@@ -11,8 +11,8 @@ import { ConfigurationError } from "../errors/index.ts";
 /**
  * Web3 网络配置类型（从 web3.ts 导入）
  */
-type Web3NetworkConfig = ReturnType<typeof loadWeb3ConfigSync> extends infer T 
-  ? T extends null ? never : T 
+type Web3NetworkConfig = ReturnType<typeof loadWeb3ConfigSync> extends infer T
+  ? T extends null ? never : T
   : never;
 
 /**
@@ -73,7 +73,7 @@ export class ConfigManager {
     if (!this.projectRoot) {
       throw new ConfigurationError(
         "配置管理器未初始化，请先调用 initialize()",
-        { network: _network, chain: _chain }
+        { network: _network, chain: _chain },
       );
     }
 
@@ -83,7 +83,7 @@ export class ConfigManager {
       if (!config) {
         throw new ConfigurationError(
           `无法加载 Web3 配置，请检查 config/web3.json 文件`,
-          { projectRoot: this.projectRoot, network: _network, chain: _chain }
+          { projectRoot: this.projectRoot, network: _network, chain: _chain },
         );
       }
       this.web3Config = config;

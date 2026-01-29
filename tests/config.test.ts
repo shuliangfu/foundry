@@ -3,10 +3,10 @@
  * @description 配置管理器测试
  */
 
-import { describe, expect, it, beforeAll, afterAll } from "@dreamer/test";
+import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
 import { ConfigManager } from "../src/config/manager.ts";
 import { ConfigurationError as _ConfigurationError } from "../src/errors/index.ts";
-import { writeTextFile, remove, join, cwd, existsSync, mkdir } from "@dreamer/runtime-adapter";
+import { cwd, existsSync, join, mkdir, remove, writeTextFile } from "@dreamer/runtime-adapter";
 
 describe("配置管理器测试", () => {
   const testProjectRoot = join(cwd(), "tests", "data", "test-config-project");
@@ -35,7 +35,7 @@ describe("配置管理器测试", () => {
 
     await writeTextFile(
       join(testProjectRoot, "config", "web3.json"),
-      JSON.stringify(web3Config, null, 2)
+      JSON.stringify(web3Config, null, 2),
     );
 
     // 创建测试 .env 文件（注意：loadEnv 需要 .env 文件存在，否则会 exit(1)）
@@ -96,10 +96,10 @@ ETH_API_KEY=test-api-key
       // 但单例模式不允许，所以我们需要测试清除 projectRoot 的情况
       const manager = ConfigManager.getInstance();
       manager.initialize(testProjectRoot);
-      
+
       // 手动清除 projectRoot 来模拟未初始化状态
       (manager as any).projectRoot = null;
-      
+
       expect(() => {
         manager.getWeb3Config();
       }).toThrow();

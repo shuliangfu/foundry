@@ -3,14 +3,14 @@
  * @description CLI 工具函数测试
  */
 
-import { describe, expect, it, beforeAll, afterAll } from "@dreamer/test";
+import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
 import {
-  getProjectConfig,
-  getScriptPath,
   getApiKey,
   getNetworkName,
+  getProjectConfig,
+  getScriptPath,
 } from "../src/utils/cli-utils.ts";
-import { writeTextFile, remove, join, cwd, existsSync, mkdir } from "@dreamer/runtime-adapter";
+import { cwd, existsSync, join, mkdir, remove, writeTextFile } from "@dreamer/runtime-adapter";
 
 describe("CLI 工具函数测试", () => {
   const testProjectRoot = join(cwd(), "tests", "data", "test-cli-project");
@@ -28,7 +28,7 @@ describe("CLI 工具函数测试", () => {
     };
     await writeTextFile(
       join(testProjectRoot, "deno.json"),
-      JSON.stringify(denoJson, null, 2)
+      JSON.stringify(denoJson, null, 2),
     );
   });
 
@@ -44,7 +44,7 @@ describe("CLI 工具函数测试", () => {
       // 注意：这个测试需要在有 deno.json 的目录中运行
       // 或者需要 mock cwd()
       const config = getProjectConfig();
-      
+
       // 如果当前目录有 deno.json，应该返回配置
       // 如果没有，应该返回 null
       if (config) {

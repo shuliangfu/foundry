@@ -3,10 +3,15 @@
  * @description 使用 @dreamer/test 编写的测试文件
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "@dreamer/test";
-import { deploy as _deploy, createDeployer } from "../src/deploy.ts";
+import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
+import { createDeployer, deploy as _deploy } from "../src/deploy.ts";
 import { verify as _verify } from "../src/verify.ts";
-import { logger, loadEnv, deployContract as _deployContract, loadContract } from "../src/utils/mod.ts";
+import {
+  deployContract as _deployContract,
+  loadContract,
+  loadEnv,
+  logger,
+} from "../src/utils/mod.ts";
 import type { NetworkConfig } from "../src/utils/deploy-utils.ts";
 
 describe("部署功能测试", () => {

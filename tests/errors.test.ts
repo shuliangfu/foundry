@@ -5,11 +5,11 @@
 
 import { describe, expect, it } from "@dreamer/test";
 import {
-  FoundryError,
-  DeploymentError,
-  VerificationError,
   ConfigurationError,
+  DeploymentError,
+  FoundryError,
   NetworkError,
+  VerificationError,
 } from "../src/errors/index.ts";
 
 describe("错误类型测试", () => {

@@ -13,13 +13,13 @@ export class FoundryError extends Error {
   constructor(
     message: string,
     code: string,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "FoundryError";
     this.code = code;
     this.context = context;
-    
+
     // 保持正确的原型链
     Object.setPrototypeOf(this, FoundryError.prototype);
   }

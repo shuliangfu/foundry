@@ -3,9 +3,9 @@
  * @description 部署工具函数测试
  */
 
-import { describe, expect, it, beforeAll, afterAll } from "@dreamer/test";
+import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
 import { loadContract } from "../src/utils/deploy-utils.ts";
-import { writeTextFile, remove, join, cwd, existsSync, mkdir } from "@dreamer/runtime-adapter";
+import { cwd, existsSync, join, mkdir, remove, writeTextFile } from "@dreamer/runtime-adapter";
 
 describe("部署工具函数测试", () => {
   const testProjectRoot = join(cwd(), "tests", "data", "test-deploy-project");
@@ -30,15 +30,19 @@ describe("部署工具函数测试", () => {
 
     await writeTextFile(
       join(testProjectRoot, "build", "abi", "local", "TestContract.json"),
-      JSON.stringify(contractInfo, null, 2)
+      JSON.stringify(contractInfo, null, 2),
     );
 
     await writeTextFile(
       join(testProjectRoot, "build", "abi", "testnet", "TestContract.json"),
-      JSON.stringify({
-        ...contractInfo,
-        address: "0x9876543210987654321098765432109876543210",
-      }, null, 2)
+      JSON.stringify(
+        {
+          ...contractInfo,
+          address: "0x9876543210987654321098765432109876543210",
+        },
+        null,
+        2,
+      ),
     );
   });
 

@@ -36,8 +36,8 @@ import {
 } from "@dreamer/runtime-adapter";
 import { logger } from "./utils/logger.ts";
 import { parseJsrPackageFromUrl } from "./utils/jsr.ts";
-import { readCache, writeCache, setInstalledVersion } from "./utils/cache.ts";
-import type { JsrMetaData, JsrDenoJson } from "./types/index.ts";
+import { readCache, setInstalledVersion, writeCache } from "./utils/cache.ts";
+import type { JsrDenoJson, JsrMetaData } from "./types/index.ts";
 
 /**
  * 查找本地项目根目录（包含 deno.json 的目录）
@@ -411,7 +411,9 @@ export async function ensureFoundryInstalled(): Promise<void> {
   logger.info("未检测到 Foundry (forge)，正在自动安装...");
   const plat = platform();
   if (plat === "windows") {
-    logger.warn("Windows 下自动安装可能失败，请使用 Git BASH 或 WSL 执行，或手动安装: https://book.getfoundry.sh/getting-started/installation");
+    logger.warn(
+      "Windows 下自动安装可能失败，请使用 Git BASH 或 WSL 执行，或手动安装: https://book.getfoundry.sh/getting-started/installation",
+    );
   }
 
   try {

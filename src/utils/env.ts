@@ -4,10 +4,18 @@
  * 使用 @dreamer/runtime-adapter 兼容 Deno 和 Bun
  */
 
-import { existsSync, readTextFileSync, join, cwd, setEnv, exit, getEnv } from "@dreamer/runtime-adapter";
+import {
+  cwd,
+  existsSync,
+  exit,
+  getEnv,
+  join,
+  readTextFileSync,
+  setEnv,
+} from "@dreamer/runtime-adapter";
 import { logger } from "./logger.ts";
 
-export { getEnv, setEnv, exit };
+export { exit, getEnv, setEnv };
 
 /**
  * 加载环境变量
@@ -40,8 +48,8 @@ export function loadEnv(envPath?: string): Record<string, string> {
         const value = trimmed.substring(equalIndex + 1).trim();
         // 移除引号（如果存在）
         const cleanValue = value.replace(/^["']|["']$/g, "");
-				env[key] = cleanValue;
-				setEnv(key, cleanValue);
+        env[key] = cleanValue;
+        setEnv(key, cleanValue);
       }
     }
 
