@@ -29,6 +29,7 @@ import {
   existsSync,
   exit,
   getEnv,
+  getEnvAll,
   IS_BUN,
   join,
   platform,
@@ -39,6 +40,7 @@ import {
   setEnv,
   writeStdoutSync,
 } from "@dreamer/runtime-adapter";
+import { DEFAULT_NETWORK } from "./constants/index.ts";
 import { init } from "./init.ts";
 import { ensureFoundryInstalled, findFoundryPath } from "./setup.ts";
 import type { JsrDenoJson, JsrMetaData } from "./types/index.ts";
@@ -57,7 +59,6 @@ import { loadEnv } from "./utils/env.ts";
 import { parseJsrPackageFromUrl, parseJsrVersionFromUrl } from "./utils/jsr.ts";
 import { logger } from "./utils/logger.ts";
 import { loadWeb3ConfigSync } from "./utils/web3.ts";
-import { DEFAULT_NETWORK } from "./constants/index.ts";
 
 // 全局初始化环境变量
 loadEnv();
@@ -1063,6 +1064,148 @@ cli
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error("❌ 脚本执行失败:", errorMessage);
+      exit(1);
+    }
+  });
+
+// 测试命令
+cli
+  .command("test", "运行测试（兼容 deno test 和 bun test）")
+  .option({
+    name: "network",
+    alias: "n",
+    description:
+      "网络名称 (local, testnet, mainnet 等)。如果不指定，将从 .env 文件中的 WEB3_ENV 读取",
+    requiresValue: true,
+    type: "string",
+    required: false,
+  })
+  .option({
+    name: "filter",
+    alias: "f",
+    description: "过滤测试名称（正则表达式）",
+    requiresValue: true,
+    type: "string",
+  })
+  .option({
+    name: "watch",
+    alias: "w",
+    description: "监听文件变化并重新运行测试",
+    type: "boolean",
+  })
+  .option({
+    name: "coverage",
+    description: "生成代码覆盖率报告（仅 Deno）",
+    type: "boolean",
+  })
+  .option({
+    name: "concurrency",
+    alias: "j",
+    description: "最大并发数（仅 Bun，默认为 CPU 核心数）",
+    requiresValue: true,
+    type: "number",
+  })
+  .action(async (args, options) => {
+    // 获取项目配置
+    const projectConfig = getProjectConfig();
+    if (!projectConfig) {
+      logger.error("❌ 未找到项目根目录（包含 deno.json 或 package.json 的目录）");
+      exit(1);
+    }
+    const { projectRoot, denoJsonPath } = projectConfig;
+
+    // 检测运行时
+    const hasDeno = existsSync(join(projectRoot, "deno.json"));
+    const hasPackageJson = existsSync(join(projectRoot, "package.json"));
+    const runtime = hasDeno ? "deno" : (hasPackageJson ? "bun" : "deno");
+
+    // 获取网络名称（从命令行参数或环境变量）
+    const network = getNetworkName(options.network as string | undefined, false);
+
+    // 设置环境变量
+    if (network) {
+      setEnv("WEB3_ENV", network);
+    }
+
+    // 构建测试命令参数
+    const testArgs: string[] = ["test"];
+
+    if (runtime === "deno") {
+      // Deno 测试参数
+      testArgs.push("-A"); // 授予所有权限
+
+      if (denoJsonPath) {
+        testArgs.push("--config", denoJsonPath);
+      }
+
+      if (options.filter) {
+        testArgs.push("--filter", options.filter as string);
+      }
+
+      if (options.watch) {
+        testArgs.push("--watch");
+      }
+
+      if (options.coverage) {
+        testArgs.push("--coverage");
+      }
+    } else {
+      // Bun 测试参数
+      if (options.filter) {
+        testArgs.push("--filter", options.filter as string);
+      }
+
+      if (options.watch) {
+        testArgs.push("--watch");
+      }
+
+      // Bun 不支持 --coverage 选项（使用不同的方式）
+      if (options.coverage) {
+        logger.warn("⚠️  Bun 暂不支持 --coverage 选项");
+      }
+
+      // Bun 的 --concurrency 选项（控制并发数）
+      if (options.concurrency) {
+        testArgs.push("--concurrency", String(options.concurrency));
+      }
+    }
+
+    // 添加位置参数（测试文件路径）
+    if (args.length > 0) {
+      testArgs.push(...args);
+    }
+
+    logger.info(`🧪 运行测试 (${runtime})`);
+    if (network) {
+      logger.info(`🌐 网络: ${network}`);
+    }
+    logger.info("------------------------------------------");
+
+    // 获取当前进程的所有环境变量
+    const envVars = getEnvAll() ?? {};
+
+    // 执行测试命令
+    try {
+      const cmd = createCommand(runtime, {
+        args: testArgs,
+        cwd: projectRoot,
+        env: envVars,
+        stdout: "inherit",
+        stderr: "inherit",
+      });
+
+      // 获取命令执行结果
+      const output = await cmd.output();
+
+      if (!output.success) {
+        exit(1);
+      }
+
+      logger.info("------------------------------------------");
+      logger.info("✅ 测试完成！");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error("❌ 测试执行失败:", errorMessage);
       exit(1);
     }
   });

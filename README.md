@@ -32,6 +32,7 @@ foundry init [项目名]
 foundry deploy --network testnet
 foundry verify --network testnet -c <合约名> --api-key YOUR_API_KEY
 foundry run scripts/test.ts --network local
+foundry test --network local
 ```
 
 > **为什么使用 Deno 安装？**
@@ -43,9 +44,9 @@ foundry run scripts/test.ts --network local
 > **智能运行时检测**：
 >
 > - 全局 CLI 本身使用 Deno 运行
-> - 但执行 `foundry deploy`/`verify`/`run` 时，会**自动检测项目类型**：
->   - 项目有 `deno.json` → 使用 `deno run` 执行脚本
->   - 项目只有 `package.json` → 使用 `bun run` 执行脚本
+> - 但执行 `foundry deploy`/`verify`/`run`/`test` 时，会**自动检测项目类型**：
+>   - 项目有 `deno.json` → 使用 `deno run`/`deno test` 执行
+>   - 项目只有 `package.json` → 使用 `bun run`/`bun test` 执行
 > - 这样 Bun 项目也能正常使用全局 CLI
 
 **卸载全局 CLI**：
@@ -268,6 +269,54 @@ import { getEnv } from "@dreamer/runtime-adapter";
 const network = getEnv("WEB3_ENV"); // 获取 CLI 传入的网络名称
 console.log(`当前网络: ${network}`);
 ```
+
+---
+
+#### `foundry test` — 运行测试
+
+运行项目测试，自动检测运行时（Deno/Bun）并使用对应的测试命令。
+
+```bash
+# 运行所有测试
+foundry test
+
+# 指定网络（自动设置 WEB3_ENV 环境变量）
+foundry test --network local
+foundry test -n testnet
+
+# 过滤测试（按名称匹配）
+foundry test --filter "deploy"
+foundry test -f "Web3"
+
+# 监听模式（文件变化时自动重新运行）
+foundry test --watch
+foundry test -w
+
+# 生成代码覆盖率报告（仅 Deno）
+foundry test --coverage
+
+# 指定测试文件
+foundry test tests/deploy.test.ts
+
+# 设置并发数（仅 Bun）
+foundry test -j 4
+foundry test --concurrency 2
+
+# 组合使用
+foundry test -n local -f "deploy" -w
+```
+
+| 选项            | 简写 | 说明                                         |
+| --------------- | ---- | -------------------------------------------- |
+| `--network`     | `-n` | 网络名称。不指定时从 `WEB3_ENV` 读取         |
+| `--filter`      | `-f` | 过滤测试名称（正则表达式匹配）               |
+| `--watch`       | `-w` | 监听文件变化并重新运行测试                   |
+| `--coverage`    | -    | 生成代码覆盖率报告（仅 Deno 支持）           |
+| `--concurrency` | `-j` | 最大并发数（仅 Bun 支持，默认为 CPU 核心数） |
+
+**运行时自动检测**：
+- 项目有 `deno.json` → 使用 `deno test -A`
+- 项目只有 `package.json` → 使用 `bun test`
 
 ---
 

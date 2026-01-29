@@ -356,6 +356,7 @@ async function install(): Promise<void> {
       logger.info("  foundry deploy --network <网络>");
       logger.info("  foundry verify --network <网络> --contract <合约名>");
       logger.info("  foundry run <脚本路径> [--network <网络>]");
+      logger.info("  foundry test [--network <网络>] [--filter <过滤>]");
       logger.info("  foundry upgrade [--beta]");
       logger.info("");
       logger.info("查看帮助：");
@@ -364,6 +365,7 @@ async function install(): Promise<void> {
       logger.info("  foundry deploy --help");
       logger.info("  foundry verify --help");
       logger.info("  foundry run --help");
+      logger.info("  foundry test --help");
       logger.info("  foundry upgrade --help");
       logger.info("");
 
