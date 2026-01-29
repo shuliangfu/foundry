@@ -45,7 +45,7 @@ import type { JsrDenoJson, JsrMetaData } from "./types/index.ts";
 import { getInstalledVersion, readCache, setInstalledVersion, writeCache } from "./utils/cache.ts";
 import {
   createLoadingProgressBar,
-  executeDenoCommand,
+  executeCommand,
   getApiKey,
   getNetworkName,
   getProjectConfig,
@@ -702,7 +702,7 @@ cli
 
     // 执行部署脚本
     try {
-      const result = await executeDenoCommand(
+      const result = await executeCommand(
         deployScriptPath,
         denoJsonPath,
         projectRoot,
@@ -961,7 +961,7 @@ cli
 
     // 执行验证脚本
     try {
-      const result = await executeDenoCommand(
+      const result = await executeCommand(
         verifyScriptPath,
         denoJsonPath,
         projectRoot,

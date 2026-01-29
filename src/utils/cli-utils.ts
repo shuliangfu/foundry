@@ -10,6 +10,7 @@ import {
   existsSync,
   exit,
   getEnv,
+  getEnvAll,
   IS_BUN,
   join,
   platform,
@@ -269,17 +270,17 @@ function detectProjectRuntime(projectRoot: string, denoJsonPath?: string): "deno
 }
 
 /**
- * 执行 Deno/Bun 子命令
+ * 执行子命令（兼容 Deno 和 Bun）
  * 实时输出日志，不等待命令完成
  * 使用 @dreamer/runtime-adapter 的 createCommand 实现跨运行时兼容
  * 根据项目类型自动选择运行时（deno.json → deno, package.json → bun）
  * @param scriptPath - 脚本路径
- * @param denoJsonPath - deno.json 路径
+ * @param configPath - 配置文件路径（deno.json 或 package.json）
  * @param projectRoot - 项目根目录
  * @param args - 命令行参数
  * @returns 执行结果，包含 stdout 和 stderr
  */
-export async function executeDenoCommand(
+export async function executeCommand(
   scriptPath: string,
   denoJsonPath: string,
   projectRoot: string,
@@ -304,12 +305,17 @@ export async function executeDenoCommand(
       ...args,
     ];
 
+  // 获取当前进程的所有环境变量，传递给子进程
+  // 这确保了 WEB3_ENV、RPC_URL 等网络配置能正确传递给部署脚本
+  const envVars = getEnvAll() ?? {};
+
   // 使用 @dreamer/runtime-adapter 的 createCommand，兼容 Deno 和 Bun
   const cmd = createCommand(runtime, {
     args: cmdArgs,
     stdout: "piped",
     stderr: "piped",
     cwd: projectRoot,
+    env: envVars, // 传递环境变量给子进程
   });
 
   // 使用 spawn 来实时读取输出
