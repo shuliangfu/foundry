@@ -1222,10 +1222,12 @@ cli
         stderr: "inherit",
       });
 
-      // 获取命令执行结果
-      const output = await cmd.output();
+      // 使用 spawn() 启动进程，然后等待状态
+      // 因为 stdout/stderr 是 inherit 模式，不能使用 output()
+      const child = cmd.spawn();
+      const status = await child.status();
 
-      if (!output.success) {
+      if (!status.success) {
         exit(1);
       }
 
