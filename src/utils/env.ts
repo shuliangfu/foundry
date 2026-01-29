@@ -49,7 +49,10 @@ export function loadEnv(envPath?: string): Record<string, string> {
         // 移除引号（如果存在）
         const cleanValue = value.replace(/^["']|["']$/g, "");
         env[key] = cleanValue;
-        setEnv(key, cleanValue);
+        // 只在环境变量不存在时才设置，避免覆盖命令行传入的参数（如 WEB3_ENV）
+        if (!getEnv(key)) {
+          setEnv(key, cleanValue);
+        }
       }
     }
 
