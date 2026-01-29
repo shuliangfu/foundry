@@ -21,8 +21,8 @@ import {
   stat,
   writeTextFile,
 } from "@dreamer/runtime-adapter";
-import { logger } from "./utils/logger.ts";
 import { parseJsrVersionFromUrl } from "./utils/jsr.ts";
+import { logger } from "./utils/logger.ts";
 
 /**
  * Foundry 配置文件内容
@@ -48,8 +48,9 @@ evm_version = "shanghai"  # EVM 版本：london, berlin, shanghai, cancun 等
 optimizer = true          # 启用优化器
 optimizer_runs = 200      # 优化器运行次数（影响代码大小 vs gas 成本）
 
-# 导入路径配置
-auto_detect_remappings = true  # 自动检测 remapping
+# 导入路径配置：不使用 lib 下外部依赖（已移除 pancake-swap），仅用 src 内相对路径
+auto_detect_remappings = false  # 关闭自动检测，避免引用已删除的 lib 依赖
+remappings = []                 # 显式不使用任何 remapping
 
 # 编译选项
 cache = true              # 启用编译缓存
@@ -63,23 +64,13 @@ invariant = { runs = 256 } # 不变性测试运行次数
 # 性能配置
 # jobs = 0               # 并行编译任务数（某些版本不支持，使用默认值）
 
+# 代码格式化（2 空格缩进，与 .prettierrc 一致）
+[fmt]
+tab_width = 2
+
 # 代码检查
 [lint]
 lint_on_build = true      # 编译时进行 lint 检查
-
-# See more config options: https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
-# 完整配置说明请查看: FOUNDRY_CONFIG.md
-
-# 注意：rpc_url 和 chain_id 不是 foundry.toml 的有效配置项
-# 这些配置仅用于文档说明，实际部署时通过命令行参数或环境变量传递
-#
-# 本地测试网络（Anvil）：
-#   RPC URL: http://127.0.0.1:8545
-#   Chain ID: 31337
-#
-# 测试网（BSC Testnet）：
-#   RPC URL: https://bsc-testnet.nodereal.io/v1/3d9db4b759454a22b901cb13630f9294
-#   Chain ID: 97
 `;
 
 /**
