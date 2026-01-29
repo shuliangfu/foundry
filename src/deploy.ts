@@ -261,6 +261,8 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
         const progressBar = createLoadingProgressBar("正在部署中...");
         // 在 for 循环之前启动进度条，这样在分割线之后立即显示
         const progressInterval = progressBar.start();
+        // 输出换行符，让部署脚本的输出从新行开始，避免与进度条混在一起
+        console.log("");
         try {
           // 部署合约
           await scriptModule.deploy(deployer);
