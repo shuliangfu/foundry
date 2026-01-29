@@ -1213,22 +1213,23 @@ cli
     }
 
     // 执行测试命令
+    // 使用 createCommand + spawn，确保输出实时显示且 Ctrl+C 能正常终止
     try {
       const cmd = createCommand(runtime, {
         args: testArgs,
         cwd: projectRoot,
         env: envVars,
+        stdin: "inherit",
         stdout: "inherit",
         stderr: "inherit",
       });
 
-      // 使用 spawn() 启动进程，然后等待状态
-      // 因为 stdout/stderr 是 inherit 模式，不能使用 output()
+      // spawn() 启动进程，status 等待完成
       const child = cmd.spawn();
-      const status = await child.status();
+      const status = await child.status;
 
       if (!status.success) {
-        exit(1);
+        exit(status.code ?? 1);
       }
 
       logger.info("------------------------------------------");
