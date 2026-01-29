@@ -150,13 +150,13 @@ describe("合约验证功能测试", () => {
   });
 
   describe("错误处理测试", () => {
-    it("应该能处理无效的合约地址", async () => {
+    it("应该能处理无效的合约地址", () => {
       // 无效地址应该导致验证失败
       // 由于需要实际调用 forge，这里跳过实际执行
       expect(typeof verify).toBe("function");
     });
 
-    it("应该能处理无效的 API Key", async () => {
+    it("应该能处理无效的 API Key", () => {
       // 无效 API Key 应该导致验证失败
       expect(typeof verify).toBe("function");
     });

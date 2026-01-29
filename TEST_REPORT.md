@@ -348,64 +348,64 @@
 
 ### 接口方法覆盖
 
-| 方法                                                   | 说明                   | 测试覆盖              |
-| ------------------------------------------------------ | ---------------------- | --------------------- |
-| `init(projectRoot?)`                                   | 初始化 Foundry 项目    | ✅ 18 个测试          |
-| `deploy(options)`                                      | 部署合约               | ✅ 6 个测试           |
-| `verify(options)`                                      | 验证合约               | ✅ 20 个测试          |
-| `createDeployer(network, config, force, accountIndex)` | 创建部署器             | ✅ 1 个测试           |
-| `loadEnv()`                                            | 加载环境变量           | ✅ 3 个测试           |
-| `validateEnv(env, required)`                           | 验证环境变量           | ✅ 4 个测试           |
-| `loadContract(contractName, network)`                  | 加载合约               | ✅ 5 个测试           |
-| `loadContracts(network)`                               | 加载所有合约           | ✅ 7 个测试           |
-| `logger.info/warn/error()`                             | 日志输出               | ✅ 2 个测试           |
-| `new Web3(contractName?, options)`                     | 创建 Web3 实例         | ✅ 4 个测试           |
-| `Web3.getBalance()`                                    | 获取余额               | ✅ 1 个测试           |
-| `Web3.accountAddress`                                  | 获取账户地址           | ✅ 1 个测试           |
-| `loadWeb3ConfigSync(projectRoot?)`                     | 加载 Web3 配置         | ✅ 5 个测试           |
-| `preloadWeb3Config(projectRoot?)`                      | 预加载 Web3 配置       | ✅ 2 个测试           |
-| `createWeb3(contractName?, options)`                   | 创建 Web3 实例工厂函数 | ✅ 2 个测试           |
-| `getProjectConfig()`                                   | 获取项目配置           | ✅ 1 个测试           |
-| `getScriptPath(scriptName)`                            | 获取脚本路径           | ✅ 3 个测试           |
-| `getApiKey(apiKeyFromOption?)`                         | 获取 API Key           | ✅ 3 个测试           |
-| `getNetworkName(networkFromOption?, requireNetwork?)`  | 获取网络名称           | ✅ 3 个测试           |
-| `handleCommandResult()`                                | 处理命令结果           | ✅ 2 个测试           |
-| `withProgressBar()`                                    | 进度条高阶函数         | ✅ 1 个测试           |
-| `readCache(key, version)`                              | 读取缓存               | ✅ 4 个测试           |
-| `writeCache(key, version, data)`                       | 写入缓存               | ✅ 4 个测试           |
-| `clearCache(version?)`                                 | 清除缓存               | ✅ 2 个测试           |
-| `getInstalledVersion(packageName?)`                    | 获取安装版本           | ✅ 3 个测试           |
-| `setInstalledVersion(version, packageName?)`           | 设置安装版本           | ✅ 3 个测试           |
-| `parseJsrPackageFromUrl()`                             | 解析 JSR 包信息        | ✅ 2 个测试           |
-| `parseJsrVersionFromUrl()`                             | 解析 JSR 版本号        | ✅ 2 个测试           |
-| `parseJsrPackageNameFromUrl()`                         | 解析 JSR 包名          | ✅ 2 个测试           |
-| `ConfigManager.getInstance()`                          | 获取配置管理器实例     | ✅ 1 个测试           |
-| `ConfigManager.initialize(projectRoot?)`               | 初始化配置管理器       | ✅ 2 个测试           |
-| `ConfigManager.getWeb3Config(network?, chain?)`        | 获取 Web3 配置         | ✅ 3 个测试           |
-| `ConfigManager.getEnvConfig(key)`                      | 获取环境变量配置       | ✅ 2 个测试           |
-| `ConfigManager.getAllEnvConfig()`                      | 获取所有环境变量配置   | ✅ 1 个测试           |
-| `ConfigManager.clearCache()`                           | 清除配置缓存           | ✅ 1 个测试           |
-| `FoundryError`                                         | 基础错误类             | ✅ 3 个测试           |
-| `DeploymentError`                                      | 部署错误               | ✅ 2 个测试           |
-| `VerificationError`                                    | 验证错误               | ✅ 2 个测试           |
-| `ConfigurationError`                                   | 配置错误               | ✅ 2 个测试           |
-| `NetworkError`                                         | 网络错误               | ✅ 2 个测试           |
-| `ensureFoundryInstalled()`                             | 确保 Foundry 已安装    | ✅ 4 个测试           |
-| `findFoundryPath()`                                    | 查找 Foundry 路径      | ✅ 4 个测试           |
-| `getAnvilTimestamp()`                                  | 获取 Anvil 时间戳      | ✅ 2 个测试           |
-| `syncAnvilTime()`                                      | 同步 Anvil 时间        | ✅ 2 个测试           |
-| `advanceAnvilTime()`                                   | 推进 Anvil 时间        | ✅ 3 个测试           |
-| `advanceTime()`                                        | 推进指定天数           | ✅ 2 个测试           |
-| `isAddress()`                                          | 验证地址               | ✅ 2 个测试           |
-| `isPrivateKey()`                                       | 验证私钥               | ✅ 2 个测试           |
-| `isTxHash()`                                           | 验证交易哈希           | ✅ 2 个测试           |
-| `toChecksumAddress()`                                  | 校验和地址             | ✅ 1 个测试           |
-| `shortenAddress()`                                     | 缩短地址               | ✅ 1 个测试           |
-| `formatAddress()`                                      | 格式化地址             | ✅ 1 个测试           |
-| `toWei() / fromWei()`                                  | 单位转换               | ✅ 3 个测试           |
-| `keccak256()`                                          | 哈希函数               | ✅ 3 个测试           |
-| 十六进制转换函数                                       | 多个函数               | ✅ 6 个测试           |
-| 填充函数                                               | padLeft/padRight       | ✅ 2 个测试           |
+| 方法                                                   | 说明                   | 测试覆盖     |
+| ------------------------------------------------------ | ---------------------- | ------------ |
+| `init(projectRoot?)`                                   | 初始化 Foundry 项目    | ✅ 18 个测试 |
+| `deploy(options)`                                      | 部署合约               | ✅ 6 个测试  |
+| `verify(options)`                                      | 验证合约               | ✅ 20 个测试 |
+| `createDeployer(network, config, force, accountIndex)` | 创建部署器             | ✅ 1 个测试  |
+| `loadEnv()`                                            | 加载环境变量           | ✅ 3 个测试  |
+| `validateEnv(env, required)`                           | 验证环境变量           | ✅ 4 个测试  |
+| `loadContract(contractName, network)`                  | 加载合约               | ✅ 5 个测试  |
+| `loadContracts(network)`                               | 加载所有合约           | ✅ 7 个测试  |
+| `logger.info/warn/error()`                             | 日志输出               | ✅ 2 个测试  |
+| `new Web3(contractName?, options)`                     | 创建 Web3 实例         | ✅ 4 个测试  |
+| `Web3.getBalance()`                                    | 获取余额               | ✅ 1 个测试  |
+| `Web3.accountAddress`                                  | 获取账户地址           | ✅ 1 个测试  |
+| `loadWeb3ConfigSync(projectRoot?)`                     | 加载 Web3 配置         | ✅ 5 个测试  |
+| `preloadWeb3Config(projectRoot?)`                      | 预加载 Web3 配置       | ✅ 2 个测试  |
+| `createWeb3(contractName?, options)`                   | 创建 Web3 实例工厂函数 | ✅ 2 个测试  |
+| `getProjectConfig()`                                   | 获取项目配置           | ✅ 1 个测试  |
+| `getScriptPath(scriptName)`                            | 获取脚本路径           | ✅ 3 个测试  |
+| `getApiKey(apiKeyFromOption?)`                         | 获取 API Key           | ✅ 3 个测试  |
+| `getNetworkName(networkFromOption?, requireNetwork?)`  | 获取网络名称           | ✅ 3 个测试  |
+| `handleCommandResult()`                                | 处理命令结果           | ✅ 2 个测试  |
+| `withProgressBar()`                                    | 进度条高阶函数         | ✅ 1 个测试  |
+| `readCache(key, version)`                              | 读取缓存               | ✅ 4 个测试  |
+| `writeCache(key, version, data)`                       | 写入缓存               | ✅ 4 个测试  |
+| `clearCache(version?)`                                 | 清除缓存               | ✅ 2 个测试  |
+| `getInstalledVersion(packageName?)`                    | 获取安装版本           | ✅ 3 个测试  |
+| `setInstalledVersion(version, packageName?)`           | 设置安装版本           | ✅ 3 个测试  |
+| `parseJsrPackageFromUrl()`                             | 解析 JSR 包信息        | ✅ 2 个测试  |
+| `parseJsrVersionFromUrl()`                             | 解析 JSR 版本号        | ✅ 2 个测试  |
+| `parseJsrPackageNameFromUrl()`                         | 解析 JSR 包名          | ✅ 2 个测试  |
+| `ConfigManager.getInstance()`                          | 获取配置管理器实例     | ✅ 1 个测试  |
+| `ConfigManager.initialize(projectRoot?)`               | 初始化配置管理器       | ✅ 2 个测试  |
+| `ConfigManager.getWeb3Config(network?, chain?)`        | 获取 Web3 配置         | ✅ 3 个测试  |
+| `ConfigManager.getEnvConfig(key)`                      | 获取环境变量配置       | ✅ 2 个测试  |
+| `ConfigManager.getAllEnvConfig()`                      | 获取所有环境变量配置   | ✅ 1 个测试  |
+| `ConfigManager.clearCache()`                           | 清除配置缓存           | ✅ 1 个测试  |
+| `FoundryError`                                         | 基础错误类             | ✅ 3 个测试  |
+| `DeploymentError`                                      | 部署错误               | ✅ 2 个测试  |
+| `VerificationError`                                    | 验证错误               | ✅ 2 个测试  |
+| `ConfigurationError`                                   | 配置错误               | ✅ 2 个测试  |
+| `NetworkError`                                         | 网络错误               | ✅ 2 个测试  |
+| `ensureFoundryInstalled()`                             | 确保 Foundry 已安装    | ✅ 4 个测试  |
+| `findFoundryPath()`                                    | 查找 Foundry 路径      | ✅ 4 个测试  |
+| `getAnvilTimestamp()`                                  | 获取 Anvil 时间戳      | ✅ 2 个测试  |
+| `syncAnvilTime()`                                      | 同步 Anvil 时间        | ✅ 2 个测试  |
+| `advanceAnvilTime()`                                   | 推进 Anvil 时间        | ✅ 3 个测试  |
+| `advanceTime()`                                        | 推进指定天数           | ✅ 2 个测试  |
+| `isAddress()`                                          | 验证地址               | ✅ 2 个测试  |
+| `isPrivateKey()`                                       | 验证私钥               | ✅ 2 个测试  |
+| `isTxHash()`                                           | 验证交易哈希           | ✅ 2 个测试  |
+| `toChecksumAddress()`                                  | 校验和地址             | ✅ 1 个测试  |
+| `shortenAddress()`                                     | 缩短地址               | ✅ 1 个测试  |
+| `formatAddress()`                                      | 格式化地址             | ✅ 1 个测试  |
+| `toWei() / fromWei()`                                  | 单位转换               | ✅ 3 个测试  |
+| `keccak256()`                                          | 哈希函数               | ✅ 3 个测试  |
+| 十六进制转换函数                                       | 多个函数               | ✅ 6 个测试  |
+| 填充函数                                               | padLeft/padRight       | ✅ 2 个测试  |
 
 ### 边界情况覆盖
 
@@ -491,7 +491,8 @@ WEB3_ENV=local deno test -A tests/web3.test.ts
 
 ## 结论
 
-@dreamer/foundry 库经过全面测试，**247 个测试中 244 个通过，3 个跳过**（跳过的测试需要特殊环境或为避免资源泄漏）。
+@dreamer/foundry 库经过全面测试，**247 个测试中 244 个通过，3
+个跳过**（跳过的测试需要特殊环境或为避免资源泄漏）。
 
 **测试总数**: 247
 

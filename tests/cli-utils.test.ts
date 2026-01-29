@@ -160,22 +160,22 @@ describe("CLI 工具函数测试", () => {
     });
 
     it("应该能够执行异步操作并返回结果", async () => {
-      const result = await withProgressBar("测试中...", async () => {
-        return "测试结果";
+      const result = await withProgressBar("测试中...", () => {
+        return Promise.resolve("测试结果");
       });
       expect(result).toBe("测试结果");
     });
 
     it("应该能够处理返回数字的异步操作", async () => {
-      const result = await withProgressBar("计算中...", async () => {
-        return 42;
+      const result = await withProgressBar("计算中...", () => {
+        return Promise.resolve(42);
       });
       expect(result).toBe(42);
     });
 
     it("应该能够处理返回对象的异步操作", async () => {
-      const result = await withProgressBar("加载中...", async () => {
-        return { name: "test", value: 123 };
+      const result = await withProgressBar("加载中...", () => {
+        return Promise.resolve({ name: "test", value: 123 });
       });
       expect(result.name).toBe("test");
       expect(result.value).toBe(123);
@@ -191,8 +191,8 @@ describe("CLI 工具函数测试", () => {
     it("应该能够捕获并重新抛出错误", async () => {
       let errorThrown = false;
       try {
-        await withProgressBar("错误测试...", async () => {
-          throw new Error("测试错误");
+        await withProgressBar("错误测试...", () => {
+          return Promise.reject(new Error("测试错误"));
         });
       } catch (error) {
         errorThrown = true;

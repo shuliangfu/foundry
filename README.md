@@ -11,7 +11,9 @@
 
 ## 🎯 功能
 
-`@dreamer/foundry` 是一个专为 Foundry 项目设计的现代化智能合约部署和验证工具库。它提供了完整的项目初始化、自动化部署、合约验证等功能，**同时支持 Deno 和 Bun 运行时**，让智能合约开发更加高效便捷。
+`@dreamer/foundry` 是一个专为 Foundry
+项目设计的现代化智能合约部署和验证工具库。它提供了完整的项目初始化、自动化部署、合约验证等功能，**同时支持
+Deno 和 Bun 运行时**，让智能合约开发更加高效便捷。
 
 ---
 
@@ -81,11 +83,11 @@ import { deploy, verify, Web3 } from "@dreamer/foundry";
 
 ## 🌍 环境兼容性
 
-| 环境       | 版本要求 | 状态                                    |
-| ---------- | -------- | --------------------------------------- |
-| **Deno**   | 2.5.0+   | ✅ 完全支持                             |
+| 环境       | 版本要求 | 状态                                     |
+| ---------- | -------- | ---------------------------------------- |
+| **Deno**   | 2.5.0+   | ✅ 完全支持                              |
 | **Bun**    | 1.0.0+   | ✅ 支持（通过 @dreamer/runtime-adapter） |
-| **服务端** | -        | ✅ 支持（Deno/Bun 运行时）              |
+| **服务端** | -        | ✅ 支持（Deno/Bun 运行时）               |
 
 ---
 
@@ -548,37 +550,37 @@ await init("/path/to/project");
 
 ```typescript
 import {
+  // 十六进制转换
+  addHexPrefix,
+  bytesToHex,
+  checkAddressChecksum,
+  // 其他
+  computeContractAddress,
+  encodeFunctionCall,
+  formatAddress,
+  fromWei,
+  generateWallet,
+  getCode,
+  getFunctionSelector,
+  hexToBytes,
+  hexToNumber,
   // 地址验证
   isAddress,
   isPrivateKey,
   isTxHash,
-  // 地址格式化
-  toChecksumAddress,
-  shortenAddress,
-  formatAddress,
-  // 十六进制转换
-  addHexPrefix,
-  stripHexPrefix,
-  hexToNumber,
+  // 哈希函数
+  keccak256,
   numberToHex,
-  hexToBytes,
-  bytesToHex,
   // 填充函数
   padLeft,
   padRight,
+  shortenAddress,
+  solidityKeccak256,
+  stripHexPrefix,
+  // 地址格式化
+  toChecksumAddress,
   // 单位转换
   toWei,
-  fromWei,
-  // 哈希函数
-  keccak256,
-  solidityKeccak256,
-  // 其他
-  computeContractAddress,
-  generateWallet,
-  getCode,
-  getFunctionSelector,
-  encodeFunctionCall,
-  checkAddressChecksum,
 } from "@dreamer/foundry/utils";
 ```
 
@@ -775,25 +777,25 @@ await advanceTime(365); // 推进 1 年
 
 **测试模块**（17 个测试文件）：
 
-| 模块                 | 测试数 | 说明                     |
-| -------------------- | ------ | ------------------------ |
-| CLI 命令测试         | 27     | 命令行参数解析、命令识别 |
-| Web3 工具函数测试    | 32     | 地址验证、单位转换、哈希 |
-| CLI 工具函数测试     | 25     | 配置获取、路径解析       |
-| 验证功能测试         | 20     | 合约验证参数、网络配置   |
-| 项目初始化测试       | 18     | 目录创建、文件生成       |
-| 部署工具函数测试     | 18     | 合约加载、敏感信息过滤   |
-| Anvil 时间工具测试   | 16     | 时间同步、时间推进       |
-| 缓存功能测试         | 13     | 读写缓存、版本管理       |
-| 错误类型测试         | 13     | 错误类继承、上下文信息   |
-| Foundry 安装测试     | 12     | 路径查找、自动安装       |
-| 配置管理器测试       | 11     | 单例模式、配置加载       |
-| Web3 配置加载测试    | 10     | 配置文件、工厂函数       |
-| JSR 工具函数测试     | 8      | URL 解析、版本提取       |
-| 合约工具测试         | 7      | 合约加载、数据验证       |
-| 环境变量工具测试     | 6      | 加载验证、格式处理       |
-| 部署功能测试         | 6      | 部署器创建、工具函数     |
-| 工具函数测试         | 5      | Logger、合约加载         |
+| 模块               | 测试数 | 说明                     |
+| ------------------ | ------ | ------------------------ |
+| CLI 命令测试       | 27     | 命令行参数解析、命令识别 |
+| Web3 工具函数测试  | 32     | 地址验证、单位转换、哈希 |
+| CLI 工具函数测试   | 25     | 配置获取、路径解析       |
+| 验证功能测试       | 20     | 合约验证参数、网络配置   |
+| 项目初始化测试     | 18     | 目录创建、文件生成       |
+| 部署工具函数测试   | 18     | 合约加载、敏感信息过滤   |
+| Anvil 时间工具测试 | 16     | 时间同步、时间推进       |
+| 缓存功能测试       | 13     | 读写缓存、版本管理       |
+| 错误类型测试       | 13     | 错误类继承、上下文信息   |
+| Foundry 安装测试   | 12     | 路径查找、自动安装       |
+| 配置管理器测试     | 11     | 单例模式、配置加载       |
+| Web3 配置加载测试  | 10     | 配置文件、工厂函数       |
+| JSR 工具函数测试   | 8      | URL 解析、版本提取       |
+| 合约工具测试       | 7      | 合约加载、数据验证       |
+| 环境变量工具测试   | 6      | 加载验证、格式处理       |
+| 部署功能测试       | 6      | 部署器创建、工具函数     |
+| 工具函数测试       | 5      | Logger、合约加载         |
 
 **测试亮点**：
 
@@ -822,7 +824,8 @@ await advanceTime(365); // 推进 1 年
 - **跨运行时兼容**：基于 @dreamer/runtime-adapter 实现 Deno/Bun 完全兼容，自动检测运行时环境
 - **Foundry 依赖**：CLI 命令会自动检测 Foundry 是否安装，未安装时会提示自动安装
 - **测试配置**：运行测试需要 `config/web3.json` 配置文件和 Anvil 本地节点
-- **Bun 使用**：在 Bun 项目中，CLI 会自动检测并使用 `bun` 执行脚本；全局 CLI 安装推荐使用 Deno（一次性操作），安装后可在任何项目中使用
+- **Bun 使用**：在 Bun 项目中，CLI 会自动检测并使用 `bun` 执行脚本；全局 CLI 安装推荐使用
+  Deno（一次性操作），安装后可在任何项目中使用
 
 ## 📋 配置文件格式
 
