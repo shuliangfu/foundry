@@ -296,8 +296,6 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
         throw error;
       }
     }
-
-    logger.info("");
   } catch (error) {
     throw error;
   }
