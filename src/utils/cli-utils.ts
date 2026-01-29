@@ -278,6 +278,7 @@ function detectProjectRuntime(projectRoot: string, denoJsonPath?: string): "deno
  * @param configPath - 配置文件路径（deno.json 或 package.json）
  * @param projectRoot - 项目根目录
  * @param args - 命令行参数
+ * @param extraEnv - 额外的环境变量（会覆盖 getEnvAll() 的值）
  * @returns 执行结果，包含 stdout 和 stderr
  */
 export async function executeCommand(
@@ -285,6 +286,7 @@ export async function executeCommand(
   denoJsonPath: string,
   projectRoot: string,
   args: string[],
+  extraEnv?: Record<string, string>,
 ): Promise<{ stdout: string; stderr: string; success: boolean }> {
   // 根据项目类型检测应该使用的运行时
   const runtime = detectProjectRuntime(projectRoot, denoJsonPath);
@@ -307,7 +309,11 @@ export async function executeCommand(
 
   // 获取当前进程的所有环境变量，传递给子进程
   // 这确保了 WEB3_ENV、RPC_URL 等网络配置能正确传递给部署脚本
-  const envVars = getEnvAll() ?? {};
+  // 额外的环境变量会覆盖 getEnvAll() 的值，确保命令行参数的优先级更高
+  const envVars: Record<string, string> = {
+    ...(getEnvAll() ?? {}),
+    ...(extraEnv ?? {}),
+  };
 
   // 使用 @dreamer/runtime-adapter 的 createCommand，兼容 Deno 和 Bun
   const cmd = createCommand(runtime, {

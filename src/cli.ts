@@ -1046,15 +1046,23 @@ cli
     // 获取网络名称（从命令行参数或环境变量）
     const network = getNetworkName(options.network as string, false);
 
-    // 如果指定了网络，设置环境变量
-    setEnv("WEB3_ENV", network ?? getEnv("WEB3_ENV") ?? DEFAULT_NETWORK);
-    logger.info(`🌐 网络: ${network}`);
+    // 确定最终的网络名称
+    const finalNetwork = network ?? getEnv("WEB3_ENV") ?? DEFAULT_NETWORK;
 
+    // 设置环境变量
+    setEnv("WEB3_ENV", finalNetwork);
+
+    logger.info(`🌐 网络: ${finalNetwork}`);
     logger.info(`🚀 执行脚本: ${scriptPath}`);
     logger.info("------------------------------------------");
 
     // 构建命令行参数（传递剩余的位置参数给脚本）
     const scriptArgs: string[] = args.slice(1);
+
+    // 构建额外的环境变量，确保 WEB3_ENV 被正确传递给子进程
+    const extraEnv: Record<string, string> = {
+      WEB3_ENV: finalNetwork,
+    };
 
     // 执行脚本
     try {
@@ -1063,6 +1071,7 @@ cli
         denoJsonPath,
         projectRoot,
         scriptArgs,
+        extraEnv,
       );
 
       // 处理执行结果
@@ -1091,6 +1100,14 @@ cli
     requiresValue: true,
     type: "string",
     required: false,
+    defaultValue: getEnv("WEB3_ENV") ?? DEFAULT_NETWORK,
+    validator: (value) => {
+      // 测试必须是 local、testnet，不允许主网测试
+      if (value !== "local" && value !== "testnet") {
+        return "网络名称必须是 local、testnet";
+      }
+      return true;
+    },
   })
   .option({
     name: "filter",
@@ -1135,9 +1152,7 @@ cli
     const network = getNetworkName(options.network as string | undefined, false);
 
     // 设置环境变量
-    if (network) {
-      setEnv("WEB3_ENV", network);
-    }
+    setEnv("WEB3_ENV", network ?? getEnv("WEB3_ENV") ?? DEFAULT_NETWORK as string);
 
     // 构建测试命令参数
     const testArgs: string[] = ["test"];
@@ -1188,13 +1203,14 @@ cli
     }
 
     logger.info(`🧪 运行测试 (${runtime})`);
-    if (network) {
-      logger.info(`🌐 网络: ${network}`);
-    }
+    logger.info(`🌐 网络: ${network}`);
     logger.info("------------------------------------------");
 
-    // 获取当前进程的所有环境变量
-    const envVars = getEnvAll() ?? {};
+    // 获取当前进程的所有环境变量，并确保 WEB3_ENV 被正确设置
+    const envVars: Record<string, string> = { ...(getEnvAll() ?? {}) };
+    if (network) {
+      envVars.WEB3_ENV = network;
+    }
 
     // 执行测试命令
     try {
