@@ -1084,6 +1084,7 @@ cli
 
       logger.info("------------------------------------------");
       logger.info("✅ 脚本执行完成！");
+      logger.info("");
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error("❌ 脚本执行失败:", errorMessage);
