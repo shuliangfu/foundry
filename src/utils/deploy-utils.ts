@@ -269,6 +269,14 @@ export async function forgeDeploy(
     "--broadcast",
   ];
 
+  // 添加区块确认数参数
+  // local 网络默认不等待确认（0），其他网络默认等待 2 个区块确认
+  const isLocalNetwork = network === "local" || config.rpcUrl.includes("127.0.0.1") || config.rpcUrl.includes("localhost");
+  const confirmations = options.confirmations ?? (isLocalNetwork ? 0 : 2);
+  if (confirmations > 0) {
+    forgeArgs.push("--confirmations", String(confirmations));
+  }
+
   if (argsArray.length > 0) {
     forgeArgs.push("--constructor-args");
     forgeArgs.push(...argsArray);

@@ -72,6 +72,8 @@ export interface DeployScriptOptions {
   force?: boolean;
   /** 要部署的合约列表（如果为空则部署所有） */
   contracts?: string[];
+  /** 等待的区块确认数（默认: local 网络为 0，其他网络为 2） */
+  confirmations?: number;
 }
 
 /**
@@ -105,11 +107,16 @@ async function scanDeployScripts(scriptDir: string): Promise<string[]> {
 
 /**
  * 创建部署器
+ * @param network - 网络名称
+ * @param config - 网络配置
+ * @param force - 是否强制部署
+ * @param confirmations - 等待的区块确认数（可选）
  */
 export function createDeployer(
   network: string,
   config: NetworkConfig,
   force: boolean = false,
+  confirmations?: number,
 ): Deployer {
   return {
     network,
@@ -121,12 +128,14 @@ export function createDeployer(
       constructorArgs: string[] | Record<string, unknown> = [],
       options?: DeployOptions,
     ) => {
-      // 合并 force 参数到 options，并设置 abiDir 为当前网络的目录
+      // 合并 force 和 confirmations 参数到 options，并设置 abiDir 为当前网络的目录
       const deployOptions: DeployOptions = {
         ...options,
         force: options?.force ?? force,
         // 如果没有提供 abiDir，根据网络名称构建 abiDir
         abiDir: options?.abiDir || join(cwd(), "build", "abi", network),
+        // 使用传入的 confirmations，如果没有则使用 createDeployer 的默认值
+        confirmations: options?.confirmations ?? confirmations,
       };
       await forgeDeploy(contractName, config, constructorArgs, deployOptions);
 
@@ -231,6 +240,7 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
     options.network,
     options.config,
     options.force || false,
+    options.confirmations,
   );
 
   // 查找项目根目录（包含 deno.json 或 package.json 的目录）
@@ -301,12 +311,14 @@ function parseArgs(): {
   network?: string;
   contracts?: string[];
   force?: boolean;
+  confirmations?: number;
 } {
   // 获取命令行参数（runtimeArgs 来自 runtime-adapter，需要调用函数获取参数数组）
   const args: string[] = typeof runtimeArgs === "function" ? runtimeArgs() : [];
   let network: string | undefined;
   const contracts: string[] = [];
   let force = false;
+  let confirmations: number | undefined;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -331,6 +343,14 @@ function parseArgs(): {
         logger.error("❌ Error: --network (-n) requires a network name");
         exit(1);
       }
+    } else if (arg === "--confirmations") {
+      if (i + 1 < args.length) {
+        confirmations = parseInt(args[i + 1], 10);
+        i++;
+      } else {
+        logger.error("❌ Error: --confirmations requires a number");
+        exit(1);
+      }
     } else if (!arg.startsWith("-")) {
       // 位置参数作为网络名称（向后兼容）
       if (!network) {
@@ -339,7 +359,7 @@ function parseArgs(): {
     }
   }
 
-  return { network, contracts: contracts.length > 0 ? contracts : undefined, force };
+  return { network, contracts: contracts.length > 0 ? contracts : undefined, force, confirmations };
 }
 
 /**
@@ -347,7 +367,7 @@ function parseArgs(): {
  */
 async function main() {
   // 解析命令行参数
-  const { network: networkArg, contracts, force } = parseArgs();
+  const { network: networkArg, contracts, force, confirmations } = parseArgs();
 
   // 确定网络：优先使用命令行参数，其次使用环境变量（getNetworkName 内部已读 WEB3_ENV），否则使用默认网络常量
   const network = getNetworkName(networkArg, false) ?? DEFAULT_NETWORK;
@@ -371,6 +391,7 @@ async function main() {
       config,
       force,
       contracts,
+      confirmations,
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

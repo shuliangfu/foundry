@@ -543,6 +543,13 @@ cli
     requiresValue: true,
     type: "string",
   })
+  .option({
+    name: "confirmations",
+    description: "等待的区块确认数（默认: local 网络为 0，其他网络为 2）",
+    requiresValue: true,
+    defaultValue: 2,
+    type: "number",
+  })
   .action(async (_args, options) => {
     // 部署依赖 forge，执行前检测并在未安装时自动安装 Foundry
     try {
@@ -700,6 +707,11 @@ cli
     if (contracts && contracts.length > 0) {
       deployArgs.push("--contract");
       deployArgs.push(...contracts);
+    }
+
+    // 添加区块确认数参数
+    if (options.confirmations !== undefined) {
+      deployArgs.push("--confirmations", String(options.confirmations));
     }
 
     // 执行部署脚本

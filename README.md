@@ -199,15 +199,19 @@ foundry deploy --network testnet --verify
 
 # 部署指定多个合约并验证
 foundry deploy --network testnet -c <合约名1> <合约名2> --verify --api-key YOUR_API_KEY
+
+# 指定区块确认数（默认: local=0, 其他网络=2）
+foundry deploy --network testnet --confirmations 3
 ```
 
-| 选项         | 简写 | 说明                                                                          |
-| ------------ | ---- | ----------------------------------------------------------------------------- |
-| `--network`  | `-n` | 网络名称：`local`、`testnet`、`mainnet`。不指定时从 `.env` 的 `WEB3_ENV` 读取 |
-| `--contract` | `-c` | 要部署的合约名，可写多个（空格分隔）。不指定则按脚本顺序部署全部              |
-| `--force`    | `-f` | 强制重新部署已存在的合约                                                      |
-| `--verify`   | -    | 部署完成后自动在区块浏览器上验证                                              |
-| `--api-key`  | -    | Etherscan/BSCScan 等 API Key。验证时也可用环境变量 `ETH_API_KEY`              |
+| 选项             | 简写 | 说明                                                                          |
+| ---------------- | ---- | ----------------------------------------------------------------------------- |
+| `--network`      | `-n` | 网络名称：`local`、`testnet`、`mainnet`。不指定时从 `.env` 的 `WEB3_ENV` 读取 |
+| `--contract`     | `-c` | 要部署的合约名，可写多个（空格分隔）。不指定则按脚本顺序部署全部              |
+| `--force`        | `-f` | 强制重新部署已存在的合约                                                      |
+| `--verify`       | -    | 部署完成后自动在区块浏览器上验证                                              |
+| `--api-key`      | -    | Etherscan/BSCScan 等 API Key。验证时也可用环境变量 `ETH_API_KEY`              |
+| `--confirmations`| -    | 等待的区块确认数（默认: local 网络为 0，其他网络为 2）                        |
 
 ---
 

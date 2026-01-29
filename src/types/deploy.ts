@@ -35,4 +35,6 @@ export interface DeployOptions {
   contractPath?: string;
   /** ABI 输出目录，默认为 "build/abi/{network}" */
   abiDir?: string;
+  /** 等待的区块确认数（默认为 2，local 网络默认为 0） */
+  confirmations?: number;
 }
