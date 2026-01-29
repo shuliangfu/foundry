@@ -249,7 +249,7 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
           logger.error(`❌ Error: ${script} does not export a deploy function`);
           continue;
         }
-        const progressBar = createLoadingProgressBar("正在部署中...");
+        const progressBar = createLoadingProgressBar("正在部署中...\n");
         // 在 for 循环之前启动进度条，这样在分割线之后立即显示
         const progressInterval = progressBar.start();
         try {
