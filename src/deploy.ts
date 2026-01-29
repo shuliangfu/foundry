@@ -300,8 +300,8 @@ function parseArgs(): {
   contracts?: string[];
   force?: boolean;
 } {
-  // 获取命令行参数（runtimeArgs 来自 runtime-adapter，兼容 Deno 和 Bun）
-  const args: string[] = Array.isArray(runtimeArgs) ? runtimeArgs : [];
+  // 获取命令行参数（runtimeArgs 来自 runtime-adapter，需要调用函数获取参数数组）
+  const args: string[] = typeof runtimeArgs === "function" ? runtimeArgs() : [];
   let network: string | undefined;
   const contracts: string[] = [];
   let force = false;

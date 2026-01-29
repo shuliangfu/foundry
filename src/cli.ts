@@ -569,7 +569,7 @@ cli
     }
 
     const contractsFromArgv = parseContractNamesFromArgv(
-      Array.isArray(runtimeArgs) ? runtimeArgs : [],
+      typeof runtimeArgs === "function" ? runtimeArgs() : [],
     );
     const contracts = contractsFromArgv.length > 0
       ? contractsFromArgv
@@ -887,7 +887,7 @@ cli
     }
 
     const contractsFromArgv = parseContractNamesFromArgv(
-      Array.isArray(runtimeArgs) ? runtimeArgs : [],
+      typeof runtimeArgs === "function" ? runtimeArgs() : [],
     );
     const contractNames = contractsFromArgv.length > 0
       ? contractsFromArgv
