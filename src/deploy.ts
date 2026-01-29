@@ -298,7 +298,6 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
     }
 
     logger.info("");
-    logger.info("✅ All Deployment Scripts Completed!");
   } catch (error) {
     throw error;
   }
