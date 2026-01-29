@@ -1258,11 +1258,13 @@ cli
   .action(async (_args, options) => {
     const includeBeta = options.beta === true;
 
+    logger.info("");
+
     try {
       // 获取当前版本
       const currentVersion = await getVersion();
       if (!currentVersion) {
-        logger.error("\n❌ 无法获取当前版本号 \n");
+        logger.error("❌ 无法获取当前版本号 \n");
         exit(1);
       }
 
@@ -1277,7 +1279,7 @@ cli
       progressBar.stop(progressInterval);
 
       if (!latestVersion) {
-        logger.error("\n❌ 无法获取最新版本号 \n");
+        logger.error("❌ 无法获取最新版本号 \n");
         exit(1);
       }
 
@@ -1285,7 +1287,7 @@ cli
       const comparison = compareVersions(latestVersion, currentVersion);
       if (comparison <= 0) {
         logger.info(
-          `\n✅ 当前已经是最新${includeBeta ? "（包括 beta）" : "正式"}版本，无需更新！\n`,
+          `✅ 当前已经是最新${includeBeta ? "（包括 beta）" : "正式"}版本，无需更新！\n`,
         );
         return;
       }
