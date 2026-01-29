@@ -725,10 +725,10 @@ cli
 
       // 处理执行结果（output 已通过 executeCommandWithStream 实时输出，不再重复打印）
       handleCommandResult(result, "✅ 所有部署脚本执行完成！", true);
+      logger.info("");
 
       // 如果启用了验证，自动验证所有部署的合约
       if (shouldVerify) {
-        logger.info("");
         logger.info("------------------------------------------");
         logger.info("🔍 开始验证合约...");
         logger.info("------------------------------------------");
@@ -739,6 +739,7 @@ cli
           logger.error("❌ 未指定 API Key");
           logger.error("   请使用 --api-key 参数提供 API Key，或在 .env 文件中设置 ETH_API_KEY");
           logger.error("   示例: foundry deploy --network testnet --verify --api-key YOUR_API_KEY");
+          logger.info("");
           exit(1);
         }
 
@@ -820,6 +821,7 @@ cli
 
         logger.info("");
         logger.info("✅ 所有合约验证完成！");
+        logger.info("");
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
