@@ -57,6 +57,7 @@ import { loadEnv } from "./utils/env.ts";
 import { parseJsrPackageFromUrl, parseJsrVersionFromUrl } from "./utils/jsr.ts";
 import { logger } from "./utils/logger.ts";
 import { loadWeb3ConfigSync } from "./utils/web3.ts";
+import { DEFAULT_NETWORK } from "./constants/index.ts";
 
 // 全局初始化环境变量
 loadEnv();
@@ -1149,6 +1150,90 @@ cli
       }
     } catch (error) {
       logger.error("❌ 卸载过程中发生错误:", error);
+      exit(1);
+    }
+  });
+
+// 运行脚本命令
+cli
+  .command("run", "执行 TypeScript 脚本")
+  .option({
+    name: "network",
+    alias: "n",
+    description:
+      "网络名称 (local, testnet, mainnet 等)。如果不指定，将从 .env 文件中的 WEB3_ENV 读取",
+    requiresValue: true,
+    type: "string",
+    required: false,
+    defaultValue: getEnv("WEB3_ENV") ?? DEFAULT_NETWORK,
+    validator: (value) => {
+      if (value !== "local" && value !== "testnet" && value !== "mainnet") {
+        return "网络名称必须是 local、testnet 或 mainnet";
+      }
+      return true;
+    },
+  })
+  .action(async (args, options) => {
+    // 获取脚本路径（第一个位置参数）
+    const scriptPath = args[0];
+
+    if (!scriptPath) {
+      logger.error("❌ 未指定脚本路径");
+      logger.error("   用法: foundry run <script.ts> [--network <network>]");
+      logger.error("   示例: foundry run scripts/test.ts --network local");
+      exit(1);
+    }
+
+    // 获取项目配置
+    const projectConfig = getProjectConfig();
+    if (!projectConfig) {
+      logger.error("❌ 未找到项目根目录（包含 deno.json 或 package.json 的目录）");
+      exit(1);
+    }
+    const { projectRoot, denoJsonPath } = projectConfig;
+
+    // 构建完整的脚本路径
+    const fullScriptPath = scriptPath.startsWith("/") ? scriptPath : join(projectRoot, scriptPath);
+
+    // 检查脚本是否存在
+    if (!existsSync(fullScriptPath)) {
+      logger.error(`❌ 脚本不存在: ${fullScriptPath}`);
+      exit(1);
+    }
+
+    // 获取网络名称（从命令行参数或环境变量）
+    const network = getNetworkName(options.network as string, false);
+
+    // 如果指定了网络，设置环境变量
+    setEnv("WEB3_ENV", network ?? getEnv("WEB3_ENV") ?? DEFAULT_NETWORK);
+    logger.info(`🌐 网络: ${network}`);
+
+    logger.info(`🚀 执行脚本: ${scriptPath}`);
+    logger.info("------------------------------------------");
+
+    // 构建命令行参数（传递剩余的位置参数给脚本）
+    const scriptArgs: string[] = args.slice(1);
+
+    // 执行脚本
+    try {
+      const result = await executeCommand(
+        fullScriptPath,
+        denoJsonPath,
+        projectRoot,
+        scriptArgs,
+      );
+
+      // 处理执行结果
+      if (!result.success) {
+        logger.error("❌ 脚本执行失败");
+        exit(1);
+      }
+
+      logger.info("------------------------------------------");
+      logger.info("✅ 脚本执行完成！");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error("❌ 脚本执行失败:", errorMessage);
       exit(1);
     }
   });

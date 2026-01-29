@@ -31,6 +31,7 @@ deno run -A jsr:@dreamer/foundry/setup
 foundry init [项目名]
 foundry deploy --network testnet
 foundry verify --network testnet -c <合约名> --api-key YOUR_API_KEY
+foundry run scripts/test.ts --network local
 ```
 
 > **为什么使用 Deno 安装？**
@@ -42,7 +43,7 @@ foundry verify --network testnet -c <合约名> --api-key YOUR_API_KEY
 > **智能运行时检测**：
 >
 > - 全局 CLI 本身使用 Deno 运行
-> - 但执行 `foundry deploy`/`verify` 时，会**自动检测项目类型**：
+> - 但执行 `foundry deploy`/`verify`/`run` 时，会**自动检测项目类型**：
 >   - 项目有 `deno.json` → 使用 `deno run` 执行脚本
 >   - 项目只有 `package.json` → 使用 `bun run` 执行脚本
 > - 这样 Bun 项目也能正常使用全局 CLI
@@ -235,6 +236,38 @@ foundry verify --network testnet -c <合约名> --rpc-url https://... --chain-id
 | `--api-key`  | -    | 否     | 区块浏览器 API Key。不传则用环境变量 `ETH_API_KEY`                              |
 | `--rpc-url`  | -    | 否     | RPC URL。不传则从 `config/web3.json` 读                                         |
 | `--chain-id` | -    | 否     | 链 ID。不传则从配置读                                                           |
+
+---
+
+#### `foundry run` — 执行脚本
+
+执行 TypeScript 脚本，自动传递网络环境变量。适用于执行测试脚本、交互脚本等。
+
+```bash
+# 执行脚本
+foundry run scripts/test.ts
+
+# 指定网络执行（自动设置 WEB3_ENV 环境变量）
+foundry run scripts/test.ts --network local
+foundry run scripts/test.ts -n testnet
+
+# 传递额外参数给脚本
+foundry run scripts/test.ts -n local arg1 arg2
+```
+
+| 选项        | 简写 | 必填   | 说明                                             |
+| ----------- | ---- | ------ | ------------------------------------------------ |
+| `<script>`  | -    | **是** | 脚本路径（相对于项目根目录或绝对路径）           |
+| `--network` | `-n` | 否     | 网络名称。不指定时从 `WEB3_ENV` 读取             |
+
+脚本中可以通过 `getEnv("WEB3_ENV")` 获取网络名称：
+
+```typescript
+import { getEnv } from "@dreamer/runtime-adapter";
+
+const network = getEnv("WEB3_ENV"); // 获取 CLI 传入的网络名称
+console.log(`当前网络: ${network}`);
+```
 
 ---
 
