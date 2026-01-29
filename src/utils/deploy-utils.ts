@@ -699,11 +699,16 @@ async function extractAddressFromOutput(
 
   // 等待区块确认（如果需要）
   if (confirmations > 0 && txHash) {
-    logger.info(`⏳ 等待 ${confirmations} 个区块确认...`);
+    const confirmProgressBar = createLoadingProgressBar(
+      `等待 ${confirmations} 个区块确认...`,
+    );
+    const confirmProgressInterval = confirmProgressBar.start();
     try {
       await waitForConfirmations(txHash, rpcUrl, confirmations);
+      confirmProgressBar.stop(confirmProgressInterval);
       logger.info(`✅ 已确认 ${confirmations} 个区块`);
     } catch {
+      confirmProgressBar.stop(confirmProgressInterval);
       logger.warn(`⚠️  等待区块确认超时，但合约可能已部署成功`);
     }
   }
