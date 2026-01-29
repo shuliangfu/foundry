@@ -315,6 +315,7 @@ foundry test -n local -f "deploy" -w
 | `--concurrency` | `-j` | 最大并发数（仅 Bun 支持，默认为 CPU 核心数） |
 
 **运行时自动检测**：
+
 - 项目有 `deno.json` → 使用 `deno test -A`
 - 项目只有 `package.json` → 使用 `bun test`
 
