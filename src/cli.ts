@@ -1262,7 +1262,7 @@ cli
       // 获取当前版本
       const currentVersion = await getVersion();
       if (!currentVersion) {
-        logger.error("❌ 无法获取当前版本号");
+        logger.error("\n❌ 无法获取当前版本号 \n");
         exit(1);
       }
 
@@ -1277,14 +1277,14 @@ cli
       progressBar.stop(progressInterval);
 
       if (!latestVersion) {
-        logger.error("❌ 无法获取最新版本号");
+        logger.error("\n❌ 无法获取最新版本号 \n");
         exit(1);
       }
 
       // 比较版本
       const comparison = compareVersions(latestVersion, currentVersion);
       if (comparison <= 0) {
-        logger.info(`✅ 当前已经是最新${includeBeta ? "（包括 beta）" : "正式"}版本，无需更新！`);
+        logger.info(`\n✅ 当前已经是最新${includeBeta ? "（包括 beta）" : "正式"}版本，无需更新！\n`);
         return;
       }
 
@@ -1323,6 +1323,7 @@ cli
 
         // 停止进度条
         installProgressBar.stop(installProgressInterval);
+        logger.info("");
 
         if (output.success) {
           // 安装成功后，更新版本缓存
@@ -1345,8 +1346,9 @@ cli
         installProgressBar.stop(installProgressInterval);
         throw error;
       }
+      logger.info("");
     } catch (error) {
-      logger.error("❌ 升级过程中发生错误:", error);
+      logger.error("\n❌ 升级过程中发生错误:", error, "\n");
       exit(1);
     }
   });
