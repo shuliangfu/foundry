@@ -19,6 +19,7 @@
     "exclude": [
       "tests/",
       "example/",
+      ".cursor/",
       "*.test.ts",
       "*.test.js"
     ]
