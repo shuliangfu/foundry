@@ -7,3 +7,4 @@ export * from "./jsr.ts";
 export * from "./abi.ts";
 export * from "./contract.ts";
 export * from "./cache.ts";
+export * from "./deploy.ts";

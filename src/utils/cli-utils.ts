@@ -4,10 +4,13 @@
  */
 
 import {
+  createCommand,
   cwd,
   dirname,
   existsSync,
+  exit,
   getEnv,
+  IS_BUN,
   join,
   platform,
   writeStdoutSync,
@@ -228,8 +231,48 @@ export async function executeCommandWithStream(
 }
 
 /**
- * 执行 Deno 子命令
+ * 检测项目应该使用的运行时
+ * 根据项目配置文件判断：
+ * - 有 deno.json → 使用 deno
+ * - 只有 package.json（无 deno.json）→ 使用 bun
+ * - 当前运行时是 Bun → 使用 bun
+ * @param projectRoot - 项目根目录
+ * @param denoJsonPath - deno.json 路径（可选）
+ * @returns "deno" | "bun"
+ */
+function detectProjectRuntime(projectRoot: string, denoJsonPath?: string): "deno" | "bun" {
+  // 如果提供了 denoJsonPath 且文件存在，使用 deno
+  if (denoJsonPath && existsSync(denoJsonPath)) {
+    return "deno";
+  }
+
+  // 检查项目根目录是否有 deno.json
+  const denoJson = join(projectRoot, "deno.json");
+  if (existsSync(denoJson)) {
+    return "deno";
+  }
+
+  // 检查是否有 package.json（Bun/Node 项目）
+  const packageJson = join(projectRoot, "package.json");
+  if (existsSync(packageJson)) {
+    // 有 package.json 但没有 deno.json，优先使用 bun
+    return "bun";
+  }
+
+  // 如果当前运行时是 Bun，使用 bun
+  if (IS_BUN) {
+    return "bun";
+  }
+
+  // 默认使用 deno
+  return "deno";
+}
+
+/**
+ * 执行 Deno/Bun 子命令
  * 实时输出日志，不等待命令完成
+ * 使用 @dreamer/runtime-adapter 的 createCommand 实现跨运行时兼容
+ * 根据项目类型自动选择运行时（deno.json → deno, package.json → bun）
  * @param scriptPath - 脚本路径
  * @param denoJsonPath - deno.json 路径
  * @param projectRoot - 项目根目录
@@ -242,16 +285,27 @@ export async function executeDenoCommand(
   projectRoot: string,
   args: string[],
 ): Promise<{ stdout: string; stderr: string; success: boolean }> {
-  const cmdArgs = [
-    "run",
-    "-A",
-    "--config",
-    denoJsonPath,
-    scriptPath,
-    ...args,
-  ];
+  // 根据项目类型检测应该使用的运行时
+  const runtime = detectProjectRuntime(projectRoot, denoJsonPath);
 
-  const cmd = new Deno.Command("deno", {
+  // 构建命令参数
+  const cmdArgs = runtime === "deno"
+    ? [
+      "run",
+      "-A",
+      "--config",
+      denoJsonPath,
+      scriptPath,
+      ...args,
+    ]
+    : [
+      "run",
+      scriptPath,
+      ...args,
+    ];
+
+  // 使用 @dreamer/runtime-adapter 的 createCommand，兼容 Deno 和 Bun
+  const cmd = createCommand(runtime, {
     args: cmdArgs,
     stdout: "piped",
     stderr: "piped",
@@ -401,7 +455,7 @@ export function handleCommandResult(
     if (!streamed && result.stderr) {
       logger.error(result.stderr);
     }
-    Deno.exit(1);
+    exit(1);
   }
 
   // 如果有成功消息，输出它
@@ -467,4 +521,31 @@ export function createLoadingProgressBar(message: string): {
       }
     },
   };
+}
+
+/**
+ * 进度条高阶函数，包装异步操作并自动管理进度条的启停
+ * @param message 显示的消息文本，例如 "正在部署中..."
+ * @param fn 要执行的异步函数
+ * @returns 异步函数的返回值
+ *
+ * @example
+ * ```typescript
+ * const result = await withProgressBar("正在部署中...", async () => {
+ *   // 执行部署逻辑
+ *   return deployResult;
+ * });
+ * ```
+ */
+export async function withProgressBar<T>(
+  message: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const progressBar = createLoadingProgressBar(message);
+  const progressInterval = progressBar.start();
+  try {
+    return await fn();
+  } finally {
+    progressBar.stop(progressInterval);
+  }
 }

@@ -1,5 +1,5 @@
 {
-  "version": "1.4.0",
+  "version": "1.4.1",
   "name": "@dreamer/foundry",
   "description": "Foundry deployment and verification utilities for Deno and Bun",
   "license": "MIT",
@@ -32,7 +32,8 @@
   },
   "test": {
     "exclude": [
-      "tests/data/**"
+      "tests/data/**",
+      "example/**"
     ]
   },
   "fmt": {

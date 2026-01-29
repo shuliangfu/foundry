@@ -28,16 +28,18 @@ import {
   existsSync,
   exit,
   getEnv,
+  IS_BUN,
   join,
   platform,
   readStdin,
   readTextFileSync,
   remove,
+  writeStdoutSync,
 } from "@dreamer/runtime-adapter";
-import { logger } from "./utils/logger.ts";
-import { parseJsrPackageFromUrl } from "./utils/jsr.ts";
-import { readCache, setInstalledVersion, writeCache } from "./utils/cache.ts";
 import type { JsrDenoJson, JsrMetaData } from "./types/index.ts";
+import { readCache, setInstalledVersion, writeCache } from "./utils/cache.ts";
+import { parseJsrPackageFromUrl } from "./utils/jsr.ts";
+import { logger } from "./utils/logger.ts";
 
 /**
  * 查找本地项目根目录（包含 deno.json 的目录）
@@ -311,11 +313,13 @@ async function install(): Promise<void> {
   ];
 
   try {
-    // 使用 deno install 命令安装到全局
+    // 使用 deno/bun install 命令安装到全局
     // 使用 --import-map 指定导入映射，这样全局安装后才能找到依赖
     // 使用 --force 标志允许覆盖现有安装
     // 使用 -A 或 --allow-all 授予所有权限，确保安装后的命令可以正常运行
-    const cmd = createCommand("deno", {
+    // 根据运行时环境选择正确的命令
+    const runtime = IS_BUN ? "bun" : "deno";
+    const cmd = createCommand(runtime, {
       args: args,
       stdout: "piped",
       stderr: "piped",
@@ -520,13 +524,12 @@ export async function findFoundryPath(): Promise<string | null> {
  */
 async function confirm(message: string): Promise<boolean> {
   logger.warn(message);
+  // 使用 writeStdoutSync 在同一行显示输入提示（不换行），兼容 Deno 和 Bun
   const prompt = "请输入 'yes' 或 'y' 确认，其他任何输入将取消操作：";
-  if (typeof Deno.stdout.write === "function") {
-    // Deno 环境
-    const encoder = new TextEncoder();
-    await Deno.stdout.write(encoder.encode(prompt));
-  } else {
-    // 其他环境，使用 logger.info
+  try {
+    writeStdoutSync(new TextEncoder().encode(prompt));
+  } catch {
+    // 如果写入失败，使用 logger.info
     logger.info(prompt);
   }
 

@@ -19,9 +19,11 @@
  */
 
 import {
+  args as runtimeArgs,
   createCommand,
   cwd,
   existsSync,
+  exit,
   join,
   readdirSync,
   readTextFileSync,
@@ -632,7 +634,8 @@ function parseArgs(): {
   chainId?: number;
   constructorArgs?: string[];
 } {
-  const args = Deno.args;
+  // 获取命令行参数（runtimeArgs 来自 runtime-adapter，兼容 Deno 和 Bun）
+  const args: string[] = Array.isArray(runtimeArgs) ? runtimeArgs : [];
   let network: string | undefined;
   const contracts: string[] = [];
   let address: string | undefined;
@@ -718,7 +721,7 @@ async function main() {
   if (!contractNames || contractNames.length === 0) {
     logger.error("❌ 未指定合约名称");
     logger.error("   请使用 --contract (-c) 参数指定合约名称，可指定多个，例如: -c MyToken Store");
-    Deno.exit(1);
+    exit(1);
   }
 
   // 获取 API Key（从命令行参数或环境变量）
@@ -726,7 +729,7 @@ async function main() {
   if (!finalApiKey) {
     logger.error("❌ 未指定 API Key");
     logger.error("   请使用 --api-key 参数或设置环境变量 ETH_API_KEY");
-    Deno.exit(1);
+    exit(1);
   }
 
   // 确定 RPC URL 和链 ID（多合约共用）
@@ -743,11 +746,11 @@ async function main() {
   }
   if (!finalRpcUrl) {
     logger.error("❌ 未指定 RPC URL，请使用 --rpc-url 参数或配置环境变量");
-    Deno.exit(1);
+    exit(1);
   }
   if (!finalChainId) {
     logger.error("❌ 未指定链 ID，请使用 --chain-id 参数或配置环境变量");
-    Deno.exit(1);
+    exit(1);
   }
 
   // 多合约时 --address 仅对第一个有效，其余从 build/abi 读取
@@ -765,7 +768,7 @@ async function main() {
         logger.error(
           `❌ 合约 ${contractName} 无法读取地址，请使用 --address 指定或确保已部署并存在 build/abi/${network}/${contractName}.json`,
         );
-        Deno.exit(1);
+        exit(1);
       }
     } else {
       try {
@@ -807,7 +810,7 @@ async function main() {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(`❌ 合约 ${actualContractName} 验证失败: ${errorMessage}`);
-      Deno.exit(1);
+      exit(1);
     }
   }
 }
@@ -816,6 +819,6 @@ async function main() {
 if (import.meta.main) {
   main().catch((error) => {
     logger.error("❌ 执行失败:", error);
-    Deno.exit(1);
+    exit(1);
   });
 }

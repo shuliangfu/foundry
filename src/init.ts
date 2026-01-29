@@ -19,6 +19,7 @@ import {
   remove,
   resolve,
   stat,
+  writeStdoutSync,
   writeTextFile,
 } from "@dreamer/runtime-adapter";
 import { parseJsrVersionFromUrl } from "./utils/jsr.ts";
@@ -1083,14 +1084,12 @@ async function isDirectoryEmpty(dirPath: string): Promise<boolean> {
  */
 async function confirm(message: string): Promise<boolean> {
   logger.warn(message);
-  // 使用 Deno.stdout.write 在同一行显示输入提示（不换行）
+  // 使用 writeStdoutSync 在同一行显示输入提示（不换行），兼容 Deno 和 Bun
   const prompt = "请输入 'yes' 或 'y' 确认，其他任何输入将取消操作：";
-  if (typeof Deno.stdout.write === "function") {
-    // Deno 环境
-    const encoder = new TextEncoder();
-    await Deno.stdout.write(encoder.encode(prompt));
-  } else {
-    // 其他环境，使用 logger.info
+  try {
+    writeStdoutSync(new TextEncoder().encode(prompt));
+  } catch {
+    // 如果写入失败，使用 logger.info
     logger.info(prompt);
   }
 

@@ -30,5 +30,11 @@ node_modules/
 # 测试相关
 tests/data/
 
-
 example/
+
+
+# bun
+.npmrc
+bun.lock
+package-lock.json
+package.json

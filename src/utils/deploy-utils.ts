@@ -36,46 +36,53 @@ import {
   GAS_BUMP_MULTIPLIERS,
 } from "../constants/index.ts";
 import { DeploymentError } from "../errors/index.ts";
-import type { AbiItem, ContractInfo } from "../types/index.ts";
+import type { AbiItem, ContractInfo, DeployOptions, NetworkConfig } from "../types/index.ts";
 import { createLoadingProgressBar } from "./cli-utils.ts";
 import { logger } from "./logger.ts";
 
 /**
- * 网络配置接口
+ * 重新导出类型，保持向后兼容
  */
-export interface NetworkConfig {
-  /** 账户地址 */
-  address: string;
-  /** RPC URL */
-  rpcUrl: string;
-  /** 部署者私钥 */
-  privateKey: string;
-  /** 链 ID（可选） */
-  chainId?: number;
+export type { ContractInfo, DeployOptions, NetworkConfig } from "../types/index.ts";
+
+/**
+ * 从 abiDir 路径中提取网络名称
+ * @param abiDir ABI 输出目录路径（如 "build/abi/testnet"）
+ * @returns 网络名称，未能解析时从环境变量或默认值获取
+ */
+export function extractNetworkFromAbiDir(abiDir?: string): string {
+  if (!abiDir) return getEnv("WEB3_ENV") ?? DEFAULT_NETWORK;
+  const parts = abiDir.split(/[/\\]/);
+  const networkIndex = parts.indexOf("abi");
+  if (networkIndex >= 0 && networkIndex < parts.length - 1) {
+    return parts[networkIndex + 1];
+  }
+  return parts[parts.length - 1] ?? getEnv("WEB3_ENV") ?? DEFAULT_NETWORK;
 }
 
 /**
- * 部署选项
+ * 过滤敏感信息（私钥、API Key 等）
+ * 用于在日志和错误消息中隐藏敏感数据，避免泄露
+ * @param text 原始文本
+ * @returns 过滤后的文本
  */
-export interface DeployOptions {
-  /** 是否验证合约 */
-  verify?: boolean;
-  /** Etherscan API Key（验证时需要） */
-  etherscanApiKey?: string;
-  /** 链 ID（验证时需要） */
-  chainId?: number;
-  /** 是否强制部署（覆盖已存在的合约） */
-  force?: boolean;
-  /** 自定义合约路径，如 "lib/pancake-swap-core/contracts/PancakeFactory.sol:PancakeFactory" */
-  contractPath?: string;
-  /** ABI 输出目录，默认为 "build/abi/{network}" */
-  abiDir?: string;
+export function filterSensitiveInfo(text: string): string {
+  // 过滤私钥（0x 开头的 64 位十六进制字符串）
+  let filtered = text.replace(/0x[a-fA-F0-9]{64}/g, "0x[PRIVATE_KEY_HIDDEN]");
+  // 过滤可能的 API Key（常见格式）
+  filtered = filtered.replace(/([A-Za-z0-9]{32,})/g, (match) => {
+    // 如果看起来像是 API Key（长度 >= 32 且全是字母数字），则隐藏
+    if (match.length >= 32 && /^[A-Za-z0-9]+$/.test(match)) {
+      return "[API_KEY_HIDDEN]";
+    }
+    return match;
+  });
+  // 过滤 --private-key 参数后的值
+  filtered = filtered.replace(/--private-key\s+\S+/g, "--private-key [HIDDEN]");
+  // 过滤 --etherscan-api-key 参数后的值
+  filtered = filtered.replace(/--etherscan-api-key\s+\S+/g, "--etherscan-api-key [HIDDEN]");
+  return filtered;
 }
-
-/**
- * 合约信息类型（重新导出，保持向后兼容）
- */
-export type { ContractInfo } from "../types/index.ts";
 
 /**
  * 清理 Foundry broadcast 目录中的交易记录
@@ -216,17 +223,7 @@ export async function forgeDeploy(
   constructorArgs: string[] | Record<string, unknown> = [],
   options: DeployOptions = {},
 ): Promise<string> {
-  // 从 abiDir 中提取网络名称，未提供或无法解析时使用环境变量 WEB3_ENV，否则用默认网络常量
-  function extractNetworkFromAbiDir(abiDir?: string): string {
-    if (!abiDir) return getEnv("WEB3_ENV") ?? DEFAULT_NETWORK;
-    const parts = abiDir.split(/[/\\]/);
-    const networkIndex = parts.indexOf("abi");
-    if (networkIndex >= 0 && networkIndex < parts.length - 1) {
-      return parts[networkIndex + 1];
-    }
-    return parts[parts.length - 1] ?? getEnv("WEB3_ENV") ?? DEFAULT_NETWORK;
-  }
-
+  // 从 abiDir 中提取网络名称
   const network = extractNetworkFromAbiDir(options.abiDir);
 
   // 检查合约是否已存在
@@ -397,18 +394,13 @@ export async function forgeDeploy(
     }
     // 如果是 "transaction already imported" 错误且 force 为 true，清理后重试
     if (isTransactionAlreadyImported && options.force) {
-      // 从 abiDir 中提取网络名称
-      const parts = options.abiDir?.split(/[/\\]/) || [];
-      const networkIndex = parts.indexOf("abi");
-      const network = (networkIndex >= 0 && networkIndex < parts.length - 1)
-        ? parts[networkIndex + 1]
-        : (parts[parts.length - 1] ?? getEnv("WEB3_ENV") ?? DEFAULT_NETWORK);
+      const retryNetwork = extractNetworkFromAbiDir(options.abiDir);
       const maxRetries = DEFAULT_RETRY_ATTEMPTS;
       let lastError: string | null = null;
 
       for (let retryCount = 1; retryCount <= maxRetries; retryCount++) {
         // 每次重试前都清理 broadcast 目录
-        await cleanBroadcastDir(network);
+        await cleanBroadcastDir(retryNetwork);
 
         // 等待一段时间，让 RPC 节点清除交易缓存（每次重试等待时间递增）
         const waitTime = DEFAULT_RETRY_DELAY * retryCount;
@@ -451,12 +443,13 @@ export async function forgeDeploy(
             retryStderrText.includes("error code -32003");
 
           if (!isStillTransactionError) {
-            // 如果不是交易已存在的错误，直接抛出错误
+            // 如果不是交易已存在的错误，直接抛出错误（过滤敏感信息）
+            const filteredStderr = filterSensitiveInfo(retryStderrText);
             logger.error("重试部署失败:");
-            logger.error(retryStderrText);
+            logger.error(filteredStderr);
             throw new DeploymentError(
-              `重试部署失败: ${retryStderrText}`,
-              { contractName, network, retryCount, rpcUrl: config.rpcUrl },
+              `重试部署失败: ${filteredStderr}`,
+              { contractName, network: retryNetwork, retryCount },
             );
           }
 
@@ -473,9 +466,10 @@ export async function forgeDeploy(
         }
       }
 
-      // 所有重试都失败了
+      // 所有重试都失败了（过滤敏感信息）
+      const filteredLastError = filterSensitiveInfo(lastError || stderrText);
       logger.error(`重试 ${maxRetries} 次后仍然失败，可能是 RPC 节点缓存了交易:`);
-      logger.error(lastError || stderrText);
+      logger.error(filteredLastError);
       logger.error("\n提示：");
       logger.error("  1. 如果使用的是本地 Anvil 节点，请重启节点以清除交易缓存");
       logger.error("  2. 或者等待更长时间后再次尝试部署");
@@ -484,10 +478,9 @@ export async function forgeDeploy(
         `重试 ${maxRetries} 次后仍然失败，可能是 RPC 节点缓存了交易`,
         {
           contractName,
-          network,
+          network: retryNetwork,
           maxRetries,
-          lastError: lastError || stderrText,
-          rpcUrl: config.rpcUrl,
+          lastError: filteredLastError,
         },
       );
     }
@@ -499,13 +492,8 @@ export async function forgeDeploy(
 
       // 尝试从已存在的合约信息中获取地址
       try {
-        // 从 abiDir 中提取网络名称
-        const parts = options.abiDir?.split(/[/\\]/) || [];
-        const networkIndex = parts.indexOf("abi");
-        const network = (networkIndex >= 0 && networkIndex < parts.length - 1)
-          ? parts[networkIndex + 1]
-          : (parts[parts.length - 1] ?? getEnv("WEB3_ENV") ?? DEFAULT_NETWORK);
-        const existingAddress = checkContractExists(contractName, network, options.abiDir);
+        const existingNetwork = extractNetworkFromAbiDir(options.abiDir);
+        const existingAddress = checkContractExists(contractName, existingNetwork, options.abiDir);
         if (existingAddress) {
           logger.info(`   当前合约地址: ${existingAddress}`);
           return existingAddress;
@@ -520,7 +508,7 @@ export async function forgeDeploy(
           }
 
           logger.warn(
-            `   无法获取已存在的合约地址，请检查 build/abi/${network}/${contractName}.json 文件。`,
+            `   无法获取已存在的合约地址，请检查 build/abi/${existingNetwork}/${contractName}.json 文件。`,
           );
           // 即使找不到地址，也不抛出错误，返回空字符串让调用者处理
           return "";
@@ -532,10 +520,11 @@ export async function forgeDeploy(
       }
     }
 
-    // 仅抛出错误，由上层统一打印（避免与流式输出重复）
+    // 仅抛出错误，由上层统一打印（过滤敏感信息）
+    const filteredStderr = filterSensitiveInfo(stderrText);
     throw new DeploymentError(
-      `部署失败: ${stderrText}`,
-      { contractName, network, rpcUrl: config.rpcUrl, stderrText },
+      `部署失败: ${filteredStderr}`,
+      { contractName, network },
     );
   }
 
@@ -608,25 +597,24 @@ async function extractAddressFromOutput(
   }
 
   if (!address) {
+    // 过滤敏感信息后再打印日志
+    const filteredStdout = filterSensitiveInfo(stdoutText);
+    const filteredStderr = filterSensitiveInfo(stderrText);
     logger.error("无法从部署输出中提取合约地址");
-    logger.error("输出:", stdoutText);
-    logger.error("错误:", stderrText);
+    logger.error("输出:", filteredStdout);
+    logger.error("错误:", filteredStderr);
     throw new DeploymentError(
       "无法提取合约地址",
-      { contractName, stdoutText, stderrText },
+      { contractName },
     );
   }
 
-  // 保存合约信息，从 abiDir 中提取网络名称，无法解析时从环境变量或默认网络常量取
-  const parts = options.abiDir?.split(/[/\\]/) || [];
-  const networkIndex = parts.indexOf("abi");
-  const network = (networkIndex >= 0 && networkIndex < parts.length - 1)
-    ? parts[networkIndex + 1]
-    : (parts[parts.length - 1] ?? getEnv("WEB3_ENV") ?? DEFAULT_NETWORK);
+  // 保存合约信息
+  const saveNetwork = extractNetworkFromAbiDir(options.abiDir);
   await saveContract(
     contractName,
     address,
-    network,
+    saveNetwork,
     constructorArgs,
     options.abiDir,
     options.force,

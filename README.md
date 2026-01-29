@@ -1,18 +1,17 @@
 # @dreamer/foundry
 
-> 一个 Foundry 智能合约部署和验证工具，基于 Deno 运行时，提供完整的项目初始化和自动化部署能力
+> 一个 Foundry 智能合约部署和验证工具，支持 Deno 和 Bun 运行时，提供完整的项目初始化和自动化部署能力
 
 [![JSR](https://jsr.io/badges/@dreamer/foundry)](https://jsr.io/@dreamer/foundry)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE.md)
-[![Tests](https://img.shields.io/badge/tests-104%20passed-brightgreen)](./TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-244%20passed-brightgreen)](./TEST_REPORT.md)
+[![Coverage](https://img.shields.io/badge/coverage-80--85%25-green)](./TEST_REPORT.md)
 
 ---
 
 ## 🎯 功能
 
-`@dreamer/foundry` 是一个专为 Foundry
-项目设计的现代化智能合约部署和验证工具库。它提供了完整的项目初始化、自动化部署、合约验证等功能，基于
-Deno 运行时，让智能合约开发更加高效便捷。
+`@dreamer/foundry` 是一个专为 Foundry 项目设计的现代化智能合约部署和验证工具库。它提供了完整的项目初始化、自动化部署、合约验证等功能，**同时支持 Deno 和 Bun 运行时**，让智能合约开发更加高效便捷。
 
 ---
 
@@ -23,7 +22,7 @@ Deno 运行时，让智能合约开发更加高效便捷。
 安装后可以在任何地方使用 `foundry` 命令：
 
 ```bash
-# 克隆或下载项目后，运行安装脚本
+# 使用 Deno 安装全局 CLI（推荐，一次性操作）
 deno run -A jsr:@dreamer/foundry/setup
 
 # 安装后使用
@@ -32,20 +31,61 @@ foundry deploy --network testnet
 foundry verify --network testnet -c <合约名> --api-key YOUR_API_KEY
 ```
 
+> **为什么使用 Deno 安装？**
+>
+> - Deno 支持直接运行 `jsr:` URL，无需预先安装
+> - Bun 不支持直接运行远程 URL，且 JSR 的 npm 兼容层不支持 `-g` 全局安装
+> - 如果你的系统没有 Deno，可以通过 `curl -fsSL https://deno.land/install.sh | sh` 快速安装
+>
+> **智能运行时检测**：
+>
+> - 全局 CLI 本身使用 Deno 运行
+> - 但执行 `foundry deploy`/`verify` 时，会**自动检测项目类型**：
+>   - 项目有 `deno.json` → 使用 `deno run` 执行脚本
+>   - 项目只有 `package.json` → 使用 `bun run` 执行脚本
+> - 这样 Bun 项目也能正常使用全局 CLI
+
 **卸载全局 CLI**：
 
 ```bash
 deno run -A jsr:@dreamer/foundry/setup --uninstall
+# 或使用已安装的 CLI
+foundry uninstall
+```
+
+### 作为项目依赖使用
+
+如果不需要全局 CLI，可以将包作为项目依赖使用：
+
+**Deno 项目**：
+
+```bash
+# 在 deno.json 中添加
+deno add jsr:@dreamer/foundry
+```
+
+**Bun 项目**：
+
+```bash
+# 使用 bunx jsr 添加依赖
+bunx jsr add @dreamer/foundry
+```
+
+然后在代码中导入使用：
+
+```typescript
+import { deploy, verify, Web3 } from "@dreamer/foundry";
 ```
 
 ---
 
 ## 🌍 环境兼容性
 
-| 环境       | 版本要求 | 状态                        |
-| ---------- | -------- | --------------------------- |
-| **Deno**   | 2.5.0+   | ✅ 完全支持                 |
-| **服务端** | -        | ✅ 支持（基于 Deno 运行时） |
+| 环境       | 版本要求 | 状态                                    |
+| ---------- | -------- | --------------------------------------- |
+| **Deno**   | 2.5.0+   | ✅ 完全支持                             |
+| **Bun**    | 1.0.0+   | ✅ 支持（通过 @dreamer/runtime-adapter） |
+| **服务端** | -        | ✅ 支持（Deno/Bun 运行时）              |
 
 ---
 
@@ -55,15 +95,22 @@ deno run -A jsr:@dreamer/foundry/setup --uninstall
   - 自动扫描并执行部署脚本
   - 在 Etherscan/BSCScan 上验证合约
   - 项目初始化功能（快速创建 Foundry 项目结构）
+  - 自动检测和安装 Foundry CLI
 - **工具函数**：
   - 日志工具（info, warn, error）
   - 环境变量加载和验证
   - 合约加载和管理
-  - Web3 客户端封装
-  - 时间同步控制
-- **Deno 原生支持**：
-  - 基于 Deno 运行时，充分利用 Deno 的特性
+  - Web3 客户端封装（读写合约、余额查询、事件监听等）
+  - 时间同步控制（Anvil 本地链时间推进）
+  - 地址验证和格式化（isAddress, toChecksumAddress, shortenAddress 等）
+  - 单位转换（toWei, fromWei）
+  - 哈希函数（keccak256, solidityKeccak256）
+  - 十六进制转换（hexToNumber, numberToHex, hexToBytes, bytesToHex）
+- **跨运行时支持**：
+  - 基于 @dreamer/runtime-adapter 实现 Deno/Bun 完全兼容
+  - 自动检测运行时环境，选择正确的命令执行方式
   - 统一的 API 接口，简洁高效
+  - 在 Deno 和 Bun 环境下行为一致
 - **项目初始化**：
   - 自动创建项目目录结构
   - 生成配置文件和模板
@@ -375,8 +422,15 @@ describe("MyToken 合约测试", () => {
 });
 ```
 
-执行方式：`WEB3_ENV=local deno test -A tests/01-mytoken.test.ts`，或配置好环境后直接
-`deno test -A tests/`。
+**执行方式**：
+
+```bash
+# Deno 环境
+WEB3_ENV=local deno test -A tests/01-mytoken.test.ts
+
+# Bun 环境
+WEB3_ENV=local bun test tests/01-mytoken.test.ts
+```
 
 更多测试相关的文档与用法，请查看 [@dreamer/test](https://jsr.io/@dreamer/test)。
 
@@ -485,6 +539,101 @@ await init("/path/to/project");
 - `privateKey?: string` - 私钥
 - `address?: string` - 地址
 - `account?: number` - 账户索引
+
+### utils/web3 — Web3 工具函数
+
+提供常用的 Web3 工具函数，从 `@dreamer/web3` 重新导出。
+
+**引入方式**：
+
+```typescript
+import {
+  // 地址验证
+  isAddress,
+  isPrivateKey,
+  isTxHash,
+  // 地址格式化
+  toChecksumAddress,
+  shortenAddress,
+  formatAddress,
+  // 十六进制转换
+  addHexPrefix,
+  stripHexPrefix,
+  hexToNumber,
+  numberToHex,
+  hexToBytes,
+  bytesToHex,
+  // 填充函数
+  padLeft,
+  padRight,
+  // 单位转换
+  toWei,
+  fromWei,
+  // 哈希函数
+  keccak256,
+  solidityKeccak256,
+  // 其他
+  computeContractAddress,
+  generateWallet,
+  getCode,
+  getFunctionSelector,
+  encodeFunctionCall,
+  checkAddressChecksum,
+} from "@dreamer/foundry/utils";
+```
+
+#### 地址验证函数
+
+```typescript
+// 验证以太坊地址格式
+isAddress("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"); // true
+isAddress("invalid"); // false
+
+// 验证私钥格式
+isPrivateKey("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"); // true
+
+// 验证交易哈希格式
+isTxHash("0x1234..."); // true/false
+```
+
+#### 地址格式化函数
+
+```typescript
+// 转换为校验和地址
+toChecksumAddress("0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266");
+// => "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+
+// 缩短地址显示
+shortenAddress("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266");
+// => "0xf39F...2266"
+
+// 格式化地址（小写 + 0x 前缀）
+formatAddress("F39FD6E51AAD88F6F4CE6AB8827279CFFFB92266");
+// => "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
+```
+
+#### 单位转换函数
+
+```typescript
+// 将 ether 转换为 wei
+toWei("1"); // => "1000000000000000000"
+toWei("0.5"); // => "500000000000000000"
+
+// 将 wei 转换为 ether
+fromWei("1000000000000000000"); // => "1"
+```
+
+#### 哈希函数
+
+```typescript
+// 计算 keccak256 哈希
+await keccak256("hello"); // => "0x1c8aff..."
+
+// Solidity 风格的 keccak256
+solidityKeccak256(["address", "uint256"], ["0x...", 100]);
+```
+
+---
 
 ### utils/time — 时间工具（Anvil 本地链）
 
@@ -610,46 +759,49 @@ await advanceTime(365); // 推进 1 年
 
 ## 📊 测试报告
 
-本库经过全面测试，所有 104 个测试用例均已通过，测试覆盖率达到约 50-60%。详细测试报告请查看
+本库经过全面测试，247 个测试用例中 244 个通过，测试覆盖率达到约 80-85%。详细测试报告请查看
 [TEST_REPORT.md](./TEST_REPORT.md)。
 
 **测试统计**：
 
-- **总测试数**: 104
-- **通过**: 104 ✅
+- **总测试数**: 247
+- **通过**: 244 ✅
 - **失败**: 0
-- **忽略**: 1（需要 RPC 节点）
-- **通过率**: 100% ✅
-- **测试执行时间**: ~6秒
+- **忽略**: 3（需要特殊环境）
+- **通过率**: 98.8% ✅
+- **测试执行时间**: ~17-23秒
 - **测试覆盖**: 所有公共 API、边界情况、错误处理、工具函数
-- **测试环境**: Deno 2.6.6+
+- **测试环境**: Deno 2.6.6+ / Anvil 本地节点
 
-**测试类型**：
+**测试模块**（17 个测试文件）：
 
-- ✅ 单元测试（97 个）
-- ✅ 集成测试（18 个）
-- ✅ 边界情况和错误处理测试（13 个）
-- ✅ 工具函数测试（76 个）
-
-**测试模块**：
-
-- ✅ 项目初始化功能（18 个测试）
-- ✅ 部署功能（6 个测试）
-- ✅ 错误类型系统（13 个测试）
-- ✅ 缓存功能（13 个测试）
-- ✅ JSR 工具函数（8 个测试）
-- ✅ 环境变量工具（6 个测试）
-- ✅ 配置管理器（11 个测试）
-- ✅ CLI 工具函数（11 个测试）
-- ✅ Web3 配置加载（10 个测试）
-- ✅ 部署工具函数（4 个测试）
+| 模块                 | 测试数 | 说明                     |
+| -------------------- | ------ | ------------------------ |
+| CLI 命令测试         | 27     | 命令行参数解析、命令识别 |
+| Web3 工具函数测试    | 32     | 地址验证、单位转换、哈希 |
+| CLI 工具函数测试     | 25     | 配置获取、路径解析       |
+| 验证功能测试         | 20     | 合约验证参数、网络配置   |
+| 项目初始化测试       | 18     | 目录创建、文件生成       |
+| 部署工具函数测试     | 18     | 合约加载、敏感信息过滤   |
+| Anvil 时间工具测试   | 16     | 时间同步、时间推进       |
+| 缓存功能测试         | 13     | 读写缓存、版本管理       |
+| 错误类型测试         | 13     | 错误类继承、上下文信息   |
+| Foundry 安装测试     | 12     | 路径查找、自动安装       |
+| 配置管理器测试       | 11     | 单例模式、配置加载       |
+| Web3 配置加载测试    | 10     | 配置文件、工厂函数       |
+| JSR 工具函数测试     | 8      | URL 解析、版本提取       |
+| 合约工具测试         | 7      | 合约加载、数据验证       |
+| 环境变量工具测试     | 6      | 加载验证、格式处理       |
+| 部署功能测试         | 6      | 部署器创建、工具函数     |
+| 工具函数测试         | 5      | Logger、合约加载         |
 
 **测试亮点**：
 
 - ✅ 所有功能、边界情况、错误处理都有完整的测试覆盖
 - ✅ 集成测试验证了端到端的完整流程
-- ✅ 基于 Deno 运行时，稳定可靠
+- ✅ 支持 Anvil 本地节点的 RPC 测试
 - ✅ 统一的错误处理系统（ConfigurationError, NetworkError 等）
+- ✅ 跨运行时兼容性测试（Deno/Bun）
 
 查看完整测试报告：[TEST_REPORT.md](./TEST_REPORT.md)
 
@@ -667,7 +819,10 @@ await advanceTime(365); // 推进 1 年
 - **部署脚本目录**：部署脚本位于 `deploy/` 目录（不再是 `script/`）
 - **错误处理**：项目使用统一的错误处理系统（`ConfigurationError`、`NetworkError`
   等），提供详细的错误信息和上下文
-- **Deno 原生**：基于 Deno 运行时，充分利用 Deno 的特性
+- **跨运行时兼容**：基于 @dreamer/runtime-adapter 实现 Deno/Bun 完全兼容，自动检测运行时环境
+- **Foundry 依赖**：CLI 命令会自动检测 Foundry 是否安装，未安装时会提示自动安装
+- **测试配置**：运行测试需要 `config/web3.json` 配置文件和 Anvil 本地节点
+- **Bun 使用**：在 Bun 项目中，CLI 会自动检测并使用 `bun` 执行脚本；全局 CLI 安装推荐使用 Deno（一次性操作），安装后可在任何项目中使用
 
 ## 📋 配置文件格式
 

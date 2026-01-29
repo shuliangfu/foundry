@@ -20,17 +20,26 @@
  */
 
 import type { Logger } from "@dreamer/logger";
-import { cwd, existsSync, join, readdir, setEnv } from "@dreamer/runtime-adapter";
+import {
+  args as runtimeArgs,
+  cwd,
+  existsSync,
+  exit,
+  join,
+  readdir,
+  setEnv,
+} from "@dreamer/runtime-adapter";
 import { DEFAULT_NETWORK } from "./constants/index.ts";
+import {
+  createLoadingProgressBar,
+  getNetworkName,
+  getProjectConfig,
+  loadNetworkConfig as loadNetworkConfigUtil,
+} from "./utils/cli-utils.ts";
 import type { ContractInfo, DeployOptions, NetworkConfig } from "./utils/deploy-utils.ts";
 import { forgeDeploy, loadContract } from "./utils/deploy-utils.ts";
 import { logger } from "./utils/logger.ts";
 import { createWeb3, type Web3, type Web3Options } from "./utils/web3.ts";
-import {
-  createLoadingProgressBar,
-  getNetworkName,
-  loadNetworkConfig as loadNetworkConfigUtil,
-} from "./utils/cli-utils.ts";
 
 /**
  * 部署器接口
@@ -225,8 +234,6 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
   );
 
   // 查找项目根目录（包含 deno.json 或 package.json 的目录）
-  // 使用 getProjectConfig 来获取项目根目录（虽然这里暂时不需要使用，但保留用于未来扩展）
-  const { getProjectConfig } = await import("./utils/cli-utils.ts");
   const projectConfig = getProjectConfig();
   if (!projectConfig) {
     throw new Error("未找到项目根目录（包含 deno.json 或 package.json 的目录）");
@@ -249,11 +256,13 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
           logger.error(`❌ Error: ${script} does not export a deploy function`);
           continue;
         }
-        const progressBar = createLoadingProgressBar("正在部署中...\n");
+
+        // 执行部署脚本（进度条继续显示）
+        const progressBar = createLoadingProgressBar("正在部署中...");
         // 在 for 循环之前启动进度条，这样在分割线之后立即显示
         const progressInterval = progressBar.start();
         try {
-          // 执行部署脚本（进度条继续显示）
+          // 部署合约
           await scriptModule.deploy(deployer);
           // 所有脚本执行完成后停止进度条
           progressBar.stop(progressInterval);
@@ -264,10 +273,9 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
 
         // 当前脚本完成后、下一个脚本开始前等待 3 秒，避免 RPC/链上状态未就绪
         if (i < scripts.length - 1) {
-          // 这里写一个 loading 进度条，等待 5 秒
           const loadingProgressBar = createLoadingProgressBar("等待 RPC/链上状态就绪...");
           const loadingProgressInterval = loadingProgressBar.start();
-          await new Promise((resolve) => setTimeout(resolve, 5000));
+          await new Promise((resolve) => setTimeout(resolve, 3000));
           loadingProgressBar.stop(loadingProgressInterval);
         }
       } catch (error) {
@@ -292,7 +300,8 @@ function parseArgs(): {
   contracts?: string[];
   force?: boolean;
 } {
-  const args = Deno.args;
+  // 获取命令行参数（runtimeArgs 来自 runtime-adapter，兼容 Deno 和 Bun）
+  const args: string[] = Array.isArray(runtimeArgs) ? runtimeArgs : [];
   let network: string | undefined;
   const contracts: string[] = [];
   let force = false;
@@ -310,7 +319,7 @@ function parseArgs(): {
       }
       if (contracts.length === 0) {
         logger.error("❌ Error: --contract (-c) requires at least one contract name");
-        Deno.exit(1);
+        exit(1);
       }
     } else if (arg === "--network" || arg === "-n") {
       if (i + 1 < args.length) {
@@ -318,7 +327,7 @@ function parseArgs(): {
         i++;
       } else {
         logger.error("❌ Error: --network (-n) requires a network name");
-        Deno.exit(1);
+        exit(1);
       }
     } else if (!arg.startsWith("-")) {
       // 位置参数作为网络名称（向后兼容）
@@ -349,7 +358,7 @@ async function main() {
     config = await loadNetworkConfigUtil();
   } catch (error) {
     logger.error("加载网络配置失败:", error);
-    Deno.exit(1);
+    exit(1);
   }
 
   // 执行部署
@@ -364,7 +373,7 @@ async function main() {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error("❌ 部署失败:", errorMessage);
-    Deno.exit(1);
+    exit(1);
   }
 }
 
@@ -372,6 +381,6 @@ async function main() {
 if (import.meta.main) {
   main().catch((error) => {
     logger.error("❌ 执行失败:", error);
-    Deno.exit(1);
+    exit(1);
   });
 }

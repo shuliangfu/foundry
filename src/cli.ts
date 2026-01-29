@@ -22,11 +22,14 @@
 
 import { Command } from "@dreamer/console";
 import {
+  args as runtimeArgs,
   createCommand,
   cwd,
   dirname,
   existsSync,
+  exit,
   getEnv,
+  IS_BUN,
   join,
   platform,
   readdir,
@@ -34,6 +37,7 @@ import {
   readTextFileSync,
   remove,
   setEnv,
+  writeStdoutSync,
 } from "@dreamer/runtime-adapter";
 import { init } from "./init.ts";
 import { ensureFoundryInstalled, findFoundryPath } from "./setup.ts";
@@ -54,6 +58,9 @@ import { parseJsrPackageFromUrl, parseJsrVersionFromUrl } from "./utils/jsr.ts";
 import { logger } from "./utils/logger.ts";
 import { loadWeb3ConfigSync } from "./utils/web3.ts";
 
+// 全局初始化环境变量
+loadEnv();
+
 /**
  * 提示用户确认
  * @param message 提示信息
@@ -61,14 +68,12 @@ import { loadWeb3ConfigSync } from "./utils/web3.ts";
  */
 async function confirm(message: string): Promise<boolean> {
   console.warn(message);
-  // 使用 process.stdout.write 在同一行显示输入提示（不换行）
+  // 使用 writeStdoutSync 在同一行显示输入提示（不换行），兼容 Deno 和 Bun
   const prompt = "请输入 'yes' 或 'y' 确认：";
-  if (typeof Deno.stdout.write === "function") {
-    // Deno 环境
-    const encoder = new TextEncoder();
-    await Deno.stdout.write(encoder.encode(prompt));
-  } else {
-    // 其他环境，使用 console.log
+  try {
+    writeStdoutSync(new TextEncoder().encode(prompt));
+  } catch {
+    // 如果写入失败，使用 console.log
     console.log(prompt);
   }
 
@@ -495,7 +500,7 @@ cli
       await init(projectRoot);
     } catch (error) {
       logger.error("❌ 初始化失败:", error);
-      Deno.exit(1);
+      exit(1);
     }
   });
 
@@ -541,7 +546,7 @@ cli
     try {
       await ensureFoundryInstalled();
     } catch {
-      Deno.exit(1);
+      exit(1);
     }
 
     // 获取网络名称（从命令行参数或环境变量）
@@ -551,7 +556,7 @@ cli
       logger.error("   请使用 --network 参数指定网络，或在 .env 文件中设置 WEB3_ENV");
       logger.error("   示例: foundry deploy --network testnet");
       logger.error("   或在 .env 文件中设置: WEB3_ENV=testnet");
-      Deno.exit(1);
+      exit(1);
     }
 
     const finalNetwork: string = network;
@@ -563,7 +568,9 @@ cli
       logger.info(`从 .env 文件读取网络配置: ${network}`);
     }
 
-    const contractsFromArgv = parseContractNamesFromArgv(Deno.args);
+    const contractsFromArgv = parseContractNamesFromArgv(
+      Array.isArray(runtimeArgs) ? runtimeArgs : [],
+    );
     const contracts = contractsFromArgv.length > 0
       ? contractsFromArgv
       : (options.contract != null
@@ -583,7 +590,7 @@ cli
 
       if (!confirmed) {
         logger.info("操作已取消。");
-        Deno.exit(0);
+        exit(0);
       }
     }
 
@@ -603,7 +610,7 @@ cli
       logger.info("");
     } catch (error) {
       logger.error("加载网络配置失败:", error);
-      Deno.exit(1);
+      exit(1);
     }
 
     // 扫描部署脚本
@@ -611,7 +618,7 @@ cli
     if (scripts.length === 0) {
       logger.error("❌ 未找到部署脚本");
       logger.error(`   请检查脚本目录: ${scriptDir}`);
-      Deno.exit(1);
+      exit(1);
     }
 
     // 如果指定了合约，过滤脚本
@@ -640,7 +647,7 @@ cli
             logger.error(`  - ${match[1]}`);
           }
         });
-        Deno.exit(1);
+        exit(1);
       }
 
       // 按原始脚本顺序排序
@@ -674,7 +681,7 @@ cli
     // 获取项目配置（项目根目录和 deno.json 路径）
     const projectConfig = getProjectConfig();
     if (!projectConfig) {
-      Deno.exit(1);
+      exit(1);
     }
     const { projectRoot, denoJsonPath } = projectConfig;
 
@@ -718,7 +725,7 @@ cli
           logger.error("❌ 未指定 API Key");
           logger.error("   请使用 --api-key 参数提供 API Key，或在 .env 文件中设置 ETH_API_KEY");
           logger.error("   示例: foundry deploy --network testnet --verify --api-key YOUR_API_KEY");
-          Deno.exit(1);
+          exit(1);
         }
 
         // 确定要验证的合约列表
@@ -803,7 +810,7 @@ cli
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error("❌ 部署失败:", errorMessage);
-      Deno.exit(1);
+      exit(1);
     }
   });
 
@@ -857,7 +864,7 @@ cli
     try {
       await ensureFoundryInstalled();
     } catch {
-      Deno.exit(1);
+      exit(1);
     }
 
     // 获取网络名称（从命令行参数或环境变量）
@@ -867,7 +874,7 @@ cli
       logger.error("   请使用 --network 参数指定网络，或在 .env 文件中设置 WEB3_ENV");
       logger.error("   示例: foundry verify --network testnet --contract MyToken");
       logger.error("   或在 .env 文件中设置: WEB3_ENV=testnet");
-      Deno.exit(1);
+      exit(1);
     }
 
     const finalNetwork: string = network;
@@ -879,7 +886,9 @@ cli
       logger.info(`从 .env 文件读取网络配置: ${network}`);
     }
 
-    const contractsFromArgv = parseContractNamesFromArgv(Deno.args);
+    const contractsFromArgv = parseContractNamesFromArgv(
+      Array.isArray(runtimeArgs) ? runtimeArgs : [],
+    );
     const contractNames = contractsFromArgv.length > 0
       ? contractsFromArgv
       : (Array.isArray(options.contract)
@@ -892,7 +901,7 @@ cli
       logger.error(
         "   请使用 --contract (-c) 参数指定合约名称，可指定多个，例如: -c MyToken Store",
       );
-      Deno.exit(1);
+      exit(1);
     }
     const address = options.address as string | undefined;
     const rpcUrl = options["rpc-url"] as string | undefined;
@@ -904,7 +913,7 @@ cli
       logger.error("❌ 未指定 API Key");
       logger.error("   请使用 --api-key 参数或设置环境变量 ETH_API_KEY");
       logger.error("   可以在 .env 文件中设置: ETH_API_KEY=your-api-key");
-      Deno.exit(1);
+      exit(1);
     }
 
     logger.info("------------------------------------------");
@@ -918,7 +927,7 @@ cli
     // 获取项目配置（项目根目录和 deno.json 路径）
     const projectConfig = getProjectConfig();
     if (!projectConfig) {
-      Deno.exit(1);
+      exit(1);
     }
     const { projectRoot, denoJsonPath } = projectConfig;
 
@@ -969,7 +978,7 @@ cli
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error("❌ 验证失败:", errorMessage);
-      Deno.exit(1);
+      exit(1);
     }
   });
 
@@ -995,7 +1004,7 @@ cli
       const currentVersion = await getVersion();
       if (!currentVersion) {
         logger.error("❌ 无法获取当前版本号");
-        Deno.exit(1);
+        exit(1);
       }
 
       // 检查更新时，总是从网络获取最新版本，不使用缓存
@@ -1010,7 +1019,7 @@ cli
 
       if (!latestVersion) {
         logger.error("❌ 无法获取最新版本号");
-        Deno.exit(1);
+        exit(1);
       }
 
       // 比较版本
@@ -1042,7 +1051,9 @@ cli
       const installProgressInterval = installProgressBar.start();
 
       try {
-        const cmd = createCommand("deno", {
+        // 根据运行时环境选择正确的命令
+        const runtime = IS_BUN ? "bun" : "deno";
+        const cmd = createCommand(runtime, {
           args: args,
           stdout: "piped",
           stderr: "piped",
@@ -1068,7 +1079,7 @@ cli
           if (stderrText) {
             logger.error(stderrText);
           }
-          Deno.exit(1);
+          exit(1);
         }
       } catch (error) {
         // 发生错误时停止进度条
@@ -1077,7 +1088,7 @@ cli
       }
     } catch (error) {
       logger.error("❌ 升级过程中发生错误:", error);
-      Deno.exit(1);
+      exit(1);
     }
   });
 
@@ -1134,11 +1145,11 @@ cli
         logger.info("");
         logger.info("请手动删除以下文件：");
         logger.info(`  ${foundryPath}`);
-        Deno.exit(1);
+        exit(1);
       }
     } catch (error) {
       logger.error("❌ 卸载过程中发生错误:", error);
-      Deno.exit(1);
+      exit(1);
     }
   });
 
