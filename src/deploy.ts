@@ -232,10 +232,6 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
     throw new Error("未找到项目根目录（包含 deno.json 或 package.json 的目录）");
   }
 
-  // 在 for 循环之前启动进度条，这样在分割线之后立即显示
-  const progressBar = createLoadingProgressBar("正在部署中...");
-  const progressInterval = progressBar.start();
-
   try {
     for (let i = 0; i < scripts.length; i++) {
       const script = scripts[i];
@@ -253,13 +249,19 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
           logger.error(`❌ Error: ${script} does not export a deploy function`);
           continue;
         }
+        const progressBar = createLoadingProgressBar("正在部署中...");
+        // 在 for 循环之前启动进度条，这样在分割线之后立即显示
+        const progressInterval = progressBar.start();
+        try {
+          // 执行部署脚本（进度条继续显示）
+          await scriptModule.deploy(deployer);
+          // 所有脚本执行完成后停止进度条
+          progressBar.stop(progressInterval);
+          logger.info(`✅ ${script} completed successfully \n`);
+        } finally {
+          progressBar.stop(progressInterval);
+        }
 
-        // 执行部署脚本（进度条继续显示）
-        await scriptModule.deploy(deployer);
-
-        // 所有脚本执行完成后停止进度条
-        progressBar.stop(progressInterval);
-        logger.info(`✅ ${script} completed successfully \n`);
         // 当前脚本完成后、下一个脚本开始前等待 3 秒，避免 RPC/链上状态未就绪
         if (i < scripts.length - 1) {
           // 这里写一个 loading 进度条，等待 5 秒
@@ -278,8 +280,6 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
     logger.info("");
     logger.info("✅ All Deployment Scripts Completed!");
   } catch (error) {
-    // 发生错误时停止进度条
-    progressBar.stop(progressInterval);
     throw error;
   }
 }
