@@ -598,7 +598,7 @@ cli
     if (force) {
       const confirmed = await confirm(
         "⚠️  警告：强制部署模式将重新部署所有合约，即使合约已存在。\n" +
-          "是否继续执行强制部署？",
+          "是否继续执行强制部署？\n",
       );
 
       if (!confirmed) {
