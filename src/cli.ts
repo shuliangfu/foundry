@@ -13,10 +13,10 @@
  * foundry deploy --network testnet
  *
  * # Deploy specific contract
- * foundry deploy --network testnet --contract MyToken
+ * foundry deploy --network testnet --contract Contract1
  *
  * # Verify contract
- * foundry verify --network testnet --contract MyToken --api-key YOUR_API_KEY
+ * foundry verify --network testnet --contract Contract1 --api-key YOUR_API_KEY
  * ```
  */
 
@@ -398,7 +398,7 @@ function loadNetworkConfig(_network: string): NetworkConfig {
 
 /**
  * 从 argv 中解析 -c/--contract 后的多个合约名称（直到下一个以 - 开头的参数）
- * 用于 deploy 和 verify 命令支持 -c store uniswap main 这种写法
+ * 用于 deploy 和 verify 命令支持 -c contract1 contract2 contract3 这种写法
  */
 function parseContractNamesFromArgv(argv: string[]): string[] {
   const names: string[] = [];
@@ -761,7 +761,7 @@ cli
   .option({
     name: "contract",
     alias: "c",
-    description: "合约名称（可多个，例如: -c store uniswap main）",
+    description: "合约名称（可多个，例如: -c Contract1 Contract2）",
     requiresValue: true,
     type: "array",
     required: true,
@@ -800,7 +800,7 @@ cli
     if (!network) {
       logger.error("❌ 未指定网络");
       logger.error("   请使用 --network 参数指定网络，或在 .env 文件中设置 WEB3_ENV");
-      logger.error("   示例: foundry verify --network testnet --contract MyToken");
+      logger.error("   示例: foundry verify --network testnet --contract Contract1");
       logger.error("   或在 .env 文件中设置: WEB3_ENV=testnet");
       exit(1);
     }
@@ -827,7 +827,7 @@ cli
     if (contractNames.length === 0) {
       logger.error("❌ 未指定合约名称");
       logger.error(
-        "   请使用 --contract (-c) 参数指定合约名称，可指定多个，例如: -c MyToken Store",
+        "   请使用 --contract (-c) 参数指定合约名称，可指定多个，例如: -c Contract1 Contract2",
       );
       exit(1);
     }
