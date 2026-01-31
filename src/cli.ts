@@ -42,7 +42,7 @@ import {
 } from "@dreamer/runtime-adapter";
 import { DEFAULT_NETWORK } from "./constants/index.ts";
 import { init } from "./init.ts";
-import { ensureFoundryInstalled, findFoundryPath } from "./setup.ts";
+import { findFoundryPath } from "./setup.ts";
 import type { JsrDenoJson, JsrMetaData } from "./types/index.ts";
 import { getInstalledVersion, readCache, setInstalledVersion, writeCache } from "./utils/cache.ts";
 import {
@@ -551,13 +551,6 @@ cli
     // 全局初始化环境变量
     loadEnv();
 
-    // 部署依赖 forge，执行前检测并在未安装时自动安装 Foundry
-    try {
-      await ensureFoundryInstalled();
-    } catch {
-      exit(1);
-    }
-
     // 获取网络名称（从命令行参数或环境变量）
     const network = getNetworkName(options.network as string | undefined, false);
     if (!network) {
@@ -801,13 +794,6 @@ cli
   .action(async (_args, options) => {
     // 全局初始化环境变量
     loadEnv();
-
-    // verify 依赖 forge/cast，执行前检测并在未安装时自动安装 Foundry
-    try {
-      await ensureFoundryInstalled();
-    } catch {
-      exit(1);
-    }
 
     // 获取网络名称（从命令行参数或环境变量）
     const network = getNetworkName(options.network as string | undefined, false);

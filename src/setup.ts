@@ -356,6 +356,19 @@ async function install(): Promise<void> {
         logger.info("");
       }
 
+      // 检查并安装官方 Foundry 工具链（forge/cast/anvil）
+      logger.info("🔧 检查官方 Foundry 工具链...");
+      try {
+        await ensureFoundryInstalled();
+        logger.info("✅ 官方 Foundry 工具链已就绪");
+        logger.info("");
+      } catch {
+        logger.warn("⚠️  官方 Foundry 安装失败，请手动安装：");
+        logger.warn("   curl -L https://foundry.paradigm.xyz | bash");
+        logger.warn("   然后运行 foundryup");
+        logger.info("");
+      }
+
       logger.info("现在可以在任何地方使用以下命令：");
       logger.info("");
       logger.info("  📦 项目初始化:");
