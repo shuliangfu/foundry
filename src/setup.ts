@@ -15,8 +15,13 @@
  * bun run src/setup.ts
  *
  * # Use after installation
- * foundry deploy --network testnet
- * foundry verify --network testnet --contract MyToken
+ * foundry init myproject              # Create new project
+ * foundry build                       # Compile contracts
+ * foundry deploy -n testnet           # Deploy contracts
+ * foundry deploy -n testnet --verify  # Deploy and verify
+ * foundry verify -n testnet -c Token  # Verify contract
+ * foundry run scripts/mint.ts         # Run script
+ * foundry test -n local               # Run tests
  * ```
  */
 
@@ -352,21 +357,42 @@ async function install(): Promise<void> {
       }
 
       logger.info("现在可以在任何地方使用以下命令：");
-      logger.info("  foundry init [项目名]");
-      logger.info("  foundry deploy --network <网络>");
-      logger.info("  foundry verify --network <网络> --contract <合约名>");
-      logger.info("  foundry run <脚本路径> [--network <网络>]");
-      logger.info("  foundry test [--network <网络>] [--filter <过滤>]");
-      logger.info("  foundry upgrade [--beta]");
       logger.info("");
-      logger.info("查看帮助：");
-      logger.info("  foundry --help");
-      logger.info("  foundry init --help");
-      logger.info("  foundry deploy --help");
-      logger.info("  foundry verify --help");
-      logger.info("  foundry run --help");
-      logger.info("  foundry test --help");
-      logger.info("  foundry upgrade --help");
+      logger.info("  📦 项目初始化:");
+      logger.info("    foundry init [项目名]              创建新的 Foundry + Deno/Bun 项目");
+      logger.info("");
+      logger.info("  🔨 编译合约:");
+      logger.info("    foundry build                      编译 Solidity 合约");
+      logger.info("    foundry build -s                   编译并显示合约大小");
+      logger.info("    foundry build -f                   强制重新编译");
+      logger.info("");
+      logger.info("  🚀 部署合约:");
+      logger.info("    foundry deploy -n <网络>           部署合约到指定网络");
+      logger.info("    foundry deploy -n <网络> -f        强制重新部署");
+      logger.info("    foundry deploy -n <网络> -c <合约> 部署指定合约");
+      logger.info("    foundry deploy -n <网络> --verify  部署后自动验证");
+      logger.info("");
+      logger.info("  ✅ 验证合约:");
+      logger.info("    foundry verify -n <网络> -c <合约> 验证指定合约");
+      logger.info("    foundry verify -n <网络>           验证所有已部署合约");
+      logger.info("");
+      logger.info("  📜 执行脚本:");
+      logger.info("    foundry run <脚本>                 执行 TypeScript 脚本");
+      logger.info("    foundry run <脚本> -n <网络>       指定网络执行脚本");
+      logger.info("");
+      logger.info("  🧪 运行测试:");
+      logger.info("    foundry test                       运行所有测试");
+      logger.info("    foundry test -n <网络>             指定网络运行测试");
+      logger.info("    foundry test -f <过滤>             过滤测试名称");
+      logger.info("    foundry test -w                    监听文件变化");
+      logger.info("");
+      logger.info("  ⬆️  升级 CLI:");
+      logger.info("    foundry upgrade                    升级到最新正式版");
+      logger.info("    foundry upgrade --beta             升级到最新 beta 版");
+      logger.info("");
+      logger.info("查看详细帮助：");
+      logger.info("  foundry --help                       查看所有命令");
+      logger.info("  foundry <命令> --help                查看命令详细参数");
       logger.info("");
 
       if (stdoutText) {
@@ -645,8 +671,13 @@ Foundry CLI 全局安装脚本
   deno run -A setup.ts --uninstall
 
 安装后使用:
-  foundry deploy --network testnet
-  foundry verify --network testnet --contract MyToken
+  foundry init myproject              # 创建新项目
+  foundry build                       # 编译合约
+  foundry deploy -n testnet           # 部署合约
+  foundry deploy -n testnet --verify  # 部署并验证
+  foundry verify -n testnet -c Token  # 验证合约
+  foundry run scripts/mint.ts -n local # 执行脚本
+  foundry test -n local               # 运行测试
 `);
   } else {
     await install();

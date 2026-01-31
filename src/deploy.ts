@@ -74,6 +74,10 @@ export interface DeployScriptOptions {
   contracts?: string[];
   /** 等待的区块确认数（默认: local 网络为 0，其他网络为 2） */
   confirmations?: number;
+  /** 是否在部署后立即验证合约 */
+  verify?: boolean;
+  /** 验证使用的 API Key */
+  apiKey?: string;
 }
 
 /**
@@ -283,6 +287,54 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
           progressBar.stop(progressInterval);
         }
 
+        // 如果启用了验证，在部署成功后立即验证该合约
+        if (options.verify && options.apiKey) {
+          // 从脚本名称提取合约名称（如 "2-hash.ts" -> "hash"）
+          const match = script.match(/^\d+-(.+)\.ts$/);
+          const contractName = match ? match[1] : script.replace(/\.ts$/, "");
+
+          // 首字母大写（如 "hash" -> "Hash"）
+          const capitalizedName = contractName.charAt(0).toUpperCase() + contractName.slice(1);
+
+          logger.info(`🔍 验证合约: ${capitalizedName}`);
+
+          try {
+            // 导入验证函数和工具
+            const { verify, findContractFileName } = await import("./verify.ts");
+
+            // 查找实际的合约文件名（大小写不敏感）
+            const actualFileName = findContractFileName(capitalizedName, options.network);
+            const actualContractName = actualFileName
+              ? actualFileName.replace(/\.json$/, "")
+              : capitalizedName;
+
+            // 读取已部署的合约信息
+            const contractInfo = loadContract(actualContractName, options.network);
+
+            if (contractInfo && contractInfo.address) {
+              // 调用验证函数
+              await verify({
+                address: contractInfo.address,
+                contractName: actualContractName,
+                network: options.network,
+                apiKey: options.apiKey,
+                rpcUrl: options.config.rpcUrl,
+                constructorArgs: contractInfo.args ? contractInfo.args.map(String) : undefined,
+                chainId: options.config.chainId,
+              });
+              logger.info(`✅ ${actualContractName} 验证成功`);
+            } else {
+              logger.warn(`⚠️  合约 ${capitalizedName} 未找到部署信息，跳过验证`);
+            }
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            logger.error(`❌ ${capitalizedName} 验证失败: ${errorMessage}`);
+            // 验证失败不中断部署流程
+          }
+        }
+
+        logger.info("");
+
         // 当前脚本完成后、下一个脚本开始前等待 3 秒，避免 RPC/链上状态未就绪
         if (i < scripts.length - 1) {
           const loadingProgressBar = createLoadingProgressBar("等待 RPC/链上状态就绪...");
@@ -309,6 +361,8 @@ function parseArgs(): {
   contracts?: string[];
   force?: boolean;
   confirmations?: number;
+  verify?: boolean;
+  apiKey?: string;
 } {
   // 获取命令行参数（runtimeArgs 来自 runtime-adapter，需要调用函数获取参数数组）
   const args: string[] = typeof runtimeArgs === "function" ? runtimeArgs() : [];
@@ -316,12 +370,24 @@ function parseArgs(): {
   const contracts: string[] = [];
   let force = false;
   let confirmations: number | undefined;
+  let verify = false;
+  let apiKey: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
 
     if (arg === "--force" || arg === "-f") {
       force = true;
+    } else if (arg === "--verify" || arg === "-v") {
+      verify = true;
+    } else if (arg === "--api-key") {
+      if (i + 1 < args.length) {
+        apiKey = args[i + 1];
+        i++;
+      } else {
+        logger.error("❌ Error: --api-key requires an API key");
+        exit(1);
+      }
     } else if (arg === "--contract" || arg === "-c") {
       // 收集所有后续的非选项参数作为合约名称
       while (i + 1 < args.length && !args[i + 1].startsWith("-")) {
@@ -356,7 +422,14 @@ function parseArgs(): {
     }
   }
 
-  return { network, contracts: contracts.length > 0 ? contracts : undefined, force, confirmations };
+  return {
+    network,
+    contracts: contracts.length > 0 ? contracts : undefined,
+    force,
+    confirmations,
+    verify,
+    apiKey,
+  };
 }
 
 /**
@@ -364,7 +437,7 @@ function parseArgs(): {
  */
 async function main() {
   // 解析命令行参数
-  const { network: networkArg, contracts, force, confirmations } = parseArgs();
+  const { network: networkArg, contracts, force, confirmations, verify, apiKey } = parseArgs();
 
   // 确定网络：优先使用命令行参数，其次使用环境变量（getNetworkName 内部已读 WEB3_ENV），否则使用默认网络常量
   const network = getNetworkName(networkArg, false) ?? DEFAULT_NETWORK;
@@ -389,6 +462,8 @@ async function main() {
       force,
       contracts,
       confirmations,
+      verify,
+      apiKey,
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

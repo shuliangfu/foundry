@@ -714,6 +714,21 @@ cli
       deployArgs.push("--confirmations", String(options.confirmations));
     }
 
+    // 如果启用了验证，传递 --verify 和 --api-key 参数给 deploy 脚本
+    // 这样可以在部署每个合约后立即验证，而不是等所有合约部署完再验证
+    const finalApiKey = shouldVerify ? getApiKey(apiKey) : null;
+    if (shouldVerify) {
+      if (!finalApiKey) {
+        logger.error("❌ 未指定 API Key");
+        logger.error("   请使用 --api-key 参数提供 API Key，或在 .env 文件中设置 ETH_API_KEY");
+        logger.error("   示例: foundry deploy --network testnet --verify --api-key YOUR_API_KEY");
+        logger.info("");
+        exit(1);
+      }
+      deployArgs.push("--verify");
+      deployArgs.push("--api-key", finalApiKey);
+    }
+
     // 执行部署脚本
     try {
       const result = await executeCommand(
@@ -727,102 +742,8 @@ cli
       handleCommandResult(result, "✅ 所有部署脚本执行完成！", true);
       logger.info("");
 
-      // 如果启用了验证，自动验证所有部署的合约
-      if (shouldVerify) {
-        logger.info("------------------------------------------");
-        logger.info("🔍 开始验证合约...");
-        logger.info("------------------------------------------");
-
-        // 获取 API Key（从命令行参数或环境变量）
-        const finalApiKey = getApiKey(apiKey);
-        if (!finalApiKey) {
-          logger.error("❌ 未指定 API Key");
-          logger.error("   请使用 --api-key 参数提供 API Key，或在 .env 文件中设置 ETH_API_KEY");
-          logger.error("   示例: foundry deploy --network testnet --verify --api-key YOUR_API_KEY");
-          logger.info("");
-          exit(1);
-        }
-
-        // 确定要验证的合约列表
-        const contractsToVerify: string[] = [];
-        if (contracts && contracts.length > 0) {
-          // 如果指定了合约，验证这些合约
-          for (const contract of contracts) {
-            const targetScript = findContractScript(contract, scripts);
-            if (targetScript) {
-              const match = targetScript.match(/^\d+-(.+)\.ts$/);
-              if (match) {
-                contractsToVerify.push(match[1]);
-              }
-            }
-          }
-        } else {
-          // 如果没有指定合约，验证所有部署脚本对应的合约
-          for (const script of scripts) {
-            const match = script.match(/^\d+-(.+)\.ts$/);
-            if (match) {
-              contractsToVerify.push(match[1]);
-            }
-          }
-        }
-
-        // 导入 loadContract 函数
-        const { loadContract } = await import("./utils/deploy-utils.ts");
-
-        // 验证每个合约
-        for (let i = 0; i < contractsToVerify.length; i++) {
-          const contractName = contractsToVerify[i];
-          logger.info(`[${i + 1}/${contractsToVerify.length}] 验证合约: ${contractName}`);
-
-          try {
-            // 导入 findContractFileName 函数（从 verify.ts 导出）
-            const { findContractFileName } = await import("./verify.ts");
-
-            // 查找实际的合约文件名（大小写不敏感）
-            const actualFileName = findContractFileName(contractName, finalNetwork);
-            const actualContractName = actualFileName
-              ? actualFileName.replace(/\.json$/, "")
-              : contractName;
-
-            // 如果实际文件名与输入不同，提示用户
-            if (actualFileName && actualFileName !== `${contractName}.json`) {
-              logger.info(`ℹ️  合约名称已自动匹配为: ${actualContractName}`);
-            }
-
-            // 读取已部署的合约信息（使用实际的合约名称）
-            const contractInfo = loadContract(actualContractName, finalNetwork);
-
-            if (!contractInfo || !contractInfo.address) {
-              logger.warn(`⚠️  合约 ${actualContractName} 未找到部署信息，跳过验证`);
-              continue;
-            }
-
-            // 导入验证函数
-            const { verify } = await import("./verify.ts");
-
-            // 调用验证函数（使用实际的合约名称）
-            await verify({
-              address: contractInfo.address,
-              contractName: actualContractName, // 使用实际的合约名称（保持原始大小写）
-              network: finalNetwork,
-              apiKey: finalApiKey,
-              rpcUrl: config.rpcUrl,
-              constructorArgs: contractInfo.args ? contractInfo.args.map(String) : undefined,
-              chainId: config.chainId,
-            });
-
-            logger.info(`✅ ${actualContractName} 验证成功`);
-          } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            logger.error(`❌ ${contractName} 验证失败: ${errorMessage}`);
-            // 验证失败不中断流程，继续验证其他合约
-          }
-        }
-
-        logger.info("");
-        logger.info("✅ 所有合约验证完成！");
-        logger.info("");
-      }
+      // 注意：如果启用了 --verify，验证已经在 deploy 脚本中逐个完成
+      // 每个合约部署成功后立即验证，无需在此统一验证
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error("❌ 部署失败:", errorMessage);
