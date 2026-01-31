@@ -592,13 +592,13 @@ cli
 
     logger.info("🚀 开始部署");
     logger.info("网络:", finalNetwork);
-    logger.info("");
 
     // 如果使用强制部署，需要用户确认
     if (force) {
+      logger.info("");
       const confirmed = await confirm(
         "⚠️  警告：强制部署模式将重新部署所有合约，即使合约已存在。\n" +
-          "是否继续执行强制部署？\n",
+          "是否继续执行强制部署？",
       );
 
       if (!confirmed) {
@@ -606,6 +606,8 @@ cli
         exit(0);
       }
     }
+
+    logger.info("");
 
     // 加载网络配置
     let config: NetworkConfig;
