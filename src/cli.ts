@@ -482,7 +482,7 @@ function findContractScript(contractName: string, scripts: string[]): string | n
 }
 
 // 创建主命令
-const cli = new Command("foundry", "Foundry 部署和验证工具");
+const cli = new Command("foundry", "Foundry 智能合约开发工具");
 
 // 初始化命令
 cli
