@@ -1099,6 +1099,78 @@ cli
     }
   });
 
+// 构建命令
+cli
+  .command("build", "编译 Solidity 合约（执行 forge build）")
+  .option({
+    name: "sizes",
+    alias: "s",
+    description: "显示合约大小",
+    type: "boolean",
+  })
+  .option({
+    name: "force",
+    alias: "f",
+    description: "强制重新编译所有合约",
+    type: "boolean",
+  })
+  .option({
+    name: "optimizer-runs",
+    description: "优化器运行次数（默认 200）",
+    requiresValue: true,
+    type: "number",
+  })
+  .action(async (_args, options) => {
+    logger.info("🔨 编译 Solidity 合约");
+    logger.info("------------------------------------------");
+
+    // 构建 forge build 参数
+    const forgeArgs: string[] = ["build"];
+
+    // 显示合约大小
+    if (options.sizes as boolean) {
+      forgeArgs.push("--sizes");
+    }
+
+    // 强制重新编译
+    if (options.force as boolean) {
+      forgeArgs.push("--force");
+    }
+
+    // 优化器运行次数
+    const optimizerRuns = options["optimizer-runs"] as number | undefined;
+    if (optimizerRuns) {
+      forgeArgs.push("--optimizer-runs", String(optimizerRuns));
+    }
+
+    // 使用 createCommand 执行 forge build
+    try {
+      const cmd = createCommand("forge", {
+        args: forgeArgs,
+        stdin: "inherit",
+        stdout: "inherit",
+        stderr: "inherit",
+      });
+
+      const child = cmd.spawn();
+      const status = await child.status;
+
+      if (!status.success) {
+        logger.error("❌ 编译失败");
+        exit(status.code ?? 1);
+      }
+
+      logger.info("");
+      logger.info("------------------------------------------");
+      logger.info("✅ 编译完成！");
+      logger.info("");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error("❌ 编译失败:", errorMessage);
+      exit(1);
+    }
+  });
+
 // 测试命令
 cli
   .command("test", "运行测试（兼容 deno test 和 bun test）")
@@ -1147,7 +1219,7 @@ cli
   .action(async (args, options) => {
     // 全局初始化环境变量
     loadEnv();
-    
+
     // 获取项目配置
     const projectConfig = getProjectConfig();
     if (!projectConfig) {
