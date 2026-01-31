@@ -41,10 +41,9 @@ broadcast = "broadcast"
 # libs = ["lib"]
 
 # 编译器配置
-# 注意：Uniswap V2 使用 Solidity 0.5.16 和 0.6.6，项目使用 0.8.18
 # 启用自动检测 Solidity 版本，Foundry 会自动下载并使用对应的编译器版本
 auto_detect_solc = true  # 自动检测并下载需要的 Solidity 版本
-solc_version = "0.8.18"  # 默认版本（用于项目自己的合约，如果 auto_detect_solc 为 false）
+solc_version = "0.8.20"  # 默认版本（用于项目自己的合约，如果 auto_detect_solc 为 false）
 evm_version = "shanghai"  # EVM 版本：london, berlin, shanghai, cancun 等
 optimizer = true          # 启用优化器
 optimizer_runs = 200      # 优化器运行次数（影响代码大小 vs gas 成本）
@@ -419,7 +418,7 @@ function getDenoJsonTemplate(version: string): string {
  */
 const VSCODE_SETTINGS = `{
   "solidity.defaultCompiler": "remote",
-  "solidity.compileUsingRemoteVersion": "v0.8.18+commit.87f61d96",
+  "solidity.compileUsingRemoteVersion": "v0.8.20",
   "solidity.packageDefaultDependenciesContractsDirectory": "src",
   "solidity.packageDefaultDependenciesDirectory": "lib",
   "solidity.remappings": [
@@ -517,7 +516,7 @@ const CONFIG_WEB3_JSON = `{
  * 示例合约 MyToken.sol
  */
 const EXAMPLE_CONTRACT_SOL = `// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.20;
 
 /**
  * @title MyToken
