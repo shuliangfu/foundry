@@ -60,9 +60,6 @@ import { parseJsrPackageFromUrl, parseJsrVersionFromUrl } from "./utils/jsr.ts";
 import { logger } from "./utils/logger.ts";
 import { loadWeb3ConfigSync } from "./utils/web3.ts";
 
-// 全局初始化环境变量
-loadEnv();
-
 /**
  * 提示用户确认
  * @param message 提示信息
@@ -551,6 +548,9 @@ cli
     type: "number",
   })
   .action(async (_args, options) => {
+    // 全局初始化环境变量
+    loadEnv();
+
     // 部署依赖 forge，执行前检测并在未安装时自动安装 Foundry
     try {
       await ensureFoundryInstalled();
@@ -876,6 +876,9 @@ cli
     type: "number",
   })
   .action(async (_args, options) => {
+    // 全局初始化环境变量
+    loadEnv();
+
     // verify 依赖 forge/cast，执行前检测并在未安装时自动安装 Foundry
     try {
       await ensureFoundryInstalled();
@@ -1018,6 +1021,9 @@ cli
     },
   })
   .action(async (args, options) => {
+    // 全局初始化环境变量
+    loadEnv();
+
     // 获取脚本路径（第一个位置参数）
     const scriptPath = args[0];
 
@@ -1139,6 +1145,9 @@ cli
     type: "number",
   })
   .action(async (args, options) => {
+    // 全局初始化环境变量
+    loadEnv();
+    
     // 获取项目配置
     const projectConfig = getProjectConfig();
     if (!projectConfig) {
