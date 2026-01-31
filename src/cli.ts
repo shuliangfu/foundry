@@ -590,6 +590,10 @@ cli
     const apiKey = options["api-key"] as string | undefined;
     const scriptDir = join(cwd(), "deploy");
 
+    logger.info("🚀 开始部署");
+    logger.info("网络:", finalNetwork);
+    logger.info("");
+
     // 如果使用强制部署，需要用户确认
     if (force) {
       const confirmed = await confirm(
@@ -602,10 +606,6 @@ cli
         exit(0);
       }
     }
-
-    logger.info("🚀 开始部署");
-    logger.info("网络:", finalNetwork);
-    logger.info("");
 
     // 加载网络配置
     let config: NetworkConfig;
