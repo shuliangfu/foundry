@@ -1434,8 +1434,8 @@ if (import.meta.main) {
       const versionStr = `\n\x1b[36mFoundry CLI\x1b[0m
 \x1b[1m\x1b[36mVersion:\x1b[0m \x1b[33m${version}\x1b[0m
 
-\x1b[90mFoundry + Deno 打造的智能合约部署和验证工具\x1b[0m
-\x1b[90m用于创建项目、智能合约的部署和验证\x1b[0m \n`;
+\x1b[90mFoundry + Deno 打造的智能合约开发工具\x1b[0m
+\x1b[90m用于创建项目、编译、测试、部署、验证智能合约\x1b[0m \n`;
       cli.setVersion(versionStr);
     }
   } catch {
