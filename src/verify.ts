@@ -190,8 +190,8 @@ export interface VerifyOptions {
   apiKey: string;
   /** RPC URL */
   rpcUrl: string;
-  /** 构造函数参数（可选） */
-  constructorArgs?: string[];
+  /** 构造函数参数（可选），支持嵌套数组如 [addr, addr, [addr, addr, ...]] */
+  constructorArgs?: unknown[];
   /** 链 ID（可选） */
   chainId?: number;
 }
@@ -489,13 +489,13 @@ export function findContractFileName(contractName: string, network: string): str
  * 从 ABI JSON 文件读取构造参数并编码为 ABI 格式
  * @param contractName 合约名称
  * @param network 网络名称
- * @param constructorArgs 构造函数参数数组（如果提供则使用，否则从 ABI 文件读取）
+ * @param constructorArgs 构造函数参数（如果提供则使用，否则从 ABI 文件读取），支持嵌套数组
  * @returns ABI 编码后的十六进制字符串，如果无法编码则返回 null
  */
 async function encodeConstructorArgs(
   contractName: string,
   network: string,
-  constructorArgs?: string[],
+  constructorArgs?: unknown[],
 ): Promise<string | null> {
   // 使用大小写不敏感的文件名查找
   const actualFileName = findContractFileName(contractName, network);
@@ -528,6 +528,14 @@ async function encodeConstructorArgs(
       return null;
     }
 
+    // 将每个参数序列化为 cast 可接受的格式（保留嵌套数组为 [a,b,c] 形式）
+    function serializeArg(arg: unknown): string {
+      if (Array.isArray(arg)) {
+        return `[${arg.map(serializeArg).join(",")}]`;
+      }
+      return String(arg);
+    }
+
     // 构建构造函数签名用于 cast abi-encode
     // cast abi-encode 需要 "constructor(type1,type2,...)" 格式
     const inputTypes = constructor.inputs.map((input) => input.type);
@@ -537,13 +545,7 @@ async function encodeConstructorArgs(
     const castArgs = [
       "abi-encode",
       signature,
-      ...argsArray.map((arg) => {
-        // 处理数组类型参数（如 address[], uint256[]）
-        if (Array.isArray(arg)) {
-          return `[${arg.join(",")}]`;
-        }
-        return String(arg);
-      }),
+      ...argsArray.map(serializeArg),
     ];
 
     const cmd = createCommand("cast", {
@@ -608,7 +610,7 @@ export function verifyContract(
   network: string,
   apiKey: string,
   rpcUrl: string,
-  constructorArgs?: string[],
+  constructorArgs?: unknown[],
   chainId?: number,
 ): Promise<void> {
   return verify({
@@ -778,11 +780,12 @@ async function main() {
       }
     }
 
-    let finalConstructorArgs: string[] | undefined = contractNames.length === 1
-      ? constructorArgs
+    // 保留嵌套数组结构，避免 .map(String) 把 address[] 变成 "addr1,addr2,..."
+    let finalConstructorArgs: unknown[] | undefined = contractNames.length === 1
+      ? (constructorArgs && constructorArgs.length > 0 ? constructorArgs : undefined)
       : undefined;
     if (!finalConstructorArgs && contractInfo && contractInfo.args) {
-      finalConstructorArgs = contractInfo.args.map(String);
+      finalConstructorArgs = contractInfo.args;
     }
 
     const actualFileName = findContractFileName(contractName, network);

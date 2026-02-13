@@ -312,14 +312,14 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
             const contractInfo = loadContract(actualContractName, options.network);
 
             if (contractInfo && contractInfo.address) {
-              // 调用验证函数
+              // 调用验证函数（保留 args 的嵌套数组结构，如 address[]）
               await verify({
                 address: contractInfo.address,
                 contractName: actualContractName,
                 network: options.network,
                 apiKey: options.apiKey,
                 rpcUrl: options.config.rpcUrl,
-                constructorArgs: contractInfo.args ? contractInfo.args.map(String) : undefined,
+                constructorArgs: contractInfo.args,
                 chainId: options.config.chainId,
               });
               logger.info(`✅ ${actualContractName} 验证成功`);
