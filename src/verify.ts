@@ -486,6 +486,16 @@ export function findContractFileName(contractName: string, network: string): str
 }
 
 /**
+ * 将构造函数参数序列化为 cast 可接受的格式（保留嵌套数组为 [a,b,c] 形式）
+ */
+function serializeConstructorArg(arg: unknown): string {
+  if (Array.isArray(arg)) {
+    return `[${arg.map(serializeConstructorArg).join(",")}]`;
+  }
+  return String(arg);
+}
+
+/**
  * 从 ABI JSON 文件读取构造参数并编码为 ABI 格式
  * @param contractName 合约名称
  * @param network 网络名称
@@ -528,14 +538,6 @@ async function encodeConstructorArgs(
       return null;
     }
 
-    // 将每个参数序列化为 cast 可接受的格式（保留嵌套数组为 [a,b,c] 形式）
-    function serializeArg(arg: unknown): string {
-      if (Array.isArray(arg)) {
-        return `[${arg.map(serializeArg).join(",")}]`;
-      }
-      return String(arg);
-    }
-
     // 构建构造函数签名用于 cast abi-encode
     // cast abi-encode 需要 "constructor(type1,type2,...)" 格式
     const inputTypes = constructor.inputs.map((input) => input.type);
@@ -545,7 +547,7 @@ async function encodeConstructorArgs(
     const castArgs = [
       "abi-encode",
       signature,
-      ...argsArray.map(serializeArg),
+      ...argsArray.map(serializeConstructorArg),
     ];
 
     const cmd = createCommand("cast", {
