@@ -5,8 +5,6 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)， 版本号遵循
 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [未发布]
-
 ## [1.7.10] - 2026-02-13
 
 ### 新增
@@ -20,6 +18,8 @@
 
 ### 变更
 
+- **CLI**：`foundry test` 命令的网络参数现支持 `mainnet`（校验与提示由仅允许 local、testnet
+  改为 local、testnet、mainnet）。
 - 根目录 `README.md` 改为仅英文；原中文内容迁移至 `docs/zh-CN/README.md`。
 - 根目录 README 中的测试报告与变更日志链接指向 `docs/en-US/` 与 `docs/zh-CN/` 对应文件。
 - `docs/zh-CN/README.md` 中增加指向英文 README、英文测试报告及中英文变更日志的链接。
@@ -598,7 +598,6 @@
 
 更早的 beta 与 1.0.x 变更请参见 git 历史。
 
-[未发布]: https://github.com/dreamer-jsr/foundry/compare/v1.7.10...HEAD
 [1.7.10]: https://github.com/dreamer-jsr/foundry/compare/v1.7.9...v1.7.10
 [1.7.9]: https://github.com/dreamer-jsr/foundry/compare/v1.7.8...v1.7.9
 [1.7.8]: https://github.com/dreamer-jsr/foundry/compare/v1.7.7...v1.7.8

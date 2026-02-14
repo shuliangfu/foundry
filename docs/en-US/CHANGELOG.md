@@ -5,8 +5,6 @@ All notable changes to @dreamer/foundry are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
 ## [1.7.10] - 2026-02-13
 
 ### Added
@@ -21,6 +19,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **CLI**: `foundry test` now accepts `mainnet` as a valid network (validator and message updated
+  from "local, testnet" to "local, testnet, mainnet").
 - Root `README.md` is now English-only; previous Chinese content moved to `docs/zh-CN/README.md`.
 - Test report and changelog links in root README point to `docs/en-US/` and `docs/zh-CN/`
   respectively.
@@ -606,7 +606,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 For earlier beta and 1.0.x changes, see the git history.
 
-[Unreleased]: https://github.com/dreamer-jsr/foundry/compare/v1.7.10...HEAD
 [1.7.10]: https://github.com/dreamer-jsr/foundry/compare/v1.7.9...v1.7.10
 [1.7.9]: https://github.com/dreamer-jsr/foundry/compare/v1.7.8...v1.7.9
 [1.7.8]: https://github.com/dreamer-jsr/foundry/compare/v1.7.7...v1.7.8
