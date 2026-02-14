@@ -1094,8 +1094,8 @@ cli
     defaultValue: getEnv("WEB3_ENV") ?? DEFAULT_NETWORK,
     validator: (value) => {
       // 测试必须是 local、testnet，不允许主网测试
-      if (value !== "local" && value !== "testnet") {
-        return "网络名称必须是 local、testnet";
+      if (value !== "local" && value !== "testnet" && value !== "mainnet") {
+        return "网络名称必须是 local、testnet、mainnet";
       }
       return true;
     },

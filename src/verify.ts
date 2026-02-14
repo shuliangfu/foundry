@@ -724,7 +724,9 @@ async function main() {
 
   if (!contractNames || contractNames.length === 0) {
     logger.error("❌ 未指定合约名称");
-    logger.error("   请使用 --contract (-c) 参数指定合约名称，可指定多个，例如: -c Contract1 Contract2");
+    logger.error(
+      "   请使用 --contract (-c) 参数指定合约名称，可指定多个，例如: -c Contract1 Contract2",
+    );
     exit(1);
   }
 

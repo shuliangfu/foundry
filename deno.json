@@ -1,8 +1,8 @@
 {
-  "version": "1.7.9",
+  "version": "1.7.10",
   "name": "@dreamer/foundry",
   "description": "Foundry deployment and verification utilities for Deno and Bun",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "exports": {
     ".": "./src/mod.ts",
     "./cli": "./src/cli.ts",
