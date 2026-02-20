@@ -1,7 +1,8 @@
 /**
+ * @module @dreamer/foundry/utils/env
  * @title Environment Utils
- * @dev 环境变量工具函数库 - 封装环境变量的加载和验证功能
- * 使用 @dreamer/runtime-adapter 兼容 Deno 和 Bun
+ * @description 环境变量工具：加载 .env、验证必需变量；使用 @dreamer/runtime-adapter 兼容 Deno 和 Bun。
+ * 同时 re-export 的 exit、getEnv、setEnv 供调用方使用。
  */
 
 import {
@@ -16,6 +17,7 @@ import {
 import { $tr } from "../i18n.ts";
 import { logger } from "./logger.ts";
 
+/** Re-export from @dreamer/runtime-adapter：进程退出、读取/设置环境变量 */
 export { exit, getEnv, setEnv };
 
 /**
@@ -26,7 +28,7 @@ export { exit, getEnv, setEnv };
 export function loadEnv(envPath?: string): Record<string, string> {
   const targetPath = envPath || join(cwd(), ".env");
   if (!existsSync(targetPath)) {
-    logger.warn(".env file not found, using empty env");
+    logger.warn($tr("foundry.utils.envNotFoundEmpty"));
     return {};
   }
 
@@ -58,8 +60,9 @@ export function loadEnv(envPath?: string): Record<string, string> {
 
     return env;
   } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
     logger.error($tr("foundry.utils.envReadError"), error);
-    exit(1);
+    throw new Error(`${$tr("foundry.utils.envReadError")} ${msg}`);
   }
 }
 

@@ -5,6 +5,26 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)， 版本号遵循
 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.8.1] - 2026-02-20
+
+### 变更
+
+- **导出**：移除冗余的 `./deploy`、`./verify` 子路径导出，统一从主入口 `@dreamer/foundry` 使用。
+- **环境变量**：`loadEnv()` 在 `.env` 不存在时返回 `{}`（不退出进程）；读取失败时改为 throw
+  便于调用方处理；新增 i18n 键 `envNotFoundEmpty`。
+- **ConfigManager**：从项目根目录加载 `.env`（`join(projectRoot, ".env")`），便于测试与 CI。
+- **CLI**：`getApiKey("")` 现返回 `null`（空字符串视为无效）。
+- **工具**：移除 `utils/mod.ts` 中重复的 logger 导出；`deno.json` 的 fmt 改为 flat
+  选项以消除弃用警告。
+- **文档**：为 deno.json 所有入口补充模块与导出
+  JSDoc（mod、cli、setup、utils、utils/env、utils/web3、utils/logger、utils/time）；补充
+  `Web3Options` 与 `Web3` 类说明。
+
+### 修复
+
+- CI：配置与 init 测试在无 `.env` 或英文环境下不再失败；放宽 `getAllEnvConfig` 断言；init
+  测试通过设置 zh-CN 断言中文。
+
 ## [1.8.0] - 2026-02-20
 
 ### 新增

@@ -266,11 +266,12 @@ See [docs/zh-CN/README.md](./docs/zh-CN/README.md) for full chain table and conf
 
 ## Changelog
 
-**v1.8.0** (2026-02-20)
+**v1.8.1** (2026-02-20)
 
-- **Added**: CI workflow (Linux/macOS/Windows); i18n with `@dreamer/i18n` and `src/locales/`.
-- **Changed**: CLI refactored into `src/cmd/`; dependency bumps; Windows path fixes; test report
-  updates.
+- **Changed**: Removed `./deploy`/`./verify` exports; `loadEnv` returns `{}` when `.env` missing and
+  throws on read error; ConfigManager loads `.env` from project root; `getApiKey("")` returns
+  `null`; fmt flat options; module/export JSDoc for all entry points.
+- **Fixed**: CI config and init tests when `.env` missing or locale en-US.
 
 Full history: [docs/en-US/CHANGELOG.md](./docs/en-US/CHANGELOG.md) |
 [docs/zh-CN/CHANGELOG.md](./docs/zh-CN/CHANGELOG.md)

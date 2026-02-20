@@ -279,6 +279,7 @@
       "envCreateAt": "Please create .env file at: {path}",
       "envReadError": "❌ Error reading .env file:",
       "envKeyNotSet": "❌ Error: {key} not set in .env",
+      "envNotFoundEmpty": ".env file not found, using empty env",
       "projectRootNotFoundDeno": "❌ Project root not found (directory containing deno.json)",
       "denoJsonNotFound": "❌ Project deno.json not found: {path}",
       "configLoadWarn": "Could not load config from config/web3.json:",

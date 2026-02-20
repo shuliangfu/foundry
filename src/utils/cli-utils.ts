@@ -340,6 +340,10 @@ export async function executeCommand(
  * @returns API Key，如果未找到则返回 null
  */
 export function getApiKey(apiKeyFromOption?: string): string | null {
+  // 空字符串视为未提供，与 undefined 一致
+  if (apiKeyFromOption === "") {
+    return null;
+  }
   // 如果命令行提供了 API Key，直接使用
   if (apiKeyFromOption) {
     return apiKeyFromOption;

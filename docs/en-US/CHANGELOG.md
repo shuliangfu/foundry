@@ -5,6 +5,28 @@ All notable changes to @dreamer/foundry are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1] - 2026-02-20
+
+### Changed
+
+- **Exports**: Removed redundant `./deploy` and `./verify` subpath exports; use main entry
+  `@dreamer/foundry` for deploy/verify.
+- **Env**: `loadEnv()` returns `{}` when `.env` is missing (no process exit); on read error throws
+  instead of `exit(1)` so callers can handle; added i18n key `envNotFoundEmpty` for warn message.
+- **ConfigManager**: Load `.env` from project root (`join(projectRoot, ".env")`) so tests and CI use
+  the correct file.
+- **CLI**: `getApiKey("")` now returns `null` (empty string treated as invalid).
+- **Utils**: Removed duplicate `logger` export in `utils/mod.ts`; `deno.json` fmt config switched to
+  flat options to remove deprecation warning.
+- **Docs**: Module JSDoc (`@module`, `@title`, `@description`) and export JSDoc added for all
+  deno.json entry points (mod, cli, setup, utils, utils/env, utils/web3, utils/logger, utils/time);
+  `Web3Options` and `Web3` class documented.
+
+### Fixed
+
+- CI: Config and init tests no longer fail when `.env` is missing or locale is en-US; relaxed
+  `getAllEnvConfig` assertion; init assertions accept zh-CN locale set in test.
+
 ## [1.8.0] - 2026-02-20
 
 ### Added

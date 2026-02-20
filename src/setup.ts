@@ -1,6 +1,6 @@
 #!/usr/bin/env -S deno run -A
 /**
- * @module
+ * @module @dreamer/foundry/setup
  * @title Foundry CLI Global Installation Script
  * @description Installs the Foundry CLI globally, allowing the `foundry` command to be used anywhere.
  *

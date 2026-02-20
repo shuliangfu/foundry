@@ -1,5 +1,5 @@
 /**
- * @module
+ * @module @dreamer/foundry
  * @title Foundry Deploy Library
  * @description Foundry deployment and verification utilities for Deno and Bun.
  *

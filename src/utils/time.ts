@@ -1,6 +1,7 @@
 /**
+ * @module @dreamer/foundry/utils/time
  * @title 时间推进工具
- * @dev 用于推进 Anvil 区块链时间，然后更新合约内部时间
+ * @description 推进 Anvil 区块链时间，供依赖 block.timestamp 的合约使用；不修改系统时间，通过 RPC 调用即可。
  *
  * 说明：
  * - 合约使用 block.timestamp 获取时间，这是区块链时间

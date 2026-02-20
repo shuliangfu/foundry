@@ -1,5 +1,5 @@
 {
-  "version": "1.8.0",
+  "version": "1.8.1",
   "name": "@dreamer/foundry",
   "description": "Foundry deployment and verification utilities for Deno and Bun",
   "license": "Apache-2.0",
@@ -7,8 +7,6 @@
     ".": "./src/mod.ts",
     "./cli": "./src/cli.ts",
     "./setup": "./src/setup.ts",
-    "./deploy": "./src/cmd/deploy.ts",
-    "./verify": "./src/cmd/verify.ts",
     "./utils": "./src/utils/mod.ts",
     "./utils/env": "./src/utils/env.ts",
     "./utils/web3": "./src/utils/web3.ts",
@@ -39,11 +37,9 @@
     ]
   },
   "fmt": {
-    "options": {
-      "indentWidth": 2,
-      "lineWidth": 100,
-      "useTabs": false
-    }
+    "indentWidth": 2,
+    "lineWidth": 100,
+    "useTabs": false
   },
   "lint": {
     "rules": {

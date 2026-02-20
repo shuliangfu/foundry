@@ -1,6 +1,6 @@
 #!/usr/bin/env -S deno run -A
 /**
- * @module
+ * @module @dreamer/foundry/cli
  * @title Foundry CLI
  * @description Foundry 命令行入口，仅注册命令并委托 cmd 目录执行逻辑。
  *

@@ -1008,10 +1008,12 @@ await advanceTime(365); // 推进 1 年
 
 ## 变更日志
 
-**v1.8.0**（2026-02-20）
+**v1.8.1**（2026-02-20）
 
-- **新增**：CI 工作流（Linux/macOS/Windows）；i18n 与 `@dreamer/i18n`、`src/locales/`。
-- **变更**：CLI 重构至 `src/cmd/`；依赖升级；Windows 路径修复；测试报告更新。
+- **变更**：移除 `./deploy`/`./verify` 导出；`loadEnv` 无 `.env` 时返回 `{}`、读错时
+  throw；ConfigManager 从项目根加载 `.env`；`getApiKey("")` 返回 `null`；fmt flat
+  选项；各入口模块与导出 JSDoc。
+- **修复**：CI 下配置与 init 测试在无 `.env` 或英文环境下的问题。
 
 完整历史：[docs/en-US/CHANGELOG.md](../en-US/CHANGELOG.md) |
 [docs/zh-CN/CHANGELOG.md](./CHANGELOG.md)

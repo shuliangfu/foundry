@@ -1,8 +1,14 @@
 /**
+ * @module @dreamer/foundry/utils/web3
  * @title Web3 Utils
- * @description Web3 utility class using @dreamer/web3
- * 使用 @dreamer/runtime-adapter 兼容 Deno 和 Bun
- * 从项目根目录的 config/web3.json 读取配置（项目规则，固定目录）
+ * @description Web3 工具：从 config/web3.json 加载配置，提供 Web3 类、createWeb3、loadWeb3ConfigSync 等；
+ * 使用 @dreamer/web3 与 @dreamer/runtime-adapter，兼容 Deno 和 Bun。
+ *
+ * @example
+ * ```typescript
+ * import { createWeb3, loadWeb3ConfigSync } from "@dreamer/foundry/utils/web3";
+ * const web3 = createWeb3("MyToken");
+ * ```
  */
 
 import {
@@ -224,19 +230,25 @@ export function preloadWeb3Config(projectRoot?: string): void {
 }
 
 /**
- * Web3 配置选项
+ * Web3 实例的可选配置，用于覆盖 config/web3.json 中的对应项
  */
 export interface Web3Options {
+  /** RPC URL，覆盖配置文件 */
   rpcUrl?: string;
+  /** WebSocket URL，覆盖配置文件 */
   wssUrl?: string;
+  /** 链 ID，覆盖配置文件 */
   chainId?: number;
+  /** 私钥（ hex 字符串），覆盖配置文件中的账户 */
   privateKey?: string;
+  /** 与 privateKey 对应的地址，覆盖配置文件 */
   address?: string;
+  /** 账户索引，从配置的 accounts 数组中选择，默认 0 */
   account?: number;
 }
 
 /**
- * Web3 工具类
+ * Web3 工具类：绑定合约、读/写调用、部署与交易；配置来自 config/web3.json 或 Web3Options。
  */
 export class Web3 {
   private client: ReturnType<typeof createWeb3Client>;
