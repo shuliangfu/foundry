@@ -21,14 +21,13 @@ export { exit, getEnv, setEnv };
 /**
  * 加载环境变量
  * @param envPath 环境变量文件路径，默认为当前目录下的 .env
- * @returns 环境变量对象
+ * @returns 环境变量对象；文件不存在时返回空对象（不退出进程，便于测试与 CI）
  */
 export function loadEnv(envPath?: string): Record<string, string> {
   const targetPath = envPath || join(cwd(), ".env");
   if (!existsSync(targetPath)) {
-    logger.error("❌ Error: .env file not found");
-    logger.error(`Please create .env file at: ${targetPath}`);
-    exit(1);
+    logger.warn(".env file not found, using empty env");
+    return {};
   }
 
   try {

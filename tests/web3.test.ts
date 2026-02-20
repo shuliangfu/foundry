@@ -6,7 +6,15 @@
  * 启动方式：anvil
  */
 
-import { cwd, existsSync, getEnv, join, mkdir, remove, writeTextFile } from "@dreamer/runtime-adapter";
+import {
+  cwd,
+  existsSync,
+  getEnv,
+  join,
+  mkdir,
+  remove,
+  writeTextFile,
+} from "@dreamer/runtime-adapter";
 import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
 import {
   addHexPrefix,

@@ -52,9 +52,10 @@ export class ConfigManager {
       this.projectRoot = this.findProjectRoot(cwd());
     }
 
-    // 加载环境变量配置
+    // 从项目根目录加载 .env，便于测试与 CI 使用指定目录的 .env
     try {
-      this.envConfig = loadEnv();
+      const envPath = this.projectRoot ? join(this.projectRoot, ".env") : undefined;
+      this.envConfig = loadEnv(envPath);
     } catch {
       // 环境变量加载失败不影响使用，只是没有环境变量配置
       this.envConfig = {};

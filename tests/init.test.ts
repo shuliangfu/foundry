@@ -16,6 +16,10 @@ import {
 } from "@dreamer/runtime-adapter";
 import { init } from "../src/cmd/init.ts";
 import { logger } from "../src/utils/logger.ts";
+import { setFoundryLocale } from "../src/i18n.ts";
+
+// 固定为中文，使 init 生成的模板（测试脚本、README）为中文，下方断言可稳定依赖中文文案
+setFoundryLocale("zh-CN");
 
 describe("Init 项目初始化测试", () => {
   // 测试项目根目录（放在 data 目录下，测试后保留）
