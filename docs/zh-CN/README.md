@@ -1008,10 +1008,10 @@ await advanceTime(365); // 推进 1 年
 
 ## 变更日志
 
-**v1.7.10**（2026-02-13）
+**v1.8.0**（2026-02-20）
 
-- **新增**：在 `docs/en-US/` 与 `docs/zh-CN/` 下建立文档（测试报告、变更日志、中文 README）。
-- **变更**：根目录 README 仅英文；测试报告与变更日志链接指向 docs；许可证仍为 Apache-2.0。
+- **新增**：CI 工作流（Linux/macOS/Windows）；i18n 与 `@dreamer/i18n`、`src/locales/`。
+- **变更**：CLI 重构至 `src/cmd/`；依赖升级；Windows 路径修复；测试报告更新。
 
 完整历史：[docs/en-US/CHANGELOG.md](../en-US/CHANGELOG.md) |
 [docs/zh-CN/CHANGELOG.md](./CHANGELOG.md)

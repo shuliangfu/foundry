@@ -266,11 +266,11 @@ See [docs/zh-CN/README.md](./docs/zh-CN/README.md) for full chain table and conf
 
 ## Changelog
 
-**v1.7.10** (2026-02-13)
+**v1.8.0** (2026-02-20)
 
-- **Added**: Docs under `docs/en-US/` and `docs/zh-CN/` (TEST_REPORT, CHANGELOG, Chinese README).
-- **Changed**: Root README is English-only; test report and changelog links point to docs; license
-  remains Apache-2.0.
+- **Added**: CI workflow (Linux/macOS/Windows); i18n with `@dreamer/i18n` and `src/locales/`.
+- **Changed**: CLI refactored into `src/cmd/`; dependency bumps; Windows path fixes; test report
+  updates.
 
 Full history: [docs/en-US/CHANGELOG.md](./docs/en-US/CHANGELOG.md) |
 [docs/zh-CN/CHANGELOG.md](./docs/zh-CN/CHANGELOG.md)
