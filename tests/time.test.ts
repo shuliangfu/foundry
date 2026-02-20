@@ -6,6 +6,7 @@
  * 启动方式：anvil 或 docker run -p 8545:8545 ghcr.io/foundry-rs/foundry:latest anvil
  */
 
+import { getEnv } from "@dreamer/runtime-adapter";
 import { describe, expect, it } from "@dreamer/test";
 import {
   advanceAnvilTime,
@@ -79,9 +80,10 @@ describe("Anvil 时间工具测试", () => {
     });
   });
 
-  // 需要 Anvil 节点的测试（需要运行 anvil）
+  // 需要 Anvil 节点的测试（需要运行 anvil）；CI 环境无 Anvil 时跳过
+  const skipAnvilTests = getEnv("CI") === "true";
   describe("Anvil 节点测试（需要运行中的 Anvil @ http://127.0.0.1:8545）", () => {
-    it("应该能够获取 Anvil 时间戳", async () => {
+    it.skipIf(skipAnvilTests, "应该能够获取 Anvil 时间戳", async () => {
       const timestamp = await getAnvilTimestamp();
       // 如果 Anvil 没有运行，返回 null
       if (timestamp !== null) {
@@ -93,26 +95,26 @@ describe("Anvil 时间工具测试", () => {
       }
     });
 
-    it("应该能够同步 Anvil 时间", async () => {
+    it.skipIf(skipAnvilTests, "应该能够同步 Anvil 时间", async () => {
       const result = await syncAnvilTime(true); // 静默模式
       // 返回 boolean，成功或失败都是正常的
       expect(typeof result).toBe("boolean");
     });
 
-    it("应该能够推进 Anvil 时间", async () => {
+    it.skipIf(skipAnvilTests, "应该能够推进 Anvil 时间", async () => {
       const result = await advanceAnvilTime(60, true); // 推进 1 分钟，静默
       // 返回 boolean，成功或失败都是正常的
       expect(typeof result).toBe("boolean");
     });
 
-    it("应该能够推进指定天数", async () => {
+    it.skipIf(skipAnvilTests, "应该能够推进指定天数", async () => {
       // advanceTime 内部调用 advanceAnvilTime
       // 这里测试返回类型
       const result = await advanceTime(0); // 推进 0 天（不实际推进）
       expect(typeof result).toBe("boolean");
     });
 
-    it("advanceAnvilTime 应该拒绝负数参数", async () => {
+    it.skipIf(skipAnvilTests, "advanceAnvilTime 应该拒绝负数参数", async () => {
       // 负数时间会被函数内部拒绝，返回 false
       const result = await advanceAnvilTime(-100);
       expect(result).toBe(false);

@@ -6,7 +6,7 @@
  * 启动方式：anvil
  */
 
-import { cwd, existsSync, join, mkdir, remove, writeTextFile } from "@dreamer/runtime-adapter";
+import { cwd, existsSync, getEnv, join, mkdir, remove, writeTextFile } from "@dreamer/runtime-adapter";
 import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
 import {
   addHexPrefix,
@@ -247,23 +247,24 @@ describe("Web3 类实例测试（需要配置）", () => {
     });
   });
 
-  // 需要 RPC 节点的测试（需要运行中的 Anvil）
+  // 需要 RPC 节点的测试（需要运行中的 Anvil）；CI 环境无 Anvil 时跳过
+  const skipAnvilTests = getEnv("CI") === "true";
   describe("Web3 实例方法（需要 Anvil 节点）", () => {
-    it("应该能够获取余额", async () => {
+    it.skipIf(skipAnvilTests, "应该能够获取余额", async () => {
       const web3 = createWeb3();
       const balance = await web3.getBalance();
       expect(balance).toBeDefined();
       expect(typeof balance).toBe("string");
     });
 
-    it("应该能够获取当前账户地址", () => {
+    it.skipIf(skipAnvilTests, "应该能够获取当前账户地址", () => {
       const web3 = createWeb3();
       // accountAddress 是账户地址 getter
       const accountAddr = web3.accountAddress;
       expect(isAddress(accountAddr)).toBe(true);
     });
 
-    it("应该能够创建 Web3 实例", () => {
+    it.skipIf(skipAnvilTests, "应该能够创建 Web3 实例", () => {
       const web3 = createWeb3();
       expect(web3).toBeDefined();
       // 验证账户地址是有效的以太坊地址
