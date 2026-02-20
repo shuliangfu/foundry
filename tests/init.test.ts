@@ -14,7 +14,7 @@ import {
   stat,
   writeTextFile,
 } from "@dreamer/runtime-adapter";
-import { init } from "../src/init.ts";
+import { init } from "../src/cmd/init.ts";
 import { logger } from "../src/utils/logger.ts";
 
 describe("Init 项目初始化测试", () => {
@@ -143,7 +143,7 @@ describe("Init 项目初始化测试", () => {
     const content = await readTextFile(join(testProjectRoot, "foundry.toml"));
     expect(content).toContain("[profile.default]");
     expect(content).toContain('src = "src"');
-    expect(content).toContain('solc_version = "0.8.18"');
+    expect(content).toContain('solc_version = "0.8.20"');
     expect(content).toContain('# libs = ["lib"]');
   });
 
@@ -156,11 +156,11 @@ describe("Init 项目初始化测试", () => {
   });
 
   it("deno.json 应该包含正确的配置", async () => {
-    // 项目已在 beforeAll 中创建，直接验证
+    // 项目已在 beforeAll 中创建，直接验证（使用 foundry 命令操作，不再包含 tasks）
     const content = await readTextFile(join(testProjectRoot, "deno.json"));
     expect(content).toContain('"@dreamer/foundry"');
     expect(content).toContain('"@dreamer/test"');
-    expect(content).toContain('"build": "forge build"');
+    expect(content).toContain('"imports"');
   });
 
   it("config/web3.json 应该包含网络配置", async () => {

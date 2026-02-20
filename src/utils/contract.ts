@@ -13,6 +13,8 @@ import {
   readTextFileSync,
 } from "@dreamer/runtime-adapter";
 import { DEFAULT_NETWORK } from "../constants/index.ts";
+import { $tr } from "../i18n.ts";
+import { logger } from "./logger.ts";
 
 /**
  * 合约接口
@@ -52,12 +54,12 @@ export function loadContracts(env?: string): Record<string, Contract> {
             };
           }
         } catch (error) {
-          console.error(`读取合约文件失败: ${filePath}`, error);
+          logger.error($tr("foundry.utils.contractReadFileFailed", { path: filePath }), error);
         }
       }
     }
   } catch (error) {
-    console.error(`读取 ABI 目录失败: ${abiDir}`, error);
+    logger.error($tr("foundry.utils.contractReadAbiDirFailed", { path: abiDir }), error);
   }
 
   return contracts;

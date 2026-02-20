@@ -5,6 +5,29 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)， 版本号遵循
 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.7.11] - 2026-02-20
+
+### 新增
+
+- **CI**：新增 GitHub Actions 工作流 `.github/workflows/ci.yml`，在推送到或 PR 到 `dev` 时于
+  Linux、macOS、Windows 上执行 `deno check`、`deno lint`、`deno test -A tests/`，用于跨平台验证。
+- **i18n**：新增 `@dreamer/i18n` 依赖，CLI 与相关文案支持国际化（中英文等），文案统一由
+  `src/locales/` 与 `$tr()` 管理。
+
+### 变更
+
+- **CLI**：优化 `cli.ts` 结构，将 deploy、init、verify、run、test、upgrade、uninstall、build
+  等命令逻辑迁移至 `src/cmd/`，CLI 入口仅负责命令注册与委托执行，便于维护与扩展。
+- 依赖版本更新：升级
+  `@dreamer/web3`、`@dreamer/logger`、`@dreamer/runtime-adapter`、`@dreamer/test`、`@dreamer/console`
+  至当前稳定版本。
+- **Windows 兼容**：`run` 命令脚本路径使用 `isAbsolute`/`resolve` 识别与解析，支持 Windows
+  绝对路径（如 `C:\path\to\script.ts`）；`setup.ts` 与 `cmd/upgrade.ts` 中 Windows
+  根路径判断改为匹配经 runtime-adapter 统一后的正斜杠形式（`C:`/`C:/`），避免根目录检测错误。
+- 测试报告（`docs/zh-CN/TEST_REPORT.md`、`docs/en-US/TEST_REPORT.md`）与 README（根目录及
+  `docs/zh-CN/README.md`）：更新测试统计为 264 个测试、261 通过、3 忽略，执行时间约 6 秒，通过率
+  98.9%。
+
 ## [1.7.10] - 2026-02-13
 
 ### 新增
@@ -18,8 +41,8 @@
 
 ### 变更
 
-- **CLI**：`foundry test` 命令的网络参数现支持 `mainnet`（校验与提示由仅允许 local、testnet
-  改为 local、testnet、mainnet）。
+- **CLI**：`foundry test` 命令的网络参数现支持 `mainnet`（校验与提示由仅允许 local、testnet 改为
+  local、testnet、mainnet）。
 - 根目录 `README.md` 改为仅英文；原中文内容迁移至 `docs/zh-CN/README.md`。
 - 根目录 README 中的测试报告与变更日志链接指向 `docs/en-US/` 与 `docs/zh-CN/` 对应文件。
 - `docs/zh-CN/README.md` 中增加指向英文 README、英文测试报告及中英文变更日志的链接。

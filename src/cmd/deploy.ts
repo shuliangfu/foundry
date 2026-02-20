@@ -20,26 +20,21 @@
  */
 
 import type { Logger } from "@dreamer/logger";
-import {
-  args as runtimeArgs,
-  cwd,
-  existsSync,
-  exit,
-  join,
-  readdir,
-  setEnv,
-} from "@dreamer/runtime-adapter";
-import { DEFAULT_NETWORK } from "./constants/index.ts";
+import { cwd, existsSync, exit, join, readdir, setEnv } from "@dreamer/runtime-adapter";
+import { $tr } from "../i18n.ts";
 import {
   createLoadingProgressBar,
+  getApiKey,
   getNetworkName,
   getProjectConfig,
   loadNetworkConfig as loadNetworkConfigUtil,
-} from "./utils/cli-utils.ts";
-import type { ContractInfo, DeployOptions, NetworkConfig } from "./utils/deploy-utils.ts";
-import { forgeDeploy, loadContract } from "./utils/deploy-utils.ts";
-import { logger } from "./utils/logger.ts";
-import { createWeb3, type Web3, type Web3Options } from "./utils/web3.ts";
+} from "../utils/cli-utils.ts";
+import { loadEnv } from "../utils/env.ts";
+import { confirm } from "./common.ts";
+import type { ContractInfo, DeployOptions, NetworkConfig } from "../utils/deploy-utils.ts";
+import { forgeDeploy, loadContract } from "../utils/deploy-utils.ts";
+import { logger } from "../utils/logger.ts";
+import { createWeb3, type Web3, type Web3Options } from "../utils/web3.ts";
 
 /**
  * 部署器接口
@@ -87,7 +82,7 @@ async function scanDeployScripts(scriptDir: string): Promise<string[]> {
   const scripts: string[] = [];
 
   if (!existsSync(scriptDir)) {
-    throw new Error(`script directory not found: ${scriptDir}`);
+    throw new Error($tr("foundry.deploy.scriptDirNotFound", { scriptDir }));
   }
 
   const entries = await readdir(scriptDir);
@@ -207,7 +202,7 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
   let scripts = await scanDeployScripts(scriptDir);
 
   if (scripts.length === 0) {
-    throw new Error("No deployment scripts found");
+    throw new Error($tr("foundry.deploy.noDeployScripts"));
   }
 
   // 如果指定了合约列表，过滤脚本
@@ -227,7 +222,9 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
     }
 
     if (notFoundContracts.length > 0) {
-      throw new Error(`Contracts not found: ${notFoundContracts.join(", ")}`);
+      throw new Error(
+        $tr("foundry.deploy.contractsNotFound", { contracts: notFoundContracts.join(", ") }),
+      );
     }
 
     // 按原始脚本顺序排序
@@ -250,13 +247,17 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
   // 查找项目根目录（包含 deno.json 或 package.json 的目录）
   const projectConfig = getProjectConfig();
   if (!projectConfig) {
-    throw new Error("未找到项目根目录（包含 deno.json 或 package.json 的目录）");
+    throw new Error($tr("foundry.deploy.projectRootNotFound"));
   }
 
   try {
     for (let i = 0; i < scripts.length; i++) {
       const script = scripts[i];
-      logger.info(`[${i + 1}/${scripts.length}] Executing: ${script}`);
+      logger.info($tr("foundry.deploy.executingScript", {
+        current: String(i + 1),
+        total: String(scripts.length),
+        script,
+      }));
 
       try {
         const scriptPath = join(scriptDir, script);
@@ -267,12 +268,12 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
         const scriptModule = await import(scriptUrl);
 
         if (!scriptModule.deploy || typeof scriptModule.deploy !== "function") {
-          logger.error(`❌ Error: ${script} does not export a deploy function`);
+          logger.error($tr("foundry.deploy.noDeployFunction", { script }));
           continue;
         }
 
         // 执行部署脚本（进度条继续显示）
-        const progressBar = createLoadingProgressBar("正在部署中...");
+        const progressBar = createLoadingProgressBar($tr("foundry.deploy.deployingProgress"));
         // 在 for 循环之前启动进度条，这样在分割线之后立即显示
         const progressInterval = progressBar.start();
         // 输出换行符，让部署脚本的输出从新行开始，避免与进度条混在一起
@@ -282,7 +283,7 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
           await scriptModule.deploy(deployer);
           // 所有脚本执行完成后停止进度条
           progressBar.stop(progressInterval);
-          logger.info(`✅ ${script} completed successfully \n`);
+          logger.info($tr("foundry.deploy.scriptSuccess", { script }) + " \n");
         } finally {
           progressBar.stop(progressInterval);
         }
@@ -296,7 +297,7 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
           // 首字母大写（如 "hash" -> "Hash"）
           const capitalizedName = contractName.charAt(0).toUpperCase() + contractName.slice(1);
 
-          logger.info(`🔍 验证合约: ${capitalizedName}`);
+          logger.info($tr("foundry.deploy.verifyingContract", { name: capitalizedName }));
 
           try {
             // 导入验证函数和工具
@@ -322,13 +323,15 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
                 constructorArgs: contractInfo.args,
                 chainId: options.config.chainId,
               });
-              logger.info(`✅ ${actualContractName} 验证成功`);
+              logger.info($tr("foundry.deploy.verifySuccess", { name: actualContractName }));
             } else {
-              logger.warn(`⚠️  合约 ${capitalizedName} 未找到部署信息，跳过验证`);
+              logger.warn($tr("foundry.deploy.contractNoDeployInfo", { name: capitalizedName }));
             }
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            logger.error(`❌ ${capitalizedName} 验证失败: ${errorMessage}`);
+            logger.error(
+              $tr("foundry.deploy.verifyFailed", { name: capitalizedName, message: errorMessage }),
+            );
             // 验证失败不中断部署流程
           }
         }
@@ -337,14 +340,16 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
 
         // 当前脚本完成后、下一个脚本开始前等待 3 秒，避免 RPC/链上状态未就绪
         if (i < scripts.length - 1) {
-          const loadingProgressBar = createLoadingProgressBar("等待 RPC/链上状态就绪...");
+          const loadingProgressBar = createLoadingProgressBar(
+            $tr("foundry.deploy.waitRpcProgress"),
+          );
           const loadingProgressInterval = loadingProgressBar.start();
           await new Promise((resolve) => setTimeout(resolve, 3000));
           loadingProgressBar.stop(loadingProgressInterval);
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error(`❌ Error executing ${script}: ${errorMessage}`);
+        logger.error($tr("foundry.deploy.errorExecuting", { script, message: errorMessage }));
         throw error;
       }
     }
@@ -353,129 +358,138 @@ export async function deploy(options: DeployScriptOptions): Promise<void> {
   }
 }
 
-/**
- * 解析命令行参数
- */
-function parseArgs(): {
-  network?: string;
-  contracts?: string[];
-  force?: boolean;
-  confirmations?: number;
-  verify?: boolean;
-  apiKey?: string;
-} {
-  // 获取命令行参数（runtimeArgs 来自 runtime-adapter，需要调用函数获取参数数组）
-  const args: string[] = typeof runtimeArgs === "function" ? runtimeArgs() : [];
-  let network: string | undefined;
-  const contracts: string[] = [];
-  let force = false;
-  let confirmations: number | undefined;
-  let verify = false;
-  let apiKey: string | undefined;
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-
-    if (arg === "--force" || arg === "-f") {
-      force = true;
-    } else if (arg === "--verify" || arg === "-v") {
-      verify = true;
-    } else if (arg === "--api-key") {
-      if (i + 1 < args.length) {
-        apiKey = args[i + 1];
+/** 从 argv 解析 -c/--contract 后的多个合约名称 */
+function parseContractNamesFromArgv(argv: string[]): string[] {
+  const names: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "-c" || argv[i] === "--contract") {
+      while (i + 1 < argv.length && !argv[i + 1].startsWith("-")) {
         i++;
-      } else {
-        logger.error("❌ Error: --api-key requires an API key");
-        exit(1);
+        names.push(argv[i].trim());
       }
-    } else if (arg === "--contract" || arg === "-c") {
-      // 收集所有后续的非选项参数作为合约名称
-      while (i + 1 < args.length && !args[i + 1].startsWith("-")) {
-        i++;
-        contracts.push(args[i].toLowerCase());
-      }
-      if (contracts.length === 0) {
-        logger.error("❌ Error: --contract (-c) requires at least one contract name");
-        exit(1);
-      }
-    } else if (arg === "--network" || arg === "-n") {
-      if (i + 1 < args.length) {
-        network = args[i + 1];
-        i++;
-      } else {
-        logger.error("❌ Error: --network (-n) requires a network name");
-        exit(1);
-      }
-    } else if (arg === "--confirmations") {
-      if (i + 1 < args.length) {
-        confirmations = parseInt(args[i + 1], 10);
-        i++;
-      } else {
-        logger.error("❌ Error: --confirmations requires a number");
-        exit(1);
-      }
-    } else if (!arg.startsWith("-")) {
-      // 位置参数作为网络名称（向后兼容）
-      if (!network) {
-        network = arg;
-      }
+      break;
     }
   }
+  return names.filter(Boolean);
+}
 
-  return {
-    network,
-    contracts: contracts.length > 0 ? contracts : undefined,
-    force,
-    confirmations,
-    verify,
-    apiKey,
-  };
+/** deploy 命令的选项（供 cli.ts 传入） */
+export interface DeployCliOptions {
+  network?: string;
+  contract?: string | string[];
+  force?: boolean;
+  verify?: boolean;
+  "api-key"?: string;
+  confirmations?: number;
 }
 
 /**
- * 主函数（当作为脚本直接运行时）
+ * 供 cli.ts 调用的 deploy 命令逻辑
  */
-async function main() {
-  // 解析命令行参数
-  const { network: networkArg, contracts, force, confirmations, verify, apiKey } = parseArgs();
+export async function runDeployCli(options: DeployCliOptions, argv: string[]): Promise<void> {
+  loadEnv();
 
-  // 确定网络：优先使用命令行参数，其次使用环境变量（getNetworkName 内部已读 WEB3_ENV），否则使用默认网络常量
-  const network = getNetworkName(networkArg, false) ?? DEFAULT_NETWORK;
-
+  const network = getNetworkName(options.network, false);
+  if (!network) {
+    logger.error($tr("foundry.deploy.networkRequired"));
+    logger.error($tr("foundry.deploy.networkRequiredHint"));
+    exit(1);
+  }
   setEnv("WEB3_ENV", network);
 
-  // 加载网络配置
+  if (!options.network && network !== "local") {
+    logger.info($tr("foundry.deploy.networkFromEnv", { network }));
+  }
+
+  const contractsFromArgv = parseContractNamesFromArgv(argv);
+  const contracts = contractsFromArgv.length > 0
+    ? contractsFromArgv
+    : (options.contract != null
+      ? (Array.isArray(options.contract) ? options.contract : [options.contract as string])
+      : undefined);
+  const force = options.force === true;
+  const scriptDir = join(cwd(), "deploy");
+
+  logger.info($tr("foundry.deploy.startDeploy"));
+  logger.info($tr("foundry.deploy.networkLabel", { network }));
+  logger.info("");
+
   let config: NetworkConfig;
   try {
     config = await loadNetworkConfigUtil();
+    logger.info($tr("foundry.deploy.rpcUrl") + " " + config.rpcUrl);
+    logger.info($tr("foundry.deploy.deployAddress") + " " + config.address);
+    if (config.chainId) logger.info($tr("foundry.deploy.chainId") + " " + String(config.chainId));
+    logger.info("");
   } catch (error) {
-    logger.error("加载网络配置失败:", error);
+    logger.error($tr("foundry.deploy.loadConfigFailed"), error);
     exit(1);
   }
 
-  // 执行部署
+  let scripts: string[];
+  try {
+    scripts = await scanDeployScripts(scriptDir);
+  } catch {
+    logger.error($tr("foundry.deploy.noScriptsFound"));
+    logger.error($tr("foundry.deploy.scriptDirHint", { scriptDir }));
+    exit(1);
+  }
+
+  if (force) {
+    const confirmed = await confirm($tr("foundry.deploy.forceConfirm"));
+    if (!confirmed) {
+      logger.info($tr("foundry.setup.operationCancelled"));
+      exit(0);
+    }
+    logger.info("");
+  }
+
+  if (contracts && contracts.length > 0) {
+    const notFoundContracts: string[] = [];
+    for (const contract of contracts) {
+      const targetScript = findContractScript(contract, scripts);
+      if (!targetScript) notFoundContracts.push(contract);
+    }
+    if (notFoundContracts.length > 0) {
+      logger.error(
+        $tr("foundry.deploy.noContractFound", { contracts: notFoundContracts.join(", ") }),
+      );
+      logger.error($tr("foundry.deploy.availableContracts"));
+      scripts.forEach((script) => {
+        const m = script.match(/^\d+-(.+)\.ts$/);
+        if (m) logger.error(`  - ${m[1]}`);
+      });
+      exit(1);
+    }
+  }
+
+  logger.info($tr("foundry.verify.sectionStart"));
+
+  const shouldVerify = options.verify === true;
+  const apiKey = shouldVerify ? getApiKey(options["api-key"]) : undefined;
+  if (shouldVerify && !apiKey) {
+    logger.error($tr("foundry.deploy.apiKeyRequired"));
+    logger.error($tr("foundry.deploy.apiKeyHint"));
+    exit(1);
+  }
+
   try {
     await deploy({
-      scriptDir: join(cwd(), "deploy"),
+      scriptDir,
       network,
       config,
       force,
       contracts,
-      confirmations,
-      verify,
-      apiKey,
+      confirmations: options.confirmations,
+      verify: options.verify,
+      apiKey: apiKey ?? undefined,
     });
+    logger.info("");
+    logger.info($tr("foundry.deploy.allScriptsDone"));
+    logger.info("");
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error("❌ 部署失败:", errorMessage);
+    const msg = error instanceof Error ? error.message : String(error);
+    logger.error($tr("foundry.deploy.deployFailed"), msg);
     exit(1);
   }
-}
-
-// 当作为脚本直接运行时执行主函数
-if (import.meta.main) {
-  main().catch((error) => {
-    logger.error("❌ 执行失败:", error);
-    exit(1);
-  });
 }

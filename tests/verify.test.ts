@@ -5,7 +5,7 @@
 
 import { cwd, existsSync, join, mkdir, remove, writeTextFile } from "@dreamer/runtime-adapter";
 import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
-import { findContractFileName, verify, verifyContract } from "../src/verify.ts";
+import { findContractFileName, verify, verifyContract } from "../src/cmd/verify.ts";
 
 describe("合约验证功能测试", () => {
   const testProjectRoot = join(cwd(), "tests", "data", "test-verify-project");

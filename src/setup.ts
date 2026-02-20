@@ -41,6 +41,7 @@ import {
   remove,
   writeStdoutSync,
 } from "@dreamer/runtime-adapter";
+import { $tr } from "./i18n.ts";
 import type { JsrDenoJson, JsrMetaData } from "./types/index.ts";
 import { readCache, setInstalledVersion, writeCache } from "./utils/cache.ts";
 import { parseJsrPackageFromUrl } from "./utils/jsr.ts";
@@ -54,7 +55,8 @@ import { logger } from "./utils/logger.ts";
 function findLocalProjectRoot(startDir: string): string | null {
   let currentDir = startDir;
   const plat = platform();
-  const root = plat === "windows" ? /^[A-Z]:\\$/ : /^\/$/;
+  // Windows 下 dirname/join 经 runtime-adapter 统一为正斜杠，根为 "C:" 或 "C:/"
+  const root = plat === "windows" ? /^[A-Za-z]:\/?$/ : /^\/$/;
 
   while (true) {
     const denoJsonPath = join(currentDir, "deno.json");
@@ -158,7 +160,7 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
     packageName = packageInfo.packageName;
     parsedVersion = packageInfo.version;
   } else {
-    logger.warn("⚠️  无法从 import.meta.url 或本地项目解析包信息，使用默认值");
+    logger.warn($tr("foundry.setup.packageInfoFallback"));
   }
 
   try {
@@ -179,7 +181,9 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
         const metaUrl = `https://jsr.io/${packageName}/meta.json`;
         const metaResponse = await fetch(metaUrl);
         if (!metaResponse.ok) {
-          throw new Error(`无法获取 meta.json: ${metaResponse.statusText}`);
+          throw new Error(
+            $tr("foundry.setup.metaFetchFailed", { message: metaResponse.statusText }),
+          );
         }
         metaData = await metaResponse.json() as JsrMetaData;
         // 写入缓存
@@ -188,7 +192,7 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
 
       const latestVersion = metaData.latest || Object.keys(metaData.versions || {})[0];
       if (!latestVersion) {
-        throw new Error("无法从 meta.json 获取最新版本");
+        throw new Error($tr("foundry.setup.metaLatestFailed"));
       }
       version = latestVersion;
     }
@@ -212,7 +216,10 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
         },
       });
       if (!response.ok) {
-        throw new Error(`无法获取 deno.json: ${response.statusText} (${response.status})`);
+        throw new Error($tr("foundry.setup.denoJsonFetchFailed", {
+          message: response.statusText,
+          status: String(response.status),
+        }));
       }
 
       // 检查 Content-Type，确保返回的是 JSON
@@ -226,10 +233,10 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
           try {
             denoJson = JSON.parse(jsonMatch[1]) as JsrDenoJson;
           } catch {
-            throw new Error("无法解析 HTML 中的 JSON 内容");
+            throw new Error($tr("foundry.setup.htmlJsonParseFailed"));
           }
         } else {
-          throw new Error(`返回的内容不是 JSON，Content-Type: ${contentType}`);
+          throw new Error($tr("foundry.setup.contentNotJson", { contentType: contentType || "" }));
         }
       } else {
         denoJson = await response.json() as JsrDenoJson;
@@ -244,9 +251,9 @@ async function fetchJsrDenoJson(): Promise<{ version: string; imports: Record<st
       imports: denoJson.imports || {},
     };
   } catch (error) {
-    logger.error("❌ 获取 deno.json 信息失败:", error);
+    logger.error($tr("foundry.setup.denoJsonFailed"), error);
     if (error instanceof Error) {
-      logger.error(`   错误详情: ${error.message}`);
+      logger.error($tr("foundry.setup.errorDetail", { message: error.message }));
     }
     exit(1);
   }
@@ -297,9 +304,9 @@ async function getPaths() {
  * 安装 CLI 到全局
  */
 async function install(): Promise<void> {
-  logger.info("===========================================");
-  logger.info("🚀 安装 Foundry CLI 到全局");
-  logger.info("===========================================");
+  logger.info($tr("foundry.init.separator"));
+  logger.info($tr("foundry.setup.installTitle"));
+  logger.info($tr("foundry.init.separator"));
   logger.info("");
 
   const { cliUrl, version } = await getPaths();
@@ -330,7 +337,7 @@ async function install(): Promise<void> {
       stderr: "piped",
     });
 
-    logger.info("正在安装...");
+    logger.info($tr("foundry.setup.installing"));
     const output = await cmd.output();
     const stdoutText = new TextDecoder().decode(output.stdout);
     const stderrText = new TextDecoder().decode(output.stderr);
@@ -345,83 +352,80 @@ async function install(): Promise<void> {
         await setInstalledVersion(version, packageName);
 
         logger.info("");
-        logger.info("✅ Foundry CLI 安装成功！");
-        logger.info(`   版本: ${version}`);
+        logger.info($tr("foundry.setup.installSuccess"));
+        logger.info($tr("foundry.setup.versionLabel", { version }));
         logger.info("");
       } catch {
-        // 缓存写入失败不影响安装，只记录警告
-        logger.warn("⚠️  无法写入版本缓存，但不影响安装");
+        logger.warn($tr("foundry.setup.versionCacheWarn"));
         logger.info("");
-        logger.info("✅ Foundry CLI 安装成功！");
+        logger.info($tr("foundry.setup.installSuccess"));
         logger.info("");
       }
 
-      // 检查并安装官方 Foundry 工具链（forge/cast/anvil）
-      logger.info("🔧 检查官方 Foundry 工具链...");
+      logger.info($tr("foundry.setup.checkFoundry"));
       try {
         await ensureFoundryInstalled();
-        logger.info("✅ 官方 Foundry 工具链已就绪");
+        logger.info($tr("foundry.setup.foundryReady"));
         logger.info("");
       } catch {
-        logger.warn("⚠️  官方 Foundry 安装失败，请手动安装：");
-        logger.warn("   curl -L https://foundry.paradigm.xyz | bash");
-        logger.warn("   然后运行 foundryup");
+        logger.warn($tr("foundry.setup.foundryInstallFailed"));
+        logger.warn($tr("foundry.setup.foundryInstallCmd"));
+        logger.warn($tr("foundry.setup.foundryupCmd"));
         logger.info("");
       }
 
-      logger.info("现在可以在任何地方使用以下命令：");
+      logger.info($tr("foundry.setup.usageIntro"));
       logger.info("");
-      logger.info("  📦 项目初始化:");
-      logger.info("    foundry init [项目名]              创建新的 Foundry + Deno/Bun 项目");
+      logger.info($tr("foundry.setup.initUsage"));
+      logger.info($tr("foundry.setup.initCmd"));
       logger.info("");
-      logger.info("  🔨 编译合约:");
-      logger.info("    foundry build                      编译 Solidity 合约");
-      logger.info("    foundry build -s                   编译并显示合约大小");
-      logger.info("    foundry build -f                   强制重新编译");
+      logger.info($tr("foundry.setup.buildUsage"));
+      logger.info($tr("foundry.setup.buildCmd"));
+      logger.info($tr("foundry.setup.buildSizeCmd"));
+      logger.info($tr("foundry.setup.buildForceCmd"));
       logger.info("");
-      logger.info("  🚀 部署合约:");
-      logger.info("    foundry deploy -n <网络>           部署合约到指定网络");
-      logger.info("    foundry deploy -n <网络> -f        强制重新部署");
-      logger.info("    foundry deploy -n <网络> -c <合约> 部署指定合约");
-      logger.info("    foundry deploy -n <网络> --verify  部署后自动验证");
+      logger.info($tr("foundry.setup.deployUsage"));
+      logger.info($tr("foundry.setup.deployCmd1"));
+      logger.info($tr("foundry.setup.deployCmd2"));
+      logger.info($tr("foundry.setup.deployCmd3"));
+      logger.info($tr("foundry.setup.deployVerifyCmd"));
       logger.info("");
-      logger.info("  ✅ 验证合约:");
-      logger.info("    foundry verify -n <网络> -c <合约> 验证指定合约");
-      logger.info("    foundry verify -n <网络>           验证所有已部署合约");
+      logger.info($tr("foundry.setup.verifyUsage"));
+      logger.info($tr("foundry.setup.verifyCmd1"));
+      logger.info($tr("foundry.setup.verifyCmd2"));
       logger.info("");
-      logger.info("  📜 执行脚本:");
-      logger.info("    foundry run <脚本>                 执行 TypeScript 脚本");
-      logger.info("    foundry run <脚本> -n <网络>       指定网络执行脚本");
+      logger.info($tr("foundry.setup.runUsage"));
+      logger.info($tr("foundry.setup.runCmd1"));
+      logger.info($tr("foundry.setup.runCmd2"));
       logger.info("");
-      logger.info("  🧪 运行测试:");
-      logger.info("    foundry test                       运行所有测试");
-      logger.info("    foundry test -n <网络>             指定网络运行测试");
-      logger.info("    foundry test -f <过滤>             过滤测试名称");
-      logger.info("    foundry test -w                    监听文件变化");
+      logger.info($tr("foundry.setup.testUsage"));
+      logger.info($tr("foundry.setup.testCmd1"));
+      logger.info($tr("foundry.setup.testCmd2"));
+      logger.info($tr("foundry.setup.testCmd3"));
       logger.info("");
-      logger.info("  ⬆️  升级 CLI:");
-      logger.info("    foundry upgrade                    升级到最新正式版");
-      logger.info("    foundry upgrade --beta             升级到最新 beta 版");
+      logger.info($tr("foundry.setup.upgradeUsage"));
+      logger.info($tr("foundry.setup.upgradeCmd1"));
+      logger.info($tr("foundry.setup.upgradeCmd2"));
       logger.info("");
-      logger.info("查看详细帮助：");
-      logger.info("  foundry --help                       查看所有命令");
-      logger.info("  foundry <命令> --help                查看命令详细参数");
+      logger.info($tr("foundry.setup.helpIntro"));
+      logger.info($tr("foundry.setup.helpCmd1"));
+      logger.info($tr("foundry.setup.helpCmd2"));
       logger.info("");
 
       if (stdoutText) {
         logger.info("");
-        logger.info("安装信息：");
+        logger.info($tr("foundry.setup.installInfo"));
         logger.info(stdoutText);
       }
     } else {
-      logger.error("❌ 安装失败");
+      logger.error($tr("foundry.setup.installFailed"));
       if (stderrText) {
         logger.error(stderrText);
       }
       exit(1);
     }
   } catch (error) {
-    logger.error("❌ 安装过程中发生错误:", error);
+    logger.error($tr("foundry.setup.installError"), error);
     exit(1);
   }
 }
@@ -455,12 +459,10 @@ export async function ensureFoundryInstalled(): Promise<void> {
     return;
   }
 
-  logger.info("未检测到 Foundry (forge)，正在自动安装...");
+  logger.info($tr("foundry.setup.foundryNotDetected"));
   const plat = platform();
   if (plat === "windows") {
-    logger.warn(
-      "Windows 下自动安装可能失败，请使用 Git BASH 或 WSL 执行，或手动安装: https://book.getfoundry.sh/getting-started/installation",
-    );
+    logger.warn($tr("foundry.setup.windowsInstallWarn"));
   }
 
   try {
@@ -472,13 +474,13 @@ export async function ensureFoundryInstalled(): Promise<void> {
     });
     const installOut = await installCmd.output();
     if (!installOut.success) {
-      throw new Error("Foundry 安装脚本执行失败");
+      throw new Error($tr("foundry.setup.installScriptFailed"));
     }
 
     const homeDir = getEnv("HOME") || getEnv("USERPROFILE") || "";
     const foundryupPath = homeDir ? join(homeDir, ".foundry", "bin", "foundryup") : "foundryup";
     if (existsSync(foundryupPath)) {
-      logger.info("正在运行 foundryup 安装 forge/cast/anvil...");
+      logger.info($tr("foundry.setup.runningFoundryup"));
       const foundryupCmd = createCommand(foundryupPath, {
         args: [],
         stdout: "inherit",
@@ -486,15 +488,15 @@ export async function ensureFoundryInstalled(): Promise<void> {
       });
       const foundryupOut = await foundryupCmd.output();
       if (!foundryupOut.success) {
-        logger.warn("foundryup 执行未成功，请在新终端中执行 foundryup 后重试");
+        logger.warn($tr("foundry.setup.foundryupFailed"));
       }
     } else {
-      logger.info("请在新终端中执行 foundryup 完成安装，或将 ~/.foundry/bin 加入 PATH 后重试");
+      logger.info($tr("foundry.setup.foundryupManual"));
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    logger.error(`自动安装 Foundry 失败: ${msg}`);
-    logger.info("请手动安装: curl -L https://foundry.paradigm.xyz | bash，然后执行 foundryup");
+    logger.error($tr("foundry.setup.autoInstallFailed", { message: msg }));
+    logger.info($tr("foundry.setup.manualInstallCmd"));
     throw err;
   }
 }
@@ -599,9 +601,9 @@ async function confirm(message: string): Promise<boolean> {
  * 卸载 CLI
  */
 export async function uninstall(): Promise<void> {
-  logger.info("===========================================");
-  logger.info("🗑️  卸载 Foundry CLI");
-  logger.info("===========================================");
+  logger.info($tr("foundry.init.separator"));
+  logger.info($tr("foundry.setup.uninstallTitle"));
+  logger.info($tr("foundry.init.separator"));
   logger.info("");
 
   try {
@@ -609,9 +611,9 @@ export async function uninstall(): Promise<void> {
     const foundryPath = await findFoundryPath();
 
     if (!foundryPath) {
-      logger.warn("⚠️  Foundry CLI 未找到，可能已经卸载");
+      logger.warn($tr("foundry.setup.uninstallNotFound"));
       logger.info("");
-      logger.info("如果已安装但未找到，请手动检查以下常见路径：");
+      logger.info($tr("foundry.setup.uninstallCheckPaths"));
       const homeDir = getEnv("HOME") || getEnv("USERPROFILE") || "";
       if (homeDir) {
         logger.info(`  ${join(homeDir, ".deno", "bin", "foundry")}`);
@@ -621,37 +623,34 @@ export async function uninstall(): Promise<void> {
     }
 
     // 显示找到的路径并要求用户确认
-    logger.info(`找到 Foundry CLI 安装路径: ${foundryPath}`);
+    logger.info($tr("foundry.setup.foundryPathFound", { path: foundryPath }));
     logger.info("");
 
-    const confirmed = await confirm(
-      "⚠️  警告：此操作将删除 Foundry CLI 全局命令。\n" +
-        "是否确认卸载？",
-    );
+    const confirmed = await confirm($tr("foundry.setup.uninstallConfirm"));
 
     if (!confirmed) {
-      logger.info("操作已取消。");
+      logger.info($tr("foundry.setup.operationCancelled"));
       return;
     }
 
     try {
       if (existsSync(foundryPath)) {
         await remove(foundryPath);
-        logger.info("✅ Foundry CLI 已卸载");
-        logger.info(`   已删除: ${foundryPath}`);
+        logger.info($tr("foundry.setup.uninstallSuccess"));
+        logger.info($tr("foundry.setup.uninstallDeleted", { path: foundryPath }));
       } else {
-        logger.warn("⚠️  Foundry CLI 未找到，可能已经卸载");
-        logger.info(`   预期路径: ${foundryPath}`);
+        logger.warn($tr("foundry.setup.uninstallNotFound"));
+        logger.info($tr("foundry.setup.uninstallExpectedPath", { path: foundryPath }));
       }
     } catch (error) {
-      logger.error("❌ 卸载失败:", error);
+      logger.error($tr("foundry.setup.uninstallFailedMsg"), error);
       logger.info("");
-      logger.info("请手动删除以下文件：");
+      logger.info($tr("foundry.setup.uninstallManualDelete"));
       logger.info(`  ${foundryPath}`);
       exit(1);
     }
   } catch (error) {
-    logger.error("❌ 卸载过程中发生错误:", error);
+    logger.error($tr("foundry.setup.uninstallError"), error);
     exit(1);
   }
 }
@@ -665,33 +664,7 @@ async function main() {
   if (cmdArgs.length > 0 && (cmdArgs[0] === "--uninstall" || cmdArgs[0] === "-u")) {
     await uninstall();
   } else if (cmdArgs.length > 0 && (cmdArgs[0] === "--help" || cmdArgs[0] === "-h")) {
-    logger.info(`
-Foundry CLI 全局安装脚本
-
-用法:
-  deno run -A setup.ts [选项]
-
-选项:
-  --install, -i    安装 Foundry CLI 到全局（默认）
-  --uninstall, -u  卸载 Foundry CLI
-  --help, -h       显示此帮助信息
-
-示例:
-  # 安装
-  deno run -A setup.ts
-
-  # 卸载
-  deno run -A setup.ts --uninstall
-
-安装后使用:
-  foundry init myproject              # 创建新项目
-  foundry build                       # 编译合约
-  foundry deploy -n testnet           # 部署合约
-  foundry deploy -n testnet --verify  # 部署并验证
-  foundry verify -n testnet -c Token  # 验证合约
-  foundry run scripts/mint.ts -n local # 执行脚本
-  foundry test -n local               # 运行测试
-`);
+    logger.info($tr("foundry.setup.helpFull"));
   } else {
     await install();
   }

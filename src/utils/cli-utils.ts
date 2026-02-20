@@ -22,6 +22,7 @@ import {
   PROGRESS_BAR_INTERVAL,
 } from "../constants/index.ts";
 import type { CommandStatus, GlobalCache } from "../types/index.ts";
+import { $tr } from "../i18n.ts";
 import { loadEnv } from "./env.ts";
 import { parseJsrPackageFromUrl } from "./jsr.ts";
 import { logger } from "./logger.ts";
@@ -33,13 +34,13 @@ import { logger } from "./logger.ts";
 export function getProjectConfig(): { projectRoot: string; denoJsonPath: string } | null {
   const projectRoot = findProjectRoot(cwd());
   if (!projectRoot) {
-    logger.error("❌ 未找到项目根目录（包含 deno.json 的目录）");
+    logger.error($tr("foundry.utils.projectRootNotFoundDeno"));
     return null;
   }
 
   const denoJsonPath = join(projectRoot, "deno.json");
   if (!existsSync(denoJsonPath)) {
-    logger.error(`❌ 未找到项目的 deno.json 文件: ${denoJsonPath}`);
+    logger.error($tr("foundry.utils.denoJsonNotFound", { path: denoJsonPath }));
     return null;
   }
 
@@ -394,10 +395,9 @@ export async function loadNetworkConfig(_network?: string): Promise<{
       };
     }
   } catch (error) {
-    logger.warn("无法从 config/web3.json 加载配置:", error);
+    logger.warn($tr("foundry.utils.configLoadWarn"), error);
   }
 
-  // 如果都加载失败，尝试从 .env 文件加载
   try {
     const env = loadEnv();
     return {
@@ -407,8 +407,8 @@ export async function loadNetworkConfig(_network?: string): Promise<{
       chainId: env.CHAIN_ID ? parseInt(env.CHAIN_ID, 10) : undefined,
     };
   } catch {
-    logger.error("无法加载网络配置，请设置环境变量或创建 config/web3.json 配置文件");
-    throw new Error("网络配置加载失败");
+    logger.error($tr("foundry.utils.networkConfigLoadFailed"));
+    throw new Error($tr("foundry.utils.networkConfigLoadFailedThrow"));
   }
 }
 

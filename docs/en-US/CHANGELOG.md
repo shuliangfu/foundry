@@ -5,6 +5,31 @@ All notable changes to @dreamer/foundry are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.11] - 2026-02-20
+
+### Added
+
+- **CI**: GitHub Actions workflow `.github/workflows/ci.yml` runs `deno check`, `deno lint`, and
+  `deno test -A tests/` on Linux, macOS, and Windows on push or PR to `dev` for cross-platform
+  validation.
+- **i18n**: New dependency `@dreamer/i18n`; CLI and related copy now use internationalization (e.g.
+  English and Chinese) with strings managed in `src/locales/` and `$tr()`.
+
+### Changed
+
+- **CLI**: Refactored `cli.ts` so that deploy, init, verify, run, test, upgrade, uninstall, and
+  build logic live in `src/cmd/`; the CLI entry only registers commands and delegates execution for
+  easier maintenance and extension.
+- Dependency updates: upgrade `@dreamer/web3`, `@dreamer/logger`, `@dreamer/runtime-adapter`,
+  `@dreamer/test`, `@dreamer/console` to current stable versions.
+- **Windows compatibility**: `run` command now uses `isAbsolute`/`resolve` for script path so
+  Windows absolute paths (e.g. `C:\path\to\script.ts`) work; `setup.ts` and `cmd/upgrade.ts` Windows
+  root detection updated to match forward-slash form (`C:`/`C:/`) from runtime-adapter to avoid
+  incorrect root detection.
+- Test reports (`docs/zh-CN/TEST_REPORT.md`, `docs/en-US/TEST_REPORT.md`) and README (root and
+  `docs/zh-CN/README.md`): update test stats to 264 total, 261 passed, 3 ignored, ~6s execution
+  time, 98.9% pass rate.
+
 ## [1.7.10] - 2026-02-13
 
 ### Added

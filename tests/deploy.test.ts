@@ -4,8 +4,8 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
-import { createDeployer, deploy as _deploy } from "../src/deploy.ts";
-import { verify as _verify } from "../src/verify.ts";
+import { createDeployer, deploy as _deploy } from "../src/cmd/deploy.ts";
+import { verify as _verify } from "../src/cmd/verify.ts";
 import {
   deployContract as _deployContract,
   loadContract,

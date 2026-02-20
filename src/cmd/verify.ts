@@ -19,7 +19,6 @@
  */
 
 import {
-  args as runtimeArgs,
   createCommand,
   cwd,
   existsSync,
@@ -29,19 +28,20 @@ import {
   readTextFileSync,
   setEnv,
 } from "@dreamer/runtime-adapter";
-import { DEFAULT_NETWORK } from "./constants/index.ts";
-import { ConfigurationError, NetworkError, VerificationError } from "./errors/index.ts";
-import type { AbiConstructor, AbiItem, ContractInfo } from "./types/index.ts";
+import { ConfigurationError, NetworkError, VerificationError } from "../errors/index.ts";
+import type { AbiConstructor, AbiItem, ContractInfo } from "../types/index.ts";
+import { $tr } from "../i18n.ts";
 import {
   createLoadingProgressBar,
   executeCommandWithStream,
   getApiKey,
   getNetworkName,
   loadNetworkConfig,
-} from "./utils/cli-utils.ts";
-import { loadContract } from "./utils/deploy-utils.ts";
-import { logger } from "./utils/logger.ts";
-import { loadWeb3ConfigSync } from "./utils/web3.ts";
+} from "../utils/cli-utils.ts";
+import { loadContract } from "../utils/deploy-utils.ts";
+import { loadEnv } from "../utils/env.ts";
+import { logger } from "../utils/logger.ts";
+import { loadWeb3ConfigSync } from "../utils/web3.ts";
 
 /**
  * 网络配置映射
@@ -287,16 +287,14 @@ export async function verify(options: VerifyOptions): Promise<void> {
     if (encodedArgs) {
       args.push("--constructor-args");
       args.push(encodedArgs);
-      logger.info("ℹ️  使用构造函数参数（已编码）");
+      logger.info($tr("foundry.verify.useConstructorArgs"));
     } else {
-      // 如果编码失败，尝试使用 --guess-constructor-args
-      logger.warn("⚠️  无法编码构造函数参数，尝试使用 --guess-constructor-args");
+      logger.warn($tr("foundry.verify.cannotEncodeTryGuess"));
       args.push("--guess-constructor-args");
     }
   }
 
-  // 在验证之前，先检查合约是否在链上
-  logger.info("🔍 检查合约是否已部署到链上...");
+  logger.info($tr("foundry.verify.checkContractOnChain"));
   const checkCmd = createCommand("cast", {
     args: ["code", options.address, "--rpc-url", options.rpcUrl],
     stdout: "piped",
@@ -307,29 +305,28 @@ export async function verify(options: VerifyOptions): Promise<void> {
   const contractCode = new TextDecoder().decode(checkOutput.stdout).trim();
 
   if (!checkOutput.success || !contractCode || contractCode === "0x" || contractCode.length <= 2) {
-    logger.error("❌ 错误：链上未找到合约");
-    logger.error(`   地址: ${options.address}`);
-    logger.error(`   网络: ${options.network} (Chain ID: ${options.chainId || 1})`);
+    logger.error($tr("foundry.verify.contractNotFoundOnChain"));
+    logger.error($tr("foundry.verify.addressLabel", { address: options.address }));
+    logger.error($tr("foundry.verify.networkChainId", {
+      network: options.network,
+      chainId: String(options.chainId || 1),
+    }));
     logger.error("");
-    logger.error("可能的原因：");
-    logger.error("  1. 合约尚未部署到此地址");
-    logger.error("  2. 合约部署失败");
-    logger.error("  3. 网络或地址错误");
+    logger.error($tr("foundry.verify.possibleReasons"));
+    logger.error($tr("foundry.verify.reason1"));
+    logger.error($tr("foundry.verify.reason2"));
+    logger.error($tr("foundry.verify.reason3"));
     logger.error("");
-    logger.error("请检查：");
+    logger.error($tr("foundry.verify.pleaseCheck"));
     if (options.network === "testnet") {
-      logger.error(
-        `  - 在 BSCScan 上查看地址: https://testnet.bscscan.com/address/${options.address}`,
-      );
+      logger.error($tr("foundry.verify.bscscanTestnet", { address: options.address }));
     } else if (options.network === "mainnet") {
-      logger.error(`  - 在 BSCScan 上查看地址: https://bscscan.com/address/${options.address}`);
+      logger.error($tr("foundry.verify.bscscanMainnet", { address: options.address }));
     } else if (options.network === "sepolia") {
-      logger.error(
-        `  - 在 Etherscan 上查看地址: https://sepolia.etherscan.io/address/${options.address}`,
-      );
+      logger.error($tr("foundry.verify.sepoliaEtherscan", { address: options.address }));
     }
-    logger.error("  - 确保合约已成功部署");
-    logger.error("  - 如果刚刚部署，请等待几个区块确认");
+    logger.error($tr("foundry.verify.ensureDeployed"));
+    logger.error($tr("foundry.verify.waitBlocks"));
     throw new NetworkError(
       `链上未找到合约，地址: ${options.address}`,
       {
@@ -340,14 +337,12 @@ export async function verify(options: VerifyOptions): Promise<void> {
     );
   }
 
-  logger.info("✅ 链上找到合约代码，开始验证...");
+  logger.info($tr("foundry.verify.contractFoundVerifying"));
   logger.info("");
 
-  // 添加 --watch 参数，等待验证完成
   args.push("--watch");
 
-  // 启动验证进度条
-  const progressBar = createLoadingProgressBar("正在验证中...");
+  const progressBar = createLoadingProgressBar($tr("foundry.verify.verifyingProgress"));
   const progressInterval = progressBar.start();
 
   const cmd = createCommand("forge", {
@@ -369,18 +364,17 @@ export async function verify(options: VerifyOptions): Promise<void> {
   const stderrText = result.stderr;
 
   if (!result.success) {
-    logger.error("Verification failed:");
+    logger.error($tr("foundry.verify.verificationFailed"));
     logger.error(stderrText);
 
-    // 检查是否是 API Key 相关的错误
     if (stderrText.includes("Invalid API Key") || stderrText.includes("API key")) {
       logger.error("");
-      logger.error("💡 提示：");
-      logger.error("   1. 请检查 API Key 是否正确设置");
-      logger.error("   2. 对于 BSC 测试网，请使用 BSCScan 的 API Key");
-      logger.error("   3. 对于 Ethereum 网络，请使用 Etherscan 的 API Key");
-      logger.error("   4. 可以在 .env 文件中设置: ETH_API_KEY=your-api-key");
-      logger.error("   5. 或使用命令行参数: --api-key your-api-key");
+      logger.error("💡 " + $tr("foundry.verify.pleaseCheck"));
+      logger.error($tr("foundry.verify.apiKeyTip1"));
+      logger.error($tr("foundry.verify.apiKeyTip2"));
+      logger.error($tr("foundry.verify.apiKeyTip3"));
+      logger.error($tr("foundry.verify.apiKeyTip4"));
+      logger.error($tr("foundry.verify.apiKeyTip5"));
     }
 
     const isApiKeyError = stderrText.includes("Invalid API Key") || stderrText.includes("API key");
@@ -444,13 +438,13 @@ export async function verify(options: VerifyOptions): Promise<void> {
     const urlMatch = stdoutText.match(/URL:\s*(https?:\/\/[^\s]+)/);
     const explorerUrl = urlMatch ? urlMatch[1] : `${networkConfig.explorerUrl}/${options.address}`;
 
-    logger.info(`✅ 合约验证成功: ${explorerUrl}`);
+    logger.info($tr("foundry.verify.verifySuccessUrl", { url: explorerUrl }));
   } else if (filteredOutput) {
-    // 如果有其他重要输出，显示它
     logger.info(filteredOutput);
   } else {
-    // 默认成功消息
-    logger.info(`✅ Contract verified: ${networkConfig.explorerUrl}/${options.address}`);
+    logger.info($tr("foundry.verify.contractVerified", {
+      url: `${networkConfig.explorerUrl}/${options.address}`,
+    }));
   }
 }
 
@@ -560,14 +554,14 @@ async function encodeConstructorArgs(
 
     if (!output.success) {
       const error = new TextDecoder().decode(output.stderr);
-      logger.warn(`⚠️  编码构造函数参数失败: ${error}`);
+      logger.warn($tr("foundry.verify.encodeConstructorFailed", { error }));
       return null;
     }
 
     const encoded = new TextDecoder().decode(output.stdout).trim();
     return encoded || null;
   } catch (error) {
-    logger.warn(`⚠️  编码构造函数参数时出错: ${error}`);
+    logger.warn($tr("foundry.verify.encodeConstructorError", { error: String(error) }));
     return null;
   }
 }
@@ -626,140 +620,105 @@ export function verifyContract(
   });
 }
 
-/**
- * 解析命令行参数
- */
-function parseArgs(): {
-  network?: string;
-  contracts?: string[];
-  address?: string;
-  rpcUrl?: string;
-  apiKey?: string;
-  chainId?: number;
-  constructorArgs?: string[];
-} {
-  // 获取命令行参数（runtimeArgs 来自 runtime-adapter，需要调用函数获取参数数组）
-  const args: string[] = typeof runtimeArgs === "function" ? runtimeArgs() : [];
-  let network: string | undefined;
-  const contracts: string[] = [];
-  let address: string | undefined;
-  let rpcUrl: string | undefined;
-  let apiKey: string | undefined;
-  let chainId: number | undefined;
-  const constructorArgs: string[] = [];
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-
-    if (arg === "--network" || arg === "-n") {
-      if (i + 1 < args.length) {
-        network = args[i + 1];
+/** 从 argv 解析 -c/--contract 后的多个合约名称 */
+function parseContractNamesFromArgv(argv: string[]): string[] {
+  const names: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "-c" || argv[i] === "--contract") {
+      while (i + 1 < argv.length && !argv[i + 1].startsWith("-")) {
         i++;
+        names.push(argv[i].trim());
       }
-    } else if (arg === "--contract" || arg === "-c") {
-      // 收集所有后续的非选项参数作为合约名称
-      while (i + 1 < args.length && !args[i + 1].startsWith("-")) {
-        i++;
-        contracts.push(args[i].trim());
-      }
-    } else if (arg === "--address" || arg === "-a") {
-      if (i + 1 < args.length) {
-        address = args[i + 1];
-        i++;
-      }
-    } else if (arg === "--rpc-url") {
-      if (i + 1 < args.length) {
-        rpcUrl = args[i + 1];
-        i++;
-      }
-    } else if (arg === "--api-key") {
-      if (i + 1 < args.length) {
-        apiKey = args[i + 1];
-        i++;
-      }
-    } else if (arg === "--chain-id") {
-      if (i + 1 < args.length) {
-        chainId = parseInt(args[i + 1], 10);
-        i++;
-      }
-    } else if (arg === "--constructor-args") {
-      // 收集所有后续的参数作为构造函数参数
-      while (i + 1 < args.length && !args[i + 1].startsWith("-")) {
-        i++;
-        constructorArgs.push(args[i]);
-      }
+      break;
     }
   }
+  return names.filter(Boolean);
+}
 
-  return {
-    network,
-    contracts: contracts.length > 0 ? contracts : undefined,
-    address,
-    rpcUrl,
-    apiKey,
-    chainId,
-    constructorArgs: constructorArgs.length > 0 ? constructorArgs : undefined,
-  };
+/** verify 命令的选项（供 cli.ts 传入） */
+export interface VerifyCliOptions {
+  network?: string;
+  contract?: string | string[];
+  address?: string;
+  "rpc-url"?: string;
+  "api-key"?: string;
+  "chain-id"?: number;
 }
 
 /**
- * 主函数（当作为脚本直接运行时）
+ * 供 cli.ts 调用的 verify 命令逻辑
  */
-async function main() {
-  // 解析命令行参数
-  const {
-    network: networkArg,
-    contracts: contractNames,
-    address,
-    rpcUrl,
-    apiKey,
-    chainId,
-    constructorArgs,
-  } = parseArgs();
+export async function runVerifyCli(
+  options: VerifyCliOptions,
+  argv: string[],
+): Promise<void> {
+  loadEnv();
 
-  // 确定网络：优先使用命令行参数，其次使用环境变量（getNetworkName 内部已读 WEB3_ENV），否则使用默认网络常量
-  const network = getNetworkName(networkArg, false) ?? DEFAULT_NETWORK;
-
+  const network = getNetworkName(options.network, false);
+  if (!network) {
+    logger.error($tr("foundry.verify.networkRequired"));
+    logger.error($tr("foundry.verify.networkHint"));
+    exit(1);
+  }
   setEnv("WEB3_ENV", network);
 
-  if (!contractNames || contractNames.length === 0) {
-    logger.error("❌ 未指定合约名称");
-    logger.error(
-      "   请使用 --contract (-c) 参数指定合约名称，可指定多个，例如: -c Contract1 Contract2",
-    );
+  if (!options.network && network !== "local") {
+    logger.info($tr("foundry.deploy.networkFromEnv", { network }));
+  }
+
+  const contractsFromArgv = parseContractNamesFromArgv(argv);
+  const contractNames = contractsFromArgv.length > 0
+    ? contractsFromArgv
+    : (Array.isArray(options.contract)
+      ? options.contract
+      : options.contract != null
+      ? [options.contract as string]
+      : []);
+
+  if (contractNames.length === 0) {
+    logger.error($tr("foundry.verify.contractRequired"));
+    logger.error($tr("foundry.verify.contractHint"));
     exit(1);
   }
 
-  // 获取 API Key（从命令行参数或环境变量）
-  const finalApiKey = getApiKey(apiKey);
+  const finalApiKey = getApiKey(options["api-key"]);
   if (!finalApiKey) {
-    logger.error("❌ 未指定 API Key");
-    logger.error("   请使用 --api-key 参数或设置环境变量 ETH_API_KEY");
+    logger.error($tr("foundry.verify.apiKeyRequired"));
+    logger.error($tr("foundry.verify.apiKeyHint"));
     exit(1);
   }
 
-  // 确定 RPC URL 和链 ID（多合约共用）
-  let finalRpcUrl = rpcUrl;
-  let finalChainId = chainId;
-  if (!finalRpcUrl || !finalChainId) {
+  logger.info($tr("foundry.verify.sectionStart"));
+  logger.info($tr("foundry.verify.startVerify"));
+  logger.info($tr("foundry.verify.sectionStart"));
+  logger.info($tr("foundry.verify.networkLabel") + " " + network);
+  logger.info($tr("foundry.verify.contractNamesLabel") + " " + contractNames.join(", "));
+  logger.info($tr("foundry.verify.sectionStart"));
+  logger.info("");
+
+  let finalRpcUrl = options["rpc-url"];
+  let finalChainId = options["chain-id"];
+  if (!finalRpcUrl || finalChainId === undefined) {
     try {
       const config = await loadNetworkConfig();
       finalRpcUrl = finalRpcUrl || config.rpcUrl;
-      finalChainId = finalChainId || config.chainId;
+      finalChainId = finalChainId ?? config.chainId;
     } catch {
-      logger.warn("无法从配置加载 RPC URL 和链 ID，请使用 --rpc-url 和 --chain-id 参数指定");
+      logger.warn($tr("foundry.verify.rpcChainIdWarn"));
     }
   }
   if (!finalRpcUrl) {
-    logger.error("❌ 未指定 RPC URL，请使用 --rpc-url 参数或配置环境变量");
+    logger.error($tr("foundry.verify.rpcUrlRequired"));
     exit(1);
   }
-  if (!finalChainId) {
-    logger.error("❌ 未指定链 ID，请使用 --chain-id 参数或配置环境变量");
+  if (finalChainId === undefined) {
+    logger.error($tr("foundry.verify.chainIdRequired"));
     exit(1);
   }
 
-  // 多合约时 --address 仅对第一个有效，其余从 build/abi 读取
+  const address = options.address;
+  const constructorArgs: string[] | undefined = undefined;
+
   for (let idx = 0; idx < contractNames.length; idx++) {
     const contractName = contractNames[idx];
     const useAddress = contractNames.length === 1 ? address : undefined;
@@ -771,24 +730,24 @@ async function main() {
         contractInfo = loadContract(contractName, network);
         contractAddress = contractInfo.address;
       } catch {
-        logger.error(
-          `❌ 合约 ${contractName} 无法读取地址，请使用 --address 指定或确保已部署并存在 build/abi/${network}/${contractName}.json`,
-        );
+        logger.error($tr("foundry.verify.verifyReadAddressFailed", {
+          name: contractName,
+          network,
+        }));
         exit(1);
       }
     } else {
       try {
         contractInfo = loadContract(contractName, network);
       } catch {
-        // 忽略
+        // ignore
       }
     }
 
-    // 保留嵌套数组结构，避免 .map(String) 把 address[] 变成 "addr1,addr2,..."
     let finalConstructorArgs: unknown[] | undefined = contractNames.length === 1
-      ? (constructorArgs && constructorArgs.length > 0 ? constructorArgs : undefined)
+      ? constructorArgs
       : undefined;
-    if (!finalConstructorArgs && contractInfo && contractInfo.args) {
+    if (!finalConstructorArgs && contractInfo?.args) {
       finalConstructorArgs = contractInfo.args;
     }
 
@@ -797,11 +756,15 @@ async function main() {
       ? actualFileName.replace(/\.json$/, "")
       : contractName;
     if (actualFileName && actualFileName !== `${contractName}.json`) {
-      logger.info(`ℹ️  合约名称已自动匹配为: ${actualContractName}`);
+      logger.info($tr("foundry.verify.contractNameMatched", { name: actualContractName }));
     }
 
     if (contractNames.length > 1) {
-      logger.info(`[${idx + 1}/${contractNames.length}] 验证合约: ${actualContractName}`);
+      logger.info($tr("foundry.verify.verifyingContractN", {
+        current: String(idx + 1),
+        total: String(contractNames.length),
+        name: actualContractName,
+      }));
     }
 
     try {
@@ -809,23 +772,20 @@ async function main() {
         address: contractAddress!,
         contractName: actualContractName,
         network,
-        apiKey: finalApiKey!,
-        rpcUrl: finalRpcUrl!,
+        apiKey: finalApiKey,
+        rpcUrl: finalRpcUrl,
         chainId: finalChainId,
         constructorArgs: finalConstructorArgs,
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(`❌ 合约 ${actualContractName} 验证失败: ${errorMessage}`);
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error($tr("foundry.verify.verifyFailedMsg", { name: actualContractName, msg }));
       exit(1);
     }
   }
-}
 
-// 当作为脚本直接运行时执行主函数
-if (import.meta.main) {
-  main().catch((error) => {
-    logger.error("❌ 执行失败:", error);
-    exit(1);
-  });
+  logger.info("");
+  logger.info($tr("foundry.verify.sectionStart"));
+  logger.info($tr("foundry.verify.sectionSuccess"));
+  logger.info($tr("foundry.verify.sectionStart"));
 }

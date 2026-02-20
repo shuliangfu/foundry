@@ -3,7 +3,7 @@
 ## Test Overview
 
 - **Test framework**: @dreamer/test (based on Deno built-in test framework)
-- **Test date**: 2026-01-26
+- **Test date**: 2026-02-20
 - **Test environment**: Deno + Anvil local node
 - **Data source**: Generated from actual terminal test output
 
@@ -11,34 +11,34 @@
 
 ### Summary
 
-- **Total tests**: 247
-- **Passed**: 244 ✅
+- **Total tests**: 264
+- **Passed**: 261 ✅
 - **Failed**: 0
 - **Ignored**: 3 (require special environment)
-- **Pass rate**: 98.8% ✅
-- **Execution time**: ~17–23 seconds
+- **Pass rate**: 98.9% ✅
+- **Execution time**: ~6 seconds
 
 ### Test Files Summary
 
 | Test file              | Count | Status       | Description                              |
 | ---------------------- | ----- | ------------ | ---------------------------------------- |
 | `cache.test.ts`        | 13    | ✅ All pass  | Cache utilities                          |
-| `cli-utils.test.ts`    | 25    | ✅ All pass  | CLI helper functions (extended)          |
-| `cli.test.ts`          | 27    | ✅ All pass  | CLI commands (new)                       |
-| `config.test.ts`       | 11    | ✅ All pass  | Config manager                           |
-| `contract.test.ts`     | 7     | ✅ All pass  | Contract utilities (new)                 |
-| `deploy-utils.test.ts` | 18    | ✅ All pass  | Deploy helpers (extended)                |
-| `deploy.test.ts`       | 6     | ✅ All pass  | Deploy flow                              |
-| `env.test.ts`          | 6     | ✅ All pass  | Env var utilities                        |
-| `errors.test.ts`       | 13    | ✅ All pass  | Error types                              |
-| `init.test.ts`         | 18    | ✅ All pass  | Project init                             |
-| `jsr.test.ts`          | 8     | ✅ All pass  | JSR helpers                              |
-| `setup.test.ts`        | 12    | ⏭️ 2 skipped | Foundry setup (new)                      |
-| `time.test.ts`         | 16    | ✅ All pass  | Anvil time utilities (new)               |
-| `utils.test.ts`        | 5     | ⏭️ 1 skipped | General utilities                        |
-| `verify.test.ts`       | 20    | ✅ All pass  | Verification (new)                       |
-| `web3-config.test.ts`  | 10    | ✅ All pass  | Web3 config loading                      |
-| `web3.test.ts`         | 32    | ✅ All pass  | Web3 helpers and instance (new/extended) |
+| `cli-utils.test.ts`    | 26    | ✅ All pass  | CLI helper functions (extended)          |
+| `cli.test.ts`          | 28    | ✅ All pass  | CLI commands (new)                       |
+| `config.test.ts`       | 12    | ✅ All pass  | Config manager                           |
+| `contract.test.ts`     | 8     | ✅ All pass  | Contract utilities (new)                 |
+| `deploy-utils.test.ts` | 19    | ✅ All pass  | Deploy helpers (extended)                |
+| `deploy.test.ts`       | 7     | ✅ All pass  | Deploy flow                              |
+| `env.test.ts`          | 7     | ✅ All pass  | Env var utilities                        |
+| `errors.test.ts`       | 14    | ✅ All pass  | Error types                              |
+| `init.test.ts`         | 19    | ✅ All pass  | Project init                             |
+| `jsr.test.ts`          | 9     | ✅ All pass  | JSR helpers                              |
+| `setup.test.ts`        | 13    | ⏭️ 2 skipped | Foundry setup (new)                      |
+| `time.test.ts`         | 17    | ✅ All pass  | Anvil time utilities (new)               |
+| `utils.test.ts`        | 6     | ⏭️ 1 skipped | General utilities                        |
+| `verify.test.ts`       | 21    | ✅ All pass  | Verification (new)                       |
+| `web3-config.test.ts`  | 11    | ✅ All pass  | Web3 config loading                      |
+| `web3.test.ts`         | 33    | ✅ All pass  | Web3 helpers and instance (new/extended) |
 
 ## Feature Test Details
 
@@ -103,7 +103,7 @@
 
 **Result**: 7 tests passed
 
-### 6. Deploy helpers (deploy-utils.test.ts) – 18 tests
+### 6. Deploy helpers (deploy-utils.test.ts) – 19 tests
 
 **Scenarios**:
 
@@ -112,25 +112,25 @@
 - ✅ filterSensitiveInfo
 - ✅ forgeDeploy params and errors
 
-**Result**: 18 tests passed
+**Result**: 19 tests passed
 
-### 7. Deploy (deploy.test.ts) – 6 tests
+### 7. Deploy (deploy.test.ts) – 7 tests
 
 **Scenarios**:
 
 - ✅ Deployer creation, env helpers, contract loading, verification, utilities
 
-**Result**: 6 tests passed
+**Result**: 7 tests passed
 
-### 8. Env (env.test.ts) – 6 tests
+### 8. Env (env.test.ts) – 7 tests
 
 **Scenarios**:
 
 - ✅ validateEnv (required vars, missing, empty list, empty string), format
 
-**Result**: 6 tests passed
+**Result**: 7 tests passed
 
-### 9. Errors (errors.test.ts) – 13 tests
+### 9. Errors (errors.test.ts) – 14 tests
 
 **Scenarios**:
 
@@ -138,7 +138,7 @@
 
 **Result**: 13 tests passed
 
-### 10. Init (init.test.ts) – 18 tests
+### 10. Init (init.test.ts) – 19 tests
 
 **Scenarios**:
 
@@ -147,17 +147,17 @@
 - ✅ Sample files (MyToken.sol, 1-mytoken.ts, 01-mytoken.test.ts)
 - ✅ Content checks, skip existing, path handling
 
-**Result**: 18 tests passed
+**Result**: 19 tests passed
 
-### 11. JSR (jsr.test.ts) – 8 tests
+### 11. JSR (jsr.test.ts) – 9 tests
 
 **Scenarios**:
 
 - ✅ parseJsrPackageFromUrl, parseJsrVersionFromUrl, parseJsrPackageNameFromUrl, relations
 
-**Result**: 8 tests passed
+**Result**: 9 tests passed
 
-### 12. Foundry setup (setup.test.ts) – 12 tests
+### 12. Foundry setup (setup.test.ts) – 13 tests
 
 **Scenarios**:
 
@@ -166,9 +166,9 @@
 - ✅ Default paths (~/.foundry/bin)
 - ⏭️ Real install/path tests skipped (avoid resource leaks)
 
-**Result**: 10 passed, 2 skipped
+**Result**: 11 passed, 2 skipped
 
-### 13. Anvil time (time.test.ts) – 16 tests
+### 13. Anvil time (time.test.ts) – 17 tests
 
 **Scenarios**:
 
@@ -176,23 +176,23 @@
 - ✅ Day/second conversion, value ranges
 - ✅ Anvil node tests (timestamp, sync, advance, advanceTime, negative param rejected)
 
-**Result**: 16 tests passed
+**Result**: 17 tests passed
 
-### 14. Utils (utils.test.ts) – 5 tests
+### 14. Utils (utils.test.ts) – 6 tests
 
 **Scenarios**:
 
 - ✅ Logger, env, contract helpers; ⏭️ Web3 (needs RPC, skipped)
 
-**Result**: 4 passed, 1 skipped
+**Result**: 5 passed, 1 skipped
 
-### 15. Verify (verify.test.ts) – 20 tests
+### 15. Verify (verify.test.ts) – 21 tests
 
 **Scenarios**:
 
 - ✅ findContractFileName, verify, verifyContract, param validation, error handling
 
-**Result**: 20 tests passed
+**Result**: 21 tests passed
 
 ### 16. Web3 config (web3-config.test.ts) – 10 tests
 
@@ -202,7 +202,7 @@
 
 **Result**: 10 tests passed
 
-### 17. Web3 (web3.test.ts) – 32 tests
+### 17. Web3 (web3.test.ts) – 33 tests
 
 **Scenarios**:
 
@@ -215,7 +215,7 @@
 - ✅ Config loading, createWeb3
 - ✅ Web3 instance (no contract, getBalance, accountAddress)
 
-**Result**: 32 tests passed
+**Result**: 33 tests passed
 
 ## Coverage Overview
 
@@ -266,13 +266,13 @@ WEB3_ENV=local deno test -A tests/web3.test.ts
 
 ## Conclusion
 
-@dreamer/foundry has **247 tests: 244 passed, 3 skipped** (special env / resource safety). Coverage
+@dreamer/foundry has **264 tests: 261 passed, 3 skipped** (special env / resource safety). Coverage
 is about **80–85%**. Suitable for production use.
 
 **Summary**:
 
-- **Total**: 247
-- **Passed**: 244 ✅
+- **Total**: 264
+- **Passed**: 261 ✅
 - **Skipped**: 3
 - **Failed**: 0
-- **Pass rate**: 98.8%
+- **Pass rate**: 98.9%

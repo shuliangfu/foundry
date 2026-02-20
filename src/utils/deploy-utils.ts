@@ -28,6 +28,7 @@ import {
   remove,
   writeTextFileSync,
 } from "@dreamer/runtime-adapter";
+import { $tr } from "../i18n.ts";
 import {
   ALREADY_KNOWN_REPLACE_RETRIES,
   DEFAULT_NETWORK,
@@ -121,9 +122,9 @@ async function cleanBroadcastDir(_network: string): Promise<void> {
               const runLatestPath = join(chainDir, "run-latest.json");
               if (existsSync(runLatestPath)) {
                 await remove(runLatestPath);
-                logger.info(`已清理交易记录: ${runLatestPath}`);
+                logger.info($tr("foundry.utils.deployCleanedRunLatest", { path: runLatestPath }));
               } else {
-                logger.warn(`无法清理交易记录: ${chainDir}`);
+                logger.warn($tr("foundry.utils.deployCleanFailed", { path: chainDir }));
               }
             }
           }
@@ -132,7 +133,7 @@ async function cleanBroadcastDir(_network: string): Promise<void> {
     }
   } catch (error) {
     // 清理失败不影响部署，只记录警告
-    logger.warn(`清理 broadcast 目录时出错: ${error}`);
+    logger.warn($tr("foundry.utils.deployCleanBroadcastError", { error: String(error) }));
   }
 }
 
@@ -297,8 +298,10 @@ export async function forgeDeploy(
   const existingAddress = checkContractExists(contractName, network, options.abiDir);
 
   if (existingAddress && !options.force) {
-    logger.warn(`⚠️  合约 ${contractName} 已存在，地址: ${existingAddress}`);
-    logger.warn(`   如需重新部署，请使用 --force 参数强制部署。`);
+    logger.warn(
+      $tr("foundry.utils.deployContractExists", { name: contractName, address: existingAddress }),
+    );
+    logger.warn($tr("foundry.utils.deployUseForce"));
     return existingAddress;
   }
 
@@ -354,10 +357,9 @@ export async function forgeDeploy(
     forgeArgs.push("--chain-id", String(options.chainId || config.chainId));
   }
 
-  logger.info(`正在部署合约 ${contractName}...`);
+  logger.info($tr("foundry.utils.deployDeploying", { name: contractName }));
 
-  // 显示进度条
-  const progressBar = createLoadingProgressBar("正在部署中...");
+  const progressBar = createLoadingProgressBar($tr("foundry.deploy.deployingProgress"));
   const progressInterval = progressBar.start();
 
   const cmd = createCommand("forge", {
@@ -395,7 +397,9 @@ export async function forgeDeploy(
           const mult = GAS_BUMP_MULTIPLIERS[r] ?? 1.5;
           const gasWei = Math.ceil(baseGasWei * mult);
           const replaceArgs = [...forgeArgs, "--gas-price", String(gasWei)];
-          const replaceProgressBar = createLoadingProgressBar("正在部署中...");
+          const replaceProgressBar = createLoadingProgressBar(
+            $tr("foundry.deploy.deployingProgress"),
+          );
           const replaceInterval = replaceProgressBar.start();
           try {
             const replaceCmd = createCommand("forge", {
@@ -437,15 +441,15 @@ export async function forgeDeploy(
                   await new Promise((resolve) => setTimeout(resolve, 3000));
                   continue;
                 }
-                logger.error("❌ 替换时 RPC 多次连接失败，请稍后重试或更换 config 中的 rpcUrl");
+                logger.error($tr("foundry.utils.deployRpcReplaceFailed"));
                 throw new DeploymentError(
-                  "替换 mempool 交易时 RPC 连接失败，请稍后重试或更换 RPC 节点。",
+                  $tr("foundry.utils.deployReplaceRpcError"),
                   { contractName, network, rpcUrl: config.rpcUrl },
                 );
               }
-              logger.error("替换交易时发生其他错误:", replaceStderr);
+              logger.error($tr("foundry.utils.deployReplaceOtherError"), replaceStderr);
               throw new DeploymentError(
-                `替换 mempool 交易时失败: ${replaceStderr}`,
+                $tr("foundry.utils.deployReplaceOtherError") + " " + replaceStderr,
                 { contractName, network, rpcUrl: config.rpcUrl },
               );
             }
@@ -455,15 +459,15 @@ export async function forgeDeploy(
           }
         }
       }
-      logger.error("❌ 部署失败：交易已在 mempool 中");
+      logger.error($tr("foundry.utils.deployMempoolFailed"));
       logger.error("");
-      logger.error("💡 解决方案：");
-      logger.error("  1. 等待更长时间后再部署（建议等待 5-10 分钟）");
-      logger.error("  2. 使用不同的账户地址进行部署");
-      logger.error("  3. 若已尝试用更高 gas 替换仍失败，可稍后重试或联系节点服务商");
+      logger.error($tr("foundry.utils.deploySolutions"));
+      logger.error($tr("foundry.utils.deploySolution1"));
+      logger.error($tr("foundry.utils.deploySolution2"));
+      logger.error($tr("foundry.utils.deploySolution3"));
       logger.error("");
       throw new DeploymentError(
-        "交易已在 mempool 中 (already known)。请等待更长时间或更换部署地址。",
+        $tr("foundry.utils.deployMempoolMessage"),
         { contractName, network, rpcUrl: config.rpcUrl },
       );
     }
@@ -482,7 +486,7 @@ export async function forgeDeploy(
         await new Promise((resolve) => setTimeout(resolve, waitTime));
 
         // 重试部署，显示进度条
-        const retryProgressBar = createLoadingProgressBar("正在部署中...");
+        const retryProgressBar = createLoadingProgressBar($tr("foundry.deploy.deployingProgress"));
         const retryProgressInterval = retryProgressBar.start();
 
         try {
@@ -522,10 +526,10 @@ export async function forgeDeploy(
           if (!isStillTransactionError) {
             // 如果不是交易已存在的错误，直接抛出错误（过滤敏感信息）
             const filteredStderr = filterSensitiveInfo(retryStderrText);
-            logger.error("重试部署失败:");
+            logger.error($tr("foundry.utils.deployRetryFailed"));
             logger.error(filteredStderr);
             throw new DeploymentError(
-              `重试部署失败: ${filteredStderr}`,
+              $tr("foundry.utils.deployRetryFailed") + " " + filteredStderr,
               { contractName, network: retryNetwork, retryCount },
             );
           }
@@ -545,14 +549,14 @@ export async function forgeDeploy(
 
       // 所有重试都失败了（过滤敏感信息）
       const filteredLastError = filterSensitiveInfo(lastError || stderrText);
-      logger.error(`重试 ${maxRetries} 次后仍然失败，可能是 RPC 节点缓存了交易:`);
+      logger.error($tr("foundry.utils.deployRetryExhausted", { n: String(maxRetries) }));
       logger.error(filteredLastError);
-      logger.error("\n提示：");
-      logger.error("  1. 如果使用的是本地 Anvil 节点，请重启节点以清除交易缓存");
-      logger.error("  2. 或者等待更长时间后再次尝试部署");
-      logger.error("  3. 或者使用不同的 nonce 或账户进行部署");
+      logger.error("\n" + $tr("foundry.utils.deployRetryHint"));
+      logger.error($tr("foundry.utils.deployRetryHint1"));
+      logger.error($tr("foundry.utils.deployRetryHint2"));
+      logger.error($tr("foundry.utils.deployRetryHint3"));
       throw new DeploymentError(
-        `重试 ${maxRetries} 次后仍然失败，可能是 RPC 节点缓存了交易`,
+        $tr("foundry.utils.deployRetryExhausted", { n: String(maxRetries) }),
         {
           contractName,
           network: retryNetwork,
@@ -564,15 +568,15 @@ export async function forgeDeploy(
 
     // 如果是 "transaction already imported" 错误但未使用 force，给出提示并尝试获取已存在的地址
     if (isTransactionAlreadyImported && !options.force) {
-      logger.warn(`⚠️  合约 ${contractName} 的交易已存在，跳过部署。`);
-      logger.warn(`   如需重新部署，请使用 --force 参数强制重新部署。`);
+      logger.warn($tr("foundry.utils.deployTxExistsSkip", { name: contractName }));
+      logger.warn($tr("foundry.utils.deployUseForce"));
 
       // 尝试从已存在的合约信息中获取地址
       try {
         const existingNetwork = extractNetworkFromAbiDir(options.abiDir);
         const existingAddress = checkContractExists(contractName, existingNetwork, options.abiDir);
         if (existingAddress) {
-          logger.info(`   当前合约地址: ${existingAddress}`);
+          logger.info($tr("foundry.utils.deployCurrentAddress", { address: existingAddress }));
           return existingAddress;
         } else {
           // 尝试从错误输出中提取地址（Foundry 可能会在错误信息中包含地址）
@@ -580,7 +584,7 @@ export async function forgeDeploy(
           const addressMatch = stderrText.match(addressPattern) || stdoutText.match(addressPattern);
           if (addressMatch && addressMatch[1]) {
             const extractedAddress = addressMatch[1];
-            logger.info(`   从交易信息中提取的合约地址: ${extractedAddress}`);
+            logger.info($tr("foundry.utils.deployExtractedAddress", { address: extractedAddress }));
             return extractedAddress;
           }
 
@@ -592,7 +596,7 @@ export async function forgeDeploy(
         }
       } catch {
         // 如果无法获取地址，给出提示但不抛出错误
-        logger.warn(`   无法获取已存在的合约地址。`);
+        logger.warn($tr("foundry.utils.deployCannotGetAddress"));
         return "";
       }
     }
@@ -688,11 +692,11 @@ async function extractAddressFromOutput(
     // 过滤敏感信息后再打印日志
     const filteredStdout = filterSensitiveInfo(stdoutText);
     const filteredStderr = filterSensitiveInfo(stderrText);
-    logger.error("无法从部署输出中提取合约地址");
-    logger.error("输出:", filteredStdout);
-    logger.error("错误:", filteredStderr);
+    logger.error($tr("foundry.utils.deployCannotExtractAddress"));
+    logger.error($tr("foundry.utils.deployOutput"), filteredStdout);
+    logger.error($tr("foundry.utils.deployError"), filteredStderr);
     throw new DeploymentError(
-      "无法提取合约地址",
+      $tr("foundry.utils.deployCannotExtractAddress"),
       { contractName },
     );
   }
@@ -702,7 +706,7 @@ async function extractAddressFromOutput(
     try {
       await waitForConfirmations(txHash, rpcUrl, confirmations);
     } catch {
-      logger.warn(`⚠️  等待区块确认超时，但合约可能已部署成功`);
+      logger.warn($tr("foundry.utils.deployConfirmTimeout"));
     }
   }
 
@@ -718,7 +722,7 @@ async function extractAddressFromOutput(
   );
 
   if (txHash) {
-    logger.info(`✅ 交易哈希: ${txHash}`);
+    logger.info($tr("foundry.utils.deployTxHash", { hash: txHash }));
   }
 
   return address;
@@ -748,9 +752,13 @@ async function saveContract(
 
   // 如果合约已存在且未使用 force，跳过保存
   if (!force && existsSync(outputPath)) {
-    logger.warn(`⚠️  合约 ${contractName} 已存在，跳过保存 ABI。如需覆盖，请使用 --force 参数。`);
-    logger.warn(`   现有地址: ${JSON.parse(readTextFileSync(outputPath)).address}`);
-    logger.warn(`   新地址: ${address}`);
+    logger.warn($tr("foundry.utils.deployContractExistsSkipAbi", { name: contractName }));
+    logger.warn(
+      $tr("foundry.utils.deployExistingAddress", {
+        address: JSON.parse(readTextFileSync(outputPath)).address,
+      }),
+    );
+    logger.warn($tr("foundry.utils.deployNewAddress", { address }));
     return;
   }
 
@@ -763,8 +771,8 @@ async function saveContract(
   );
 
   if (!existsSync(artifactPath)) {
-    logger.warn(`Artifact not found: ${artifactPath}`);
-    logger.warn("合约信息将不包含 ABI");
+    logger.warn($tr("foundry.utils.deployArtifactNotFound", { path: artifactPath }));
+    logger.warn($tr("foundry.utils.deployNoAbiInArtifact"));
     const contractData = {
       contractName: contractName,
       address: address,
@@ -789,7 +797,11 @@ async function saveContract(
   };
 
   writeTextFileSync(outputPath, JSON.stringify(contractData, null, 2));
-  logger.info(`✅ 合约信息已保存到: ${join("build", "abi", network, `${contractName}.json`)}`);
+  logger.info(
+    $tr("foundry.utils.deploySavedTo", {
+      path: join("build", "abi", network, `${contractName}.json`),
+    }),
+  );
 }
 
 /**

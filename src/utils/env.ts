@@ -13,6 +13,7 @@ import {
   readTextFileSync,
   setEnv,
 } from "@dreamer/runtime-adapter";
+import { $tr } from "../i18n.ts";
 import { logger } from "./logger.ts";
 
 export { exit, getEnv, setEnv };
@@ -58,7 +59,7 @@ export function loadEnv(envPath?: string): Record<string, string> {
 
     return env;
   } catch (error) {
-    logger.error("❌ Error reading .env file:", error);
+    logger.error($tr("foundry.utils.envReadError"), error);
     exit(1);
   }
 }
@@ -71,7 +72,7 @@ export function loadEnv(envPath?: string): Record<string, string> {
 export function validateEnv(env: Record<string, string>, required: string[] = []): void {
   for (const key of required) {
     if (!env[key]) {
-      logger.error(`❌ Error: ${key} not set in .env`);
+      logger.error($tr("foundry.utils.envKeyNotSet", { key }));
       exit(1);
     }
   }

@@ -5,7 +5,7 @@
 
 [![JSR](https://jsr.io/badges/@dreamer/foundry)](https://jsr.io/@dreamer/foundry)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
-[![Tests](https://img.shields.io/badge/tests-244%20passed-brightgreen)](./docs/en-US/TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-261%20passed-brightgreen)](./docs/en-US/TEST_REPORT.md)
 [![Coverage](https://img.shields.io/badge/coverage-80--85%25-green)](./docs/en-US/TEST_REPORT.md)
 
 **中文文档**: [docs/zh-CN/README.md](./docs/zh-CN/README.md) · **Changelog**:
@@ -246,7 +246,7 @@ See [docs/zh-CN/README.md](./docs/zh-CN/README.md) for full chain table and conf
 
 ## Test report
 
-244 of 247 tests pass (~98.8%), coverage ~80–85%. Full report:
+261 of 264 tests pass (~98.9%), coverage ~80–85%. Full report:
 
 - **English**: [docs/en-US/TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 - **中文**: [docs/zh-CN/TEST_REPORT.md](./docs/zh-CN/TEST_REPORT.md)
