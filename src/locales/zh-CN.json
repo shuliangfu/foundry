@@ -392,7 +392,7 @@
       "deployConstructorArgs": "MyToken 构造函数参数",
       "deployContractComment": "部署合约",
       "deployWeb3Note": "如需与已部署合约交互可用 deployer.web3，需 await",
-      "deployCompletedLog": "Deployment completed!",
+      "deployCompletedLog": "部署完成!",
       "testTitle": "MyToken 合约测试",
       "testDevDesc": "测试 MyToken 代币合约的基本功能",
       "testUsage": "使用方法: WEB3_ENV=local deno test -A tests/01-mytoken.test.ts",

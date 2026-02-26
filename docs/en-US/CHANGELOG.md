@@ -5,6 +5,25 @@ All notable changes to @dreamer/foundry are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.2] - 2026-02-26
+
+### Added
+
+- **build command**: `foundry build` to compile Solidity contracts, with `-s` (show sizes), `-f` (force rebuild), and `--optimizer-runs`.
+
+### Changed
+
+- **Cache directory**: From `~/.foundry-cache` to `~/.dreamer/foundry`; installed version is stored in `~/.dreamer/foundry/version.json`. `getInstalledVersion` / `setInstalledVersion` read and write this file directly, with multi-package format support.
+- **deploy --verify**: When using `--verify`, each contract is verified immediately after deployment (deploy one, verify one) instead of verifying all at the end. `--api-key` can be omitted when `ETH_API_KEY` is set in `.env`.
+- **CLI examples**: Help and error messages now use generic placeholders (e.g. `Contract1`, `Contract2`) for contract names instead of business-specific names.
+- **init template**: Example test script uses `"${$tr(...)}"` for `describe` / `it` so generated code has valid string literals; default Solidity version set to `^0.8.20`.
+- **setup**: After install, automatically check and install the official Foundry toolchain (forge/cast/anvil); help text lists all CLI commands and usage; removed redundant Foundry install checks from deploy/verify/build (done once at setup).
+
+### Fixed
+
+- **Verify constructor args**: Nested arrays (e.g. `address[]`) are now supported; no longer flattened with `.map(String)`. `VerifyOptions.constructorArgs` is `unknown[]`, `serializeConstructorArg` serializes recursively; fixed lint `no-inner-declarations` by moving the function to module scope.
+- **foundry test**: Real-time output and Ctrl+C handling via `createCommand` with `stdin`/`stdout`/`stderr: "inherit"`; `WEB3_ENV` and other env vars are passed correctly.
+
 ## [1.8.1] - 2026-02-20
 
 ### Changed

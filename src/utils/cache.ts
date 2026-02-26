@@ -19,28 +19,42 @@ import { CACHE_TTL } from "../constants/index.ts";
 
 /**
  * 获取缓存目录路径
- * @returns 缓存目录路径（~/.foundry-cache）
+ * @returns 缓存目录路径（~/.dreamer/foundry）
  */
 function getCacheDir(): string {
   const homeDir = getEnv("HOME") || getEnv("USERPROFILE") || cwd();
-  return join(homeDir, ".foundry-cache");
+  return join(homeDir, ".dreamer", "foundry");
 }
 
 /**
- * 获取全局安装的版本号（从安装时的缓存读取）
- * 这是全局版本号的标准来源，安装时会写入，其他地方应该优先读取这个
+ * 获取版本缓存文件路径（安装/升级时写入的版本号）
+ * @returns ~/.dreamer/foundry/version.json
+ */
+function getVersionFilePath(): string {
+  return join(getCacheDir(), "version.json");
+}
+
+/**
+ * 获取全局安装的版本号（从 ~/.dreamer/foundry/version.json 读取）
+ * 安装/升级时会写入，其他地方应优先读取此缓存
  * @param packageName - 包名（可选，默认为 "@dreamer/foundry"）
- * @returns 版本号字符串，如果不存在则返回 null
+ * @returns 版本号字符串，不存在则返回 null
  */
 export function getInstalledVersion(packageName: string = "@dreamer/foundry"): string | null {
   try {
-    const versionCacheKey = `installed_version_${packageName.replace(/[^a-zA-Z0-9]/g, "_")}`;
-    const installedVersionCache = readCache<{ version: string }>(versionCacheKey, "installed");
-
-    if (installedVersionCache && installedVersionCache.version) {
-      return installedVersionCache.version;
+    const path = getVersionFilePath();
+    if (!existsSync(path)) {
+      return null;
     }
-
+    const content = readTextFileSync(path);
+    const data = JSON.parse(content) as { versions?: Record<string, string>; version?: string };
+    // 支持多包格式 { versions: { "@dreamer/foundry": "1.8.1" } } 或单包格式 { version: "1.8.1" }
+    if (data.versions && data.versions[packageName]) {
+      return data.versions[packageName];
+    }
+    if (data.version && packageName === "@dreamer/foundry") {
+      return data.version;
+    }
     return null;
   } catch {
     return null;
@@ -48,7 +62,7 @@ export function getInstalledVersion(packageName: string = "@dreamer/foundry"): s
 }
 
 /**
- * 写入全局安装的版本号（安装时调用）
+ * 写入全局安装的版本号到 ~/.dreamer/foundry/version.json（安装/升级时调用）
  * @param version - 版本号
  * @param packageName - 包名（可选，默认为 "@dreamer/foundry"）
  */
@@ -56,8 +70,28 @@ export async function setInstalledVersion(
   version: string,
   packageName: string = "@dreamer/foundry",
 ): Promise<void> {
-  const versionCacheKey = `installed_version_${packageName.replace(/[^a-zA-Z0-9]/g, "_")}`;
-  await writeCache(versionCacheKey, "installed", { version });
+  try {
+    const cacheDir = getCacheDir();
+    await ensureDir(cacheDir);
+
+    const path = getVersionFilePath();
+    let data: { versions: Record<string, string>; version?: string } = { versions: {} };
+
+    if (existsSync(path)) {
+      const content = readTextFileSync(path);
+      const parsed = JSON.parse(content) as { versions?: Record<string, string>; version?: string };
+      data.versions = parsed.versions ?? (parsed.version ? { "@dreamer/foundry": parsed.version } : {});
+    }
+
+    data.versions[packageName] = version;
+    if (packageName === "@dreamer/foundry") {
+      data.version = version; // 兼容单包读取
+    }
+
+    writeTextFileSync(path, JSON.stringify(data, null, 2));
+  } catch {
+    // 忽略写入错误
+  }
 }
 
 /**

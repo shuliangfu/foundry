@@ -5,6 +5,25 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)， 版本号遵循
 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.8.2] - 2026-02-26
+
+### 新增
+
+- **build 命令**：`foundry build` 编译 Solidity 合约，支持 `-s`（显示合约大小）、`-f`（强制重新编译）、`--optimizer-runs`。
+
+### 变更
+
+- **缓存目录**：由 `~/.foundry-cache` 改为 `~/.dreamer/foundry`；安装/升级的版本号写入 `~/.dreamer/foundry/version.json`，`getInstalledVersion` / `setInstalledVersion` 直接读写该文件，支持多包格式。
+- **deploy --verify**：使用 `--verify` 时改为「部署一个、验证一个」，不再等全部部署完再统一验证；`--api-key` 可省略，从 `.env` 的 `ETH_API_KEY` 读取。
+- **CLI 示例**：帮助与错误提示中的合约名示例改为通用占位符（如 `Contract1`、`Contract2`），不再使用业务相关名称。
+- **init 模板**：示例测试脚本中 `describe` / `it` 的文案使用 `"${$tr(...)}"` 生成合法字符串字面量；Solidity 默认版本改为 `^0.8.20`。
+- **setup**：安装成功后自动检查并安装官方 Foundry 工具链（forge/cast/anvil）；帮助信息列出全部 CLI 命令与用法；移除 deploy/verify/build 命令内的重复 Foundry 安装检查（仅在 setup 时执行一次）。
+
+### 修复
+
+- **验证构造函数参数**：支持嵌套数组（如 `address[]`），不再用 `.map(String)` 压平；`VerifyOptions.constructorArgs` 改为 `unknown[]`，`serializeConstructorArg` 递归序列化；修复 lint `no-inner-declarations`（将函数移至模块顶层）。
+- **foundry test**：通过 `createCommand` + `stdin/stdout/stderr: "inherit"` 实现实时输出与 Ctrl+C 终止；正确传递 `WEB3_ENV` 等环境变量。
+
 ## [1.8.1] - 2026-02-20
 
 ### 变更

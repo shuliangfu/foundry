@@ -489,7 +489,7 @@ import { logger } from "@dreamer/foundry";
  * @param deployer ${$tr("foundry.template.deployParam")}
  */
 export async function deploy(deployer: Deployer) {
-  logger.info($tr("foundry.template.deployStartLog") + "\\n");
+  logger.info("${$tr("foundry.template.deployStartLog")}" + "\\n");
 
   // ${$tr("foundry.template.deployConstructorArgs")}
   const args = [
@@ -509,7 +509,7 @@ export async function deploy(deployer: Deployer) {
   // const name = await web3.read("name");
   // logger.info(\`name: \${name}\`);
 
-  logger.info("\\n✅ " + $tr("foundry.template.deployCompletedLog"));
+  logger.info("\\n✅ " + "${$tr("foundry.template.deployCompletedLog")}");
 }
 `;
 }
@@ -526,7 +526,7 @@ export function getExampleTestScript(): string {
 import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
 import { createWeb3, logger, type Web3 } from "@dreamer/foundry";
 
-describe($tr("foundry.template.testDescribe"), () => {
+describe("${$tr("foundry.template.testDescribe")}", () => {
   let web3: Web3;
   let deployerAddress: string;
 
@@ -539,34 +539,34 @@ describe($tr("foundry.template.testDescribe"), () => {
   });
 
   afterAll(() => {
-    logger.info($tr("foundry.template.testDoneLog"));
+    logger.info("${$tr("foundry.template.testDoneLog")}");
   });
 
-  describe($tr("foundry.template.testDescribeBasic"), () => {
-    it($tr("foundry.template.testItName"), async () => {
+  describe("${$tr("foundry.template.testDescribeBasic")}", () => {
+    it("${$tr("foundry.template.testItName")}", async () => {
       const name = await web3.read("name");
       expect(name).toBe("MyToken");
     });
 
-    it($tr("foundry.template.testItSymbol"), async () => {
+    it("${$tr("foundry.template.testItSymbol")}", async () => {
       const symbol = await web3.read("symbol");
       expect(symbol).toBe("MTK");
     });
 
-    it($tr("foundry.template.testItDecimals"), async () => {
+    it("${$tr("foundry.template.testItDecimals")}", async () => {
       const decimals = await web3.read("decimals");
       expect(Number(decimals)).toBe(18);
     });
 
-    it($tr("foundry.template.testItSupply"), async () => {
+    it("${$tr("foundry.template.testItSupply")}", async () => {
       const totalSupply = await web3.read("totalSupply");
       expect(totalSupply).toBeDefined();
       expect(Number(totalSupply)).toBeGreaterThan(0);
     });
   });
 
-  describe($tr("foundry.template.testDescribeBalance"), () => {
-    it($tr("foundry.template.testItBalance"), async () => {
+  describe("${$tr("foundry.template.testDescribeBalance")}", () => {
+    it("${$tr("foundry.template.testItBalance")}", async () => {
       const balance = await web3.read("balanceOf", [deployerAddress]);
       expect(balance).toBeDefined();
       expect(Number(balance)).toBeGreaterThan(0);

@@ -21,8 +21,8 @@ import {
   PROGRESS_BAR_CLEAR_LENGTH,
   PROGRESS_BAR_INTERVAL,
 } from "../constants/index.ts";
-import type { CommandStatus, GlobalCache } from "../types/index.ts";
 import { $tr } from "../i18n.ts";
+import type { CommandStatus, GlobalCache } from "../types/index.ts";
 import { loadEnv } from "./env.ts";
 import { parseJsrPackageFromUrl } from "./jsr.ts";
 import { logger } from "./logger.ts";
