@@ -11,12 +11,19 @@
 
 - **build 命令**：`foundry build` 编译 Solidity 合约，支持
   `-s`（显示合约大小）、`-f`（强制重新编译）、`--optimizer-runs`。
+- **deploy / verify 可执行入口**：新增 `src/deploy.ts`、`src/verify.ts` 作为可执行入口；二者在
+  `import.meta.main` 时调用 `main().catch(...)`，失败时输出「❌ 执行失败」并 `exit(1)`；`deno.json`
+  恢复导出 `./deploy`、`./verify`，便于通过 `jsr:@dreamer/foundry/deploy` 等子进程调用。
 
 ### 变更
 
 - **缓存目录**：由 `~/.foundry-cache` 改为 `~/.dreamer/foundry`；安装/升级的版本号写入
   `~/.dreamer/foundry/version.json`，`getInstalledVersion` / `setInstalledVersion`
   直接读写该文件，支持多包格式。
+- **deploy / verify 执行方式**：恢复 1.7.9 风格，CLI 的 `foundry deploy`、`foundry verify`
+  改为通过子进程执行可执行入口（使用项目的 `deno.json`），不再在同进程内直接调用 `runDeployCli` /
+  `runVerifyCli`；用户项目中的部署脚本（如 `deploy/1-mytoken.ts`）在子进程中运行，其
+  `import "@dreamer/foundry"` 能正确解析，解决 JSR 全局安装时的「not a dependency」问题。
 - **deploy --verify**：使用 `--verify`
   时改为「部署一个、验证一个」，不再等全部部署完再统一验证；`--api-key` 可省略，从 `.env` 的
   `ETH_API_KEY` 读取。
@@ -29,11 +36,19 @@
 
 ### 修复
 
+- **JSR 全局安装下 deploy**：在通过 JSR 全局安装的 `foundry` 执行 `foundry deploy` 时，不再出现
+  `Import "@dreamer/foundry" not a dependency`；deploy 逻辑在子进程中以项目配置运行，依赖解析正确。
 - **验证构造函数参数**：支持嵌套数组（如 `address[]`），不再用 `.map(String)`
   压平；`VerifyOptions.constructorArgs` 改为 `unknown[]`，`serializeConstructorArg` 递归序列化；修复
   lint `no-inner-declarations`（将函数移至模块顶层）。
 - **foundry test**：通过 `createCommand` + `stdin/stdout/stderr: "inherit"` 实现实时输出与 Ctrl+C
   终止；正确传递 `WEB3_ENV` 等环境变量。
+
+### 国际化
+
+- **deploy**：新增 i18n 键 `scriptFailedExit`（部署脚本执行失败）。
+- **verify**：新增 i18n 键 `commandFailed`（验证失败）；CLI 成功/失败文案使用
+  `sectionSuccess`、`commandFailed`。
 
 ## [1.8.1] - 2026-02-20
 

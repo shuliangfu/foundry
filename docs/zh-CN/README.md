@@ -1008,12 +1008,15 @@ await advanceTime(365); // 推进 1 年
 
 ## 变更日志
 
-**v1.8.1**（2026-02-20）
+**v1.8.2**（2026-02-26）
 
-- **变更**：移除 `./deploy`/`./verify` 导出；`loadEnv` 无 `.env` 时返回 `{}`、读错时
-  throw；ConfigManager 从项目根加载 `.env`；`getApiKey("")` 返回 `null`；fmt flat
-  选项；各入口模块与导出 JSDoc。
-- **修复**：CI 下配置与 init 测试在无 `.env` 或英文环境下的问题。
+- **新增**：`foundry build` 命令；deploy/verify 可执行入口（`src/deploy.ts`、`src/verify.ts`）及
+  `./deploy`/`./verify` 导出。
+- **变更**：缓存目录改为 `~/.dreamer/foundry`；deploy/verify 改为子进程执行（1.7.9 风格），JSR
+  全局安装下 `import "@dreamer/foundry"` 正常解析；部署一个验证一个；init 模板与 setup 更新。
+- **修复**：JSR 全局安装下 deploy「not a dependency」；验证构造函数参数（嵌套数组）；foundry test
+  实时输出与环境变量。
+- **国际化**：`scriptFailedExit`、`commandFailed` 等键。
 
 完整历史：[docs/en-US/CHANGELOG.md](../en-US/CHANGELOG.md) |
 [docs/zh-CN/CHANGELOG.md](./CHANGELOG.md)

@@ -11,12 +11,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - **build command**: `foundry build` to compile Solidity contracts, with `-s` (show sizes), `-f`
   (force rebuild), and `--optimizer-runs`.
+- **deploy / verify runnable entries**: New `src/deploy.ts` and `src/verify.ts` as runnable entry
+  scripts; when `import.meta.main`, they call `main().catch(...)` and on failure log "❌ 执行失败"
+  and `exit(1)`. `deno.json` again exports `./deploy` and `./verify` for subprocess use (e.g.
+  `jsr:@dreamer/foundry/deploy`).
 
 ### Changed
 
 - **Cache directory**: From `~/.foundry-cache` to `~/.dreamer/foundry`; installed version is stored
   in `~/.dreamer/foundry/version.json`. `getInstalledVersion` / `setInstalledVersion` read and write
   this file directly, with multi-package format support.
+- **deploy / verify execution**: Restored 1.7.9-style flow: `foundry deploy` and `foundry verify`
+  now run the deploy/verify entry scripts in a subprocess (using the project’s `deno.json`) instead
+  of calling `runDeployCli` / `runVerifyCli` in-process. User deploy scripts (e.g.
+  `deploy/1-mytoken.ts`) run in that subprocess so `import "@dreamer/foundry"` resolves correctly
+  and the JSR global-install "not a dependency" issue is fixed.
 - **deploy --verify**: When using `--verify`, each contract is verified immediately after deployment
   (deploy one, verify one) instead of verifying all at the end. `--api-key` can be omitted when
   `ETH_API_KEY` is set in `.env`.
@@ -30,12 +39,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **deploy under JSR global install**: Running `foundry deploy` via a JSR-global-installed `foundry`
+  no longer triggers `Import "@dreamer/foundry" not a dependency`; deploy runs in a subprocess with
+  the project config so dependency resolution is correct.
 - **Verify constructor args**: Nested arrays (e.g. `address[]`) are now supported; no longer
   flattened with `.map(String)`. `VerifyOptions.constructorArgs` is `unknown[]`,
   `serializeConstructorArg` serializes recursively; fixed lint `no-inner-declarations` by moving the
   function to module scope.
 - **foundry test**: Real-time output and Ctrl+C handling via `createCommand` with
   `stdin`/`stdout`/`stderr: "inherit"`; `WEB3_ENV` and other env vars are passed correctly.
+
+### i18n
+
+- **deploy**: New key `scriptFailedExit` (deployment script execution failed).
+- **verify**: New key `commandFailed` (verification failed); CLI success/failure messages use
+  `sectionSuccess` and `commandFailed`.
 
 ## [1.8.1] - 2026-02-20
 

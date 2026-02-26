@@ -266,12 +266,16 @@ See [docs/zh-CN/README.md](./docs/zh-CN/README.md) for full chain table and conf
 
 ## Changelog
 
-**v1.8.1** (2026-02-20)
+**v1.8.2** (2026-02-26)
 
-- **Changed**: Removed `./deploy`/`./verify` exports; `loadEnv` returns `{}` when `.env` missing and
-  throws on read error; ConfigManager loads `.env` from project root; `getApiKey("")` returns
-  `null`; fmt flat options; module/export JSDoc for all entry points.
-- **Fixed**: CI config and init tests when `.env` missing or locale en-US.
+- **Added**: `foundry build` command; deploy/verify runnable entries (`src/deploy.ts`,
+  `src/verify.ts`) and `./deploy`/`./verify` exports.
+- **Changed**: Cache dir to `~/.dreamer/foundry`; deploy/verify run in subprocess (1.7.9-style) so
+  `import "@dreamer/foundry"` works under JSR global install; deploy-one-verify-one; init template
+  and setup updates.
+- **Fixed**: JSR global install "not a dependency" on deploy; verify constructor args (nested
+  arrays); foundry test real-time output and env.
+- **i18n**: `scriptFailedExit`, `commandFailed` keys.
 
 Full history: [docs/en-US/CHANGELOG.md](./docs/en-US/CHANGELOG.md) |
 [docs/zh-CN/CHANGELOG.md](./docs/zh-CN/CHANGELOG.md)
