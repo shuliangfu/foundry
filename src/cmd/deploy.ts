@@ -20,7 +20,7 @@
  */
 
 import type { Logger } from "@dreamer/logger";
-import { cwd, existsSync, exit, join, readdir, setEnv } from "@dreamer/runtime-adapter";
+import { cwd, existsSync, exit, getEnv, join, readdir, setEnv } from "@dreamer/runtime-adapter";
 import { $tr } from "../i18n.ts";
 import {
   createLoadingProgressBar,
@@ -29,12 +29,12 @@ import {
   getProjectConfig,
   loadNetworkConfig as loadNetworkConfigUtil,
 } from "../utils/cli-utils.ts";
-import { loadEnv } from "../utils/env.ts";
-import { confirm } from "./common.ts";
 import type { ContractInfo, DeployOptions, NetworkConfig } from "../utils/deploy-utils.ts";
 import { forgeDeploy, loadContract } from "../utils/deploy-utils.ts";
+import { loadEnv } from "../utils/env.ts";
 import { logger } from "../utils/logger.ts";
 import { createWeb3, type Web3, type Web3Options } from "../utils/web3.ts";
+import { confirm } from "./common.ts";
 
 /**
  * 部署器接口
@@ -111,6 +111,30 @@ async function scanDeployScripts(scriptDir: string): Promise<string[]> {
  * @param force - 是否强制部署
  * @param confirmations - 等待的区块确认数（可选）
  */
+/**
+ * 从环境变量创建部署器（供部署脚本在子进程中调用）
+ * CLI 执行 deploy 时通过子进程运行脚本并传入 WEB3_ENV、RPC_URL、PRIVATE_KEY 等，
+ * 脚本内可调用此函数获取 deployer，避免动态 import 导致在 JSR 安装下解析到错误的 deno.json
+ */
+export function createDeployerFromEnv(): Deployer {
+  const network = getEnv("WEB3_ENV") || "local";
+  const rpcUrl = getEnv("RPC_URL");
+  const privateKey = getEnv("PRIVATE_KEY");
+  const address = getEnv("ADDRESS");
+  if (!rpcUrl || !privateKey || !address) {
+    throw new Error(
+      "Missing RPC_URL, PRIVATE_KEY or ADDRESS. Set them in .env or pass when running foundry deploy.",
+    );
+  }
+  const chainIdStr = getEnv("CHAIN_ID");
+  const chainId = chainIdStr ? parseInt(chainIdStr, 10) : undefined;
+  const config: NetworkConfig = { rpcUrl, privateKey, address, chainId };
+  const force = getEnv("FOUNDRY_DEPLOY_FORCE") === "1";
+  const confirmationsStr = getEnv("FOUNDRY_CONFIRMATIONS");
+  const confirmations = confirmationsStr ? parseInt(confirmationsStr, 10) : undefined;
+  return createDeployer(network, config, force, confirmations);
+}
+
 export function createDeployer(
   network: string,
   config: NetworkConfig,

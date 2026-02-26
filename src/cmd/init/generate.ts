@@ -15,7 +15,7 @@ import {
 } from "@dreamer/runtime-adapter";
 import { $tr } from "../../i18n.ts";
 import { logger } from "../../utils/logger.ts";
-import { getCopyrightOwner, getCurrentVersion } from "./helpers.ts";
+import { getCopyrightOwner, getCurrentVersion, getLatestJsrVersion } from "./helpers.ts";
 import type { InitOptions } from "./types.ts";
 import {
   getConfigWeb3Json,
@@ -95,6 +95,7 @@ async function createConfigFiles(
 ): Promise<void> {
   logger.info($tr("foundry.init.createConfigFiles"));
   const currentVersion = getCurrentVersion();
+  const testVersion = await getLatestJsrVersion("dreamer", "test");
   const copyrightOwner = getCopyrightOwner();
 
   const configFiles = [
@@ -104,7 +105,7 @@ async function createConfigFiles(
     { path: ".env", content: getEnvFile() },
     { path: ".prettierrc", content: getPrettierrc() },
     { path: ".cursorignore", content: getCursorignore() },
-    { path: "deno.json", content: getDenoJsonTemplate(currentVersion) },
+    { path: "deno.json", content: getDenoJsonTemplate(currentVersion, testVersion) },
     { path: "config/web3.json", content: getConfigWeb3Json() },
     { path: ".vscode/settings.json", content: getVscodeSettings() },
     { path: ".vscode/extensions.json", content: getVscodeExtensions() },

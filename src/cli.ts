@@ -12,19 +12,28 @@
  */
 
 import { Command } from "@dreamer/console";
-import { args as runtimeArgs, exit, getEnv } from "@dreamer/runtime-adapter";
+import { exit, getEnv, setEnv } from "@dreamer/runtime-adapter";
 import { DEFAULT_NETWORK } from "./constants/index.ts";
 import { $tr } from "./i18n.ts";
 import { runBuildCli } from "./cmd/build.ts";
 import type { BuildCliOptions } from "./cmd/build.ts";
-import { type DeployCliOptions, runDeployCli } from "./cmd/deploy.ts";
 import { init } from "./cmd/init.ts";
 import { type RunCliOptions, runRunCli } from "./cmd/run.ts";
 import { runTestCli, type TestCliOptions } from "./cmd/test.ts";
 import { getVersion, runUpgradeCli, type UpgradeCliOptions } from "./cmd/upgrade.ts";
-import { runVerifyCli, type VerifyCliOptions } from "./cmd/verify.ts";
 import { runUninstallCli } from "./cmd/uninstall.ts";
+import {
+  executeCommand,
+  getApiKey,
+  getNetworkName,
+  getProjectConfig,
+  getScriptPath,
+  handleCommandResult,
+} from "./utils/cli-utils.ts";
+import { loadEnv } from "./utils/env.ts";
 import { logger } from "./utils/logger.ts";
+
+loadEnv();
 
 const cli = new Command("foundry", $tr("foundry.cli.appDescription"));
 
@@ -88,8 +97,53 @@ cli
     type: "number",
   })
   .action(async (_args, options) => {
-    const argv = typeof runtimeArgs === "function" ? runtimeArgs() : [];
-    await runDeployCli(options as DeployCliOptions, argv);
+    const network = getNetworkName(options.network as string | undefined, false);
+    if (!network) {
+      logger.error($tr("foundry.deploy.networkRequired"));
+      logger.error($tr("foundry.deploy.networkRequiredHint"));
+      exit(1);
+    }
+    setEnv("WEB3_ENV", network);
+    const shouldVerify = options.verify === true;
+    if (shouldVerify && !getApiKey(options["api-key"] as string | undefined)) {
+      logger.error($tr("foundry.verify.apiKeyRequired"));
+      logger.error($tr("foundry.verify.apiKeyHint"));
+      exit(1);
+    }
+    const projectConfig = getProjectConfig();
+    if (!projectConfig) {
+      exit(1);
+    }
+    const { projectRoot, denoJsonPath } = projectConfig;
+    const deployScriptPath = getScriptPath("deploy");
+    const deployArgs: string[] = ["--network", network];
+    if (options.force === true) deployArgs.push("--force");
+    const contracts = options.contract != null
+      ? (Array.isArray(options.contract) ? options.contract : [options.contract as string])
+      : undefined;
+    if (contracts?.length) {
+      deployArgs.push("--contract", ...contracts);
+    }
+    if (options.confirmations !== undefined) {
+      deployArgs.push("--confirmations", String(options.confirmations));
+    }
+    if (shouldVerify) {
+      deployArgs.push("--verify");
+      const apiKey = getApiKey(options["api-key"] as string | undefined);
+      if (apiKey) deployArgs.push("--api-key", apiKey);
+    }
+    try {
+      const result = await executeCommand(
+        deployScriptPath,
+        denoJsonPath,
+        projectRoot,
+        deployArgs,
+      );
+      handleCommandResult(result, $tr("foundry.deploy.allScriptsDone"), true);
+    } catch (error) {
+      logger.error($tr("foundry.deploy.scriptFailedExit") + ":", error);
+      exit(1);
+    }
   });
 
 // ----- verify -----
@@ -137,8 +191,63 @@ cli
     type: "number",
   })
   .action(async (_args, options) => {
-    const argv = typeof runtimeArgs === "function" ? runtimeArgs() : [];
-    await runVerifyCli(options as VerifyCliOptions, argv);
+    const network = getNetworkName(options.network as string | undefined, false);
+    if (!network) {
+      logger.error($tr("foundry.verify.networkRequired"));
+      logger.error($tr("foundry.verify.networkHint"));
+      exit(1);
+    }
+    setEnv("WEB3_ENV", network);
+    const contractNames = options.contract != null
+      ? (Array.isArray(options.contract) ? options.contract : [options.contract as string])
+      : [];
+    if (contractNames.length === 0) {
+      logger.error($tr("foundry.verify.contractRequired"));
+      logger.error($tr("foundry.verify.contractHint"));
+      exit(1);
+    }
+    const apiKey = getApiKey(options["api-key"] as string | undefined);
+    if (!apiKey) {
+      logger.error($tr("foundry.verify.apiKeyRequired"));
+      logger.error($tr("foundry.verify.apiKeyHint"));
+      exit(1);
+    }
+    const projectConfig = getProjectConfig();
+    if (!projectConfig) {
+      exit(1);
+    }
+    const { projectRoot, denoJsonPath } = projectConfig;
+    const verifyScriptPath = getScriptPath("verify");
+    const verifyArgs = [
+      "--network",
+      network,
+      "--contract",
+      ...contractNames,
+      "--api-key",
+      apiKey,
+    ];
+    if (options.address != null) {
+      verifyArgs.push("--address", options.address as string);
+    }
+    if (options["rpc-url"] != null) {
+      verifyArgs.push("--rpc-url", options["rpc-url"] as string);
+    }
+    if (options["chain-id"] != null) {
+      verifyArgs.push("--chain-id", String(options["chain-id"]));
+    }
+    try {
+      const result = await executeCommand(
+        verifyScriptPath,
+        denoJsonPath,
+        projectRoot,
+        verifyArgs,
+      );
+      handleCommandResult(result, undefined, true);
+      logger.info($tr("foundry.verify.sectionSuccess"));
+    } catch (error) {
+      logger.error($tr("foundry.verify.commandFailed") + ":", error);
+      exit(1);
+    }
   });
 
 // ----- run -----

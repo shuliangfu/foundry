@@ -80,7 +80,8 @@ export async function setInstalledVersion(
     if (existsSync(path)) {
       const content = readTextFileSync(path);
       const parsed = JSON.parse(content) as { versions?: Record<string, string>; version?: string };
-      data.versions = parsed.versions ?? (parsed.version ? { "@dreamer/foundry": parsed.version } : {});
+      data.versions = parsed.versions ??
+        (parsed.version ? { "@dreamer/foundry": parsed.version } : {});
     }
 
     data.versions[packageName] = version;

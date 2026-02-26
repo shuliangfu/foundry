@@ -1,11 +1,13 @@
 {
-  "version": "1.8.2-beta.1",
+  "version": "1.8.2-beta.2",
   "name": "@dreamer/foundry",
   "description": "Foundry deployment and verification utilities for Deno and Bun",
   "license": "Apache-2.0",
   "exports": {
     ".": "./src/mod.ts",
     "./cli": "./src/cli.ts",
+    "./deploy": "./src/deploy.ts",
+    "./verify": "./src/verify.ts",
     "./setup": "./src/setup.ts",
     "./utils": "./src/utils/mod.ts",
     "./utils/env": "./src/utils/env.ts",

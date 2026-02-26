@@ -280,11 +280,18 @@ async function getPaths() {
 
   // 如果是本地运行，使用本地文件路径；否则使用远程 JSR URL
   let cliUrl: string;
+  /** 本地安装时项目根目录，用于传 --config，避免在子目录运行 foundry 时用到子目录的 deno.json */
+  let configPath: string | null = null;
+
   if (isLocal && packageInfo) {
     // 本地运行：使用本地文件路径
     const projectRoot = findLocalProjectRoot(cwd());
     if (projectRoot) {
       cliUrl = join(projectRoot, "src", "cli.ts");
+      const denoJsonPath = join(projectRoot, "deno.json");
+      if (existsSync(denoJsonPath)) {
+        configPath = denoJsonPath;
+      }
     } else {
       // 如果找不到项目根目录，回退到远程 URL
       cliUrl = `jsr:${packageName}@${version}/cli`;
@@ -294,10 +301,7 @@ async function getPaths() {
     cliUrl = `jsr:${packageName}@${version}/cli`;
   }
 
-  // 不再创建临时 import map
-  // 使用 JSR URL 安装时，Deno 会自动解析 JSR 依赖
-  // CLI 脚本中的相对路径导入会在运行时从 JSR 包中解析
-  return { cliUrl, version };
+  return { cliUrl, version, configPath };
 }
 
 /**
@@ -309,20 +313,22 @@ async function install(): Promise<void> {
   logger.info($tr("foundry.init.separator"));
   logger.info("");
 
-  const { cliUrl, version } = await getPaths();
+  const { cliUrl, version, configPath } = await getPaths();
 
-  // 不使用 --import-map，因为临时文件会在安装后删除
-  // 使用 JSR URL 安装时，Deno 会自动解析 JSR 依赖
-  // CLI 脚本中的相对路径导入（如 ./deploy.ts）会在运行时从 JSR 包中解析
-  const args = [
+  // 本地安装时必须传 --config，否则在子目录（如 app-test）运行 foundry 时
+  // Deno 会使用该目录的 deno.json，其中没有 @dreamer/runtime-adapter 等依赖，导致报错
+  const args: string[] = [
     "install",
     "-A",
     "--global",
     "--force",
     "--name",
     "foundry",
-    cliUrl,
   ];
+  if (configPath) {
+    args.push("--config", configPath);
+  }
+  args.push(cliUrl);
 
   try {
     // 使用 deno/bun install 命令安装到全局

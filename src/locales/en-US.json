@@ -108,6 +108,7 @@
       "apiKeyRequired": "❌ API Key not specified",
       "apiKeyHint": "   Use --api-key or set ETH_API_KEY in .env",
       "allScriptsDone": "✅ All deployment scripts completed!",
+      "scriptFailedExit": "Deployment script execution failed",
       "deployFailed": "❌ Deploy failed:"
     },
     "verify": {
@@ -156,6 +157,7 @@
       "verifyingContractN": "[{current}/{total}] Verifying: {name}",
       "verifyFailedMsg": "❌ Contract {name} verification failed: {msg}",
       "verifyReadAddressFailed": "❌ Cannot read address for {name}; use --address or ensure build/abi/{network}/{name}.json exists",
+      "commandFailed": "❌ Verification failed",
       "sectionSuccess": "✅ Contract verification succeeded!"
     },
     "build": {

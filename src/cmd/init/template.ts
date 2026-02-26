@@ -253,14 +253,14 @@ site/
 `;
 }
 
-/** deno.json 模板，需传入 @dreamer/foundry 版本号 */
-export function getDenoJsonTemplate(version: string): string {
+/** deno.json 模板，需传入 @dreamer/foundry 与 @dreamer/test 版本号 */
+export function getDenoJsonTemplate(version: string, testVersion: string = "1.0.0"): string {
   return `{
   "version": "1.0.0",
   "license": "Apache-2.0",
   "imports": {
     "@dreamer/foundry": "jsr:@dreamer/foundry@^${version}",
-\t\t"@dreamer/test": "jsr:@dreamer/test@1.0.0-beta.23"
+    "@dreamer/test": "jsr:@dreamer/test@^${testVersion}"
   },
   "nodeModulesDir": "auto",
   "fmt": {

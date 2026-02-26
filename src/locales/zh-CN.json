@@ -108,6 +108,7 @@
       "apiKeyRequired": "❌ 未指定 API Key",
       "apiKeyHint": "   请使用 --api-key 参数提供 API Key，或在 .env 文件中设置 ETH_API_KEY",
       "allScriptsDone": "✅ 所有部署脚本执行完成！",
+      "scriptFailedExit": "部署脚本执行失败",
       "deployFailed": "❌ 部署失败:"
     },
     "verify": {
@@ -156,6 +157,7 @@
       "verifyingContractN": "[{current}/{total}] 验证合约: {name}",
       "verifyFailedMsg": "❌ 合约 {name} 验证失败: {msg}",
       "verifyReadAddressFailed": "❌ 合约 {name} 无法读取地址，请使用 --address 指定或确保已部署并存在 build/abi/{network}/{name}.json",
+      "commandFailed": "❌ 验证失败",
       "sectionSuccess": "✅ 合约验证成功！"
     },
     "build": {

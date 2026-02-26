@@ -79,10 +79,31 @@ export function getCurrentVersion(): string {
 }
 
 /**
+ * 从 JSR 获取包的最新版本号
+ * @param scope 包 scope（如 dreamer）
+ * @param name 包名（如 test）
+ * @returns 最新版本号，失败时返回默认 1.0.0
+ */
+export async function getLatestJsrVersion(scope: string, name: string): Promise<string> {
+  try {
+    const url = `https://jsr.io/@${scope}/${name}/meta.json`;
+    const res = await fetch(url, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return "1.0.0";
+    const data = (await res.json()) as { latest?: string };
+    return data.latest ?? "1.0.0";
+  } catch {
+    return "1.0.0";
+  }
+}
+
+/**
  * 生成 deno.json 模板内容
  * @param version - @dreamer/foundry 版本号
+ * @param testVersion - @dreamer/test 版本号（可选，不传则用默认）
  */
-export function getDenoJsonTemplate(version: string): string {
+export function getDenoJsonTemplate(version: string, testVersion: string = "1.0.0"): string {
   return `{
   "version": "1.0.0",
   "license": "MIT",
@@ -93,7 +114,7 @@ export function getDenoJsonTemplate(version: string): string {
   },
   "imports": {
     "@dreamer/foundry": "jsr:@dreamer/foundry@^${version}",
-		"@dreamer/test": "jsr:@dreamer/test@1.0.0-beta.23"
+    "@dreamer/test": "jsr:@dreamer/test@^${testVersion}"
   },
   "nodeModulesDir": "auto",
   "fmt": {
