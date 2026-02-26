@@ -75,7 +75,7 @@ export async function setInstalledVersion(
     await ensureDir(cacheDir);
 
     const path = getVersionFilePath();
-    let data: { versions: Record<string, string>; version?: string } = { versions: {} };
+    const data: { versions: Record<string, string>; version?: string } = { versions: {} };
 
     if (existsSync(path)) {
       const content = readTextFileSync(path);
