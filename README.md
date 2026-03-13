@@ -266,15 +266,13 @@ See [docs/zh-CN/README.md](./docs/zh-CN/README.md) for full chain table and conf
 
 ## Changelog
 
-**v1.8.2** (2026-02-26)
+**v1.8.3** (2026-03-13)
 
-- **Added**: `foundry build` command; deploy/verify runnable entries (`src/deploy.ts`,
-  `src/verify.ts`) and `./deploy`/`./verify` exports.
-- **Changed**: Cache dir to `~/.dreamer/foundry`; deploy/verify run in subprocess (1.7.9-style) so
-  `import "@dreamer/foundry"` works under JSR global install; deploy-one-verify-one; init template
-  and setup updates.
-- **Fixed**: JSR global install "not a dependency" on deploy; verify constructor args (nested
-  arrays); foundry test real-time output and env.
+- **Added**: Morph network verification (Blockscout; mainnet 2818, testnet Hoodi 2910). Set
+  `chain: "morph"` in `config/web3.json` to use; no API key required for Morph.
+
+See [CHANGELOG.md](./docs/en-US/CHANGELOG.md) for full history.
+
 - **i18n**: `scriptFailedExit`, `commandFailed` keys.
 
 Full history: [docs/en-US/CHANGELOG.md](./docs/en-US/CHANGELOG.md) |

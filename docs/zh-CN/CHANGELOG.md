@@ -5,6 +5,16 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)， 版本号遵循
 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.8.3] - 2026-03-13
+
+### 新增
+
+- **Morph 网络验证**：合约验证现支持 Morph（L2），通过 Blockscout。在 `config/web3.json` 中设置
+  `"chain": "morph"`，使用 `--network mainnet`（chain ID 2818）或 `--network testnet`（Hoodi，chain
+  ID 2910）。使用 `--verifier blockscout --verifier-url`，Morph 无需 API Key。
+
+---
+
 ## [1.8.2] - 2026-02-26
 
 ### 新增

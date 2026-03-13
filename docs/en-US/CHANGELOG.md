@@ -5,6 +5,17 @@ All notable changes to @dreamer/foundry are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.3] - 2026-03-13
+
+### Added
+
+- **Morph network verification**: Contract verification now supports Morph (L2) via Blockscout. Set
+  `config/web3.json` with `"chain": "morph"` and use `--network mainnet` (chain ID 2818) or
+  `--network testnet` (Hoodi, chain ID 2910). Uses `--verifier blockscout --verifier-url`; no API
+  key required for Morph.
+
+---
+
 ## [1.8.2] - 2026-02-26
 
 ### Added

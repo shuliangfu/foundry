@@ -1008,15 +1008,12 @@ await advanceTime(365); // 推进 1 年
 
 ## 变更日志
 
-**v1.8.2**（2026-02-26）
+**v1.8.3**（2026-03-13）
 
-- **新增**：`foundry build` 命令；deploy/verify 可执行入口（`src/deploy.ts`、`src/verify.ts`）及
-  `./deploy`/`./verify` 导出。
-- **变更**：缓存目录改为 `~/.dreamer/foundry`；deploy/verify 改为子进程执行（1.7.9 风格），JSR
-  全局安装下 `import "@dreamer/foundry"` 正常解析；部署一个验证一个；init 模板与 setup 更新。
-- **修复**：JSR 全局安装下 deploy「not a dependency」；验证构造函数参数（嵌套数组）；foundry test
-  实时输出与环境变量。
-- **国际化**：`scriptFailedExit`、`commandFailed` 等键。
+- **新增**：Morph 网络合约验证（Blockscout；主网 2818、测试网 Hoodi 2910）。在 `config/web3.json`
+  中设置 `chain: "morph"` 即可使用；Morph 无需 API Key。
+
+完整版本历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
 完整历史：[docs/en-US/CHANGELOG.md](../en-US/CHANGELOG.md) |
 [docs/zh-CN/CHANGELOG.md](./CHANGELOG.md)

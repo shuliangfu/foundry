@@ -44,19 +44,24 @@ import { logger } from "../utils/logger.ts";
 import { loadWeb3ConfigSync } from "../utils/web3.ts";
 
 /**
+ * 单网络配置：apiUrl 用于合约验证，explorerUrl 用于浏览器链接
+ * verifier 为 blockscout 时使用 forge --verifier blockscout --verifier-url，否则使用 --etherscan-api-key
+ */
+interface NetworkConfigItem {
+  apiUrl: string;
+  explorerUrl: string;
+  /** Blockscout 链（如 Morph）用 blockscout，不传则走 Etherscan 兼容 */
+  verifier?: "etherscan" | "blockscout";
+}
+
+/**
  * 网络配置映射
  * 格式：{ chain: { testnet: {...}, mainnet: {...} } }
- * 注意：所有 API URL 都使用 /api 后缀（Etherscan 兼容格式）
+ * 注意：所有 API URL 使用 /api 后缀（Etherscan/Blockscout 兼容格式）
  */
 const NETWORK_MAP: Record<string, {
-  testnet?: {
-    apiUrl: string;
-    explorerUrl: string;
-  };
-  mainnet?: {
-    apiUrl: string;
-    explorerUrl: string;
-  };
+  testnet?: NetworkConfigItem;
+  mainnet?: NetworkConfigItem;
 }> = {
   bsc: {
     testnet: {
@@ -174,6 +179,19 @@ const NETWORK_MAP: Record<string, {
       explorerUrl: "https://blastscan.io/address",
     },
   },
+  // Morph (L2)，使用 Blockscout 验证，主网 2818 / 测试网 Hoodi 2910
+  morph: {
+    testnet: {
+      apiUrl: "https://explorer-hoodi.morph.network/api",
+      explorerUrl: "https://explorer-hoodi.morph.network/address",
+      verifier: "blockscout",
+    },
+    mainnet: {
+      apiUrl: "https://explorer-api.morph.network/api",
+      explorerUrl: "https://explorer.morph.network/address",
+      verifier: "blockscout",
+    },
+  },
 };
 
 /**
@@ -220,7 +238,7 @@ export async function verify(options: VerifyOptions): Promise<void> {
   }
 
   // 根据 chain 和 network 查找网络配置
-  let networkConfig: { apiUrl: string; explorerUrl: string } | null = null;
+  let networkConfig: NetworkConfigItem | null = null;
 
   if (chain && NETWORK_MAP[chain]) {
     // 如果找到了 chain，从 NETWORK_MAP 中查找对应的 network
@@ -259,7 +277,7 @@ export async function verify(options: VerifyOptions): Promise<void> {
   // 构建 forge verify-contract 命令
   // 注意：forge verify-contract 的格式是: verify-contract <地址> <合约名>
   // 合约名应该是 Solidity 文件中的合约名称，而不是文件路径
-  // 参考参考脚本，参数顺序：verify-contract <地址> <合约名> --chain-id <id> --rpc-url <url> --etherscan-api-key <key> ...
+  // Etherscan 系用 --etherscan-api-key；Blockscout 系（如 Morph）用 --verifier blockscout --verifier-url
   const args = [
     "verify-contract",
     options.address,
@@ -268,13 +286,16 @@ export async function verify(options: VerifyOptions): Promise<void> {
     String(options.chainId || 1),
     "--rpc-url",
     options.rpcUrl,
-    "--etherscan-api-key",
-    options.apiKey,
     "--compiler-version",
     foundryConfig.compilerVersion,
     "--num-of-optimizations",
     String(foundryConfig.optimizerRuns),
   ];
+  if (networkConfig.verifier === "blockscout") {
+    args.push("--verifier", "blockscout", "--verifier-url", networkConfig.apiUrl);
+  } else {
+    args.push("--etherscan-api-key", options.apiKey);
+  }
 
   // 处理构造函数参数
   // 如果提供了构造函数参数，使用 cast abi-encode 编码为十六进制字符串
@@ -324,6 +345,8 @@ export async function verify(options: VerifyOptions): Promise<void> {
       logger.error($tr("foundry.verify.bscscanMainnet", { address: options.address }));
     } else if (options.network === "sepolia") {
       logger.error($tr("foundry.verify.sepoliaEtherscan", { address: options.address }));
+    } else {
+      logger.error(`  - 在浏览器查看: ${networkConfig.explorerUrl}/${options.address}`);
     }
     logger.error($tr("foundry.verify.ensureDeployed"));
     logger.error($tr("foundry.verify.waitBlocks"));
