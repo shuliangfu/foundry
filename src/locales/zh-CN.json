@@ -173,6 +173,7 @@
       "runExample": "   示例: foundry run scripts/test.ts --network local",
       "projectRootNotFound": "❌ 未找到项目根目录（包含 deno.json 或 package.json 的目录）",
       "scriptNotExist": "❌ 脚本不存在: {path}",
+      "scriptOutsideProject": "❌ 脚本路径必须在项目根目录下: {path}",
       "networkLabel": "🌐 网络: {network}",
       "runScript": "🚀 执行脚本: {script}",
       "scriptDone": "✅ 脚本执行完成！",

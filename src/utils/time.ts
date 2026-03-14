@@ -76,7 +76,7 @@ export async function getAnvilTimestamp(): Promise<bigint | null> {
     }
 
     return null;
-  } catch (error: any) {
+  } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     logger.warn(`⚠️  获取区块链时间失败: ${message}`);
     return null;
@@ -194,7 +194,7 @@ export async function syncAnvilTime(silent: boolean = false): Promise<boolean> {
     }
 
     return false;
-  } catch (error: any) {
+  } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     if (!silent) {
       logger.warn(`⚠️  同步 Anvil 时间失败: ${message}`);
@@ -336,7 +336,7 @@ export async function advanceAnvilTime(seconds: number, silent?: boolean): Promi
             const dateStr = `${year}-${month}-${day}`;
             logger.info(`   当前时间: ${dateStr}`);
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           // 获取时间失败不影响主流程，只记录警告
           logger.warn(
             `   ⚠️  获取最新时间失败: ${error instanceof Error ? error.message : String(error)}`,
@@ -348,7 +348,7 @@ export async function advanceAnvilTime(seconds: number, silent?: boolean): Promi
     }
 
     return false;
-  } catch (error: any) {
+  } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     logger.warn(`   ⚠️  推进 Anvil 时间失败: ${message}`);
     return false;

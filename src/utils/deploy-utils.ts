@@ -750,14 +750,19 @@ async function saveContract(
 
   const outputPath = join(buildDir, `${contractName}.json`);
 
-  // 如果合约已存在且未使用 force，跳过保存
+  // 如果合约已存在且未使用 force，跳过保存（单次读取 outputPath 用于日志）
   if (!force && existsSync(outputPath)) {
+    let existingAddress: string | undefined;
+    try {
+      const content = readTextFileSync(outputPath);
+      existingAddress = (JSON.parse(content) as { address?: string }).address;
+    } catch {
+      existingAddress = undefined;
+    }
     logger.warn($tr("foundry.utils.deployContractExistsSkipAbi", { name: contractName }));
-    logger.warn(
-      $tr("foundry.utils.deployExistingAddress", {
-        address: JSON.parse(readTextFileSync(outputPath)).address,
-      }),
-    );
+    if (existingAddress != null) {
+      logger.warn($tr("foundry.utils.deployExistingAddress", { address: existingAddress }));
+    }
     logger.warn($tr("foundry.utils.deployNewAddress", { address }));
     return;
   }

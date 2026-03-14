@@ -78,11 +78,14 @@ export {
 
 /**
  * 网络配置类型
+ * chain 来自 config/web3.json 顶层，供 verify 等复用，避免重复读取配置文件
  */
 interface NetworkConfig {
   chainId: number;
   rpcUrl: string;
   wssUrl: string;
+  /** 可选，来自 config/web3.json 的 chain 字段（如 "bsc", "morph"） */
+  chain?: string;
   accounts: Array<{
     address: string;
     privateKey: string;
@@ -185,8 +188,8 @@ export function loadWeb3ConfigSync(projectRoot?: string): NetworkConfig | null {
     }
 
     if (config) {
-      web3ConfigCache = config;
-      return config;
+      web3ConfigCache = { ...config, chain: jsonConfig.chain };
+      return web3ConfigCache;
     }
 
     // 如果配置格式正确但没有找到对应环境的配置

@@ -17,13 +17,19 @@ import {
 } from "@dreamer/runtime-adapter";
 import { CACHE_TTL } from "../constants/index.ts";
 
+/** 惰性缓存的缓存目录路径，避免重复计算 */
+let _cacheDir: string | null = null;
+
 /**
  * 获取缓存目录路径
  * @returns 缓存目录路径（~/.dreamer/foundry）
  */
 function getCacheDir(): string {
-  const homeDir = getEnv("HOME") || getEnv("USERPROFILE") || cwd();
-  return join(homeDir, ".dreamer", "foundry");
+  if (_cacheDir === null) {
+    const homeDir = getEnv("HOME") || getEnv("USERPROFILE") || cwd();
+    _cacheDir = join(homeDir, ".dreamer", "foundry");
+  }
+  return _cacheDir;
 }
 
 /**
@@ -153,12 +159,11 @@ export function readCache<T>(key: string, version: string): T | null {
     const cacheContent = readTextFileSync(cachePath);
     const cache = JSON.parse(cacheContent);
 
-    // 检查缓存是否过期
+    // 统一按 getCacheTTL(key) 检查过期：Infinity 或无 timestamp 视为永不过期
     const ttl = getCacheTTL(key);
-    if (ttl !== Infinity && cache.timestamp) {
+    if (ttl !== Infinity && cache.timestamp != null) {
       const age = Date.now() - cache.timestamp;
       if (age > ttl) {
-        // 缓存已过期，删除文件
         try {
           removeSync(cachePath);
         } catch {
@@ -166,21 +171,6 @@ export function readCache<T>(key: string, version: string): T | null {
         }
         return null;
       }
-    }
-
-    // 检查缓存是否过期（24小时）
-    const now = Date.now();
-    const cacheAge = now - cache.timestamp;
-    const maxAge = 24 * 60 * 60 * 1000; // 24小时
-
-    if (cacheAge > maxAge) {
-      // 缓存已过期，删除文件
-      try {
-        removeSync(cachePath);
-      } catch {
-        // 忽略删除错误
-      }
-      return null;
     }
 
     return cache.data as T;

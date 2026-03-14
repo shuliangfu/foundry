@@ -35,8 +35,15 @@ export function loadEnv(envPath?: string): Record<string, string> {
     // 直接读取 .env 文件内容，手动解析
     const envText = readTextFileSync(targetPath);
     const env: Record<string, string> = {};
+    /** 单行最大长度，防止异常或恶意文件占用内存 */
+    const maxLineLength = 64 * 1024;
+    /** key 仅允许 [A-Za-z_][A-Za-z0-9_]*，避免注入或异常键名 */
+    const keyRegex = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
     for (const line of envText.split("\n")) {
+      if (line.length > maxLineLength) {
+        continue;
+      }
       const trimmed = line.trim();
       // 跳过空行和注释
       if (!trimmed || trimmed.startsWith("#")) {
@@ -46,6 +53,9 @@ export function loadEnv(envPath?: string): Record<string, string> {
       const equalIndex = trimmed.indexOf("=");
       if (equalIndex > 0) {
         const key = trimmed.substring(0, equalIndex).trim();
+        if (!keyRegex.test(key)) {
+          continue;
+        }
         const value = trimmed.substring(equalIndex + 1).trim();
         // 移除引号（如果存在）
         const cleanValue = value.replace(/^["']|["']$/g, "");

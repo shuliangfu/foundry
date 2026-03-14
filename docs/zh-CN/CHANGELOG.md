@@ -5,6 +5,24 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)， 版本号遵循
 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.8.5] - 2026-03-14
+
+### 修复
+
+- **缓存**：统一 TTL 逻辑，移除会误杀永久缓存的重复 24 小时检查；缓存目录改为惰性计算。
+- **run 命令**：脚本路径必须在项目根目录下，拒绝如 `../../other/script.ts` 的路径逃逸。
+- **ConfigManager**：Windows 根目录判断与 cli-utils 一致（`/^[A-Z]:\\$/`）。
+- **verify**：从 `loadWeb3ConfigSync()` 返回值读取 `chain`，不再重复读 `config/web3.json`。
+- **deploy saveContract**：已有合约文件仅读取一次用于日志。
+- **loadEnv**：key 须符合 `[A-Za-z_][A-Za-z0-9_]*`，超过 64KB 的行跳过（安全）。
+
+### 变更
+
+- **time 工具**：`catch (error: any)` 改为 `catch (error: unknown)`
+  并统一取消息。**NetworkConfig**：新增可选字段 `chain` 供 verify 复用。
+
+---
+
 ## [1.8.4] - 2026-03-14
 
 ### 修复

@@ -5,6 +5,27 @@ All notable changes to @dreamer/foundry are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.5] - 2026-03-14
+
+### Fixed
+
+- **Cache**: Unified TTL logic; removed duplicate 24h check that could expire permanent caches (e.g.
+  `installed_version`). Cache dir is now lazily computed to avoid repeated path work.
+- **run command**: Script path must be under project root; paths like `../../other/script.ts` are
+  rejected to prevent running scripts outside the project.
+- **ConfigManager**: Windows root detection aligned with cli-utils (`/^[A-Z]:\\$/`).
+- **verify**: Reads `chain` from `loadWeb3ConfigSync()` result instead of re-reading
+  `config/web3.json`, avoiding duplicate I/O and parse.
+- **deploy saveContract**: Single read of existing contract file for log (no redundant read).
+- **loadEnv**: Key must match `[A-Za-z_][A-Za-z0-9_]*`; lines over 64KB are skipped (safety).
+
+### Changed
+
+- **time utils**: `catch (error: any)` replaced with `catch (error: unknown)` and standard message
+  extraction. **NetworkConfig**: optional `chain` field for verify reuse.
+
+---
+
 ## [1.8.4] - 2026-03-14
 
 ### Fixed

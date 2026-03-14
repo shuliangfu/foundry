@@ -266,9 +266,11 @@ See [docs/zh-CN/README.md](./docs/zh-CN/README.md) for full chain table and conf
 
 ## Changelog
 
-**v1.8.4** (2026-03-14)
+**v1.8.5** (2026-03-14)
 
-- **Fixed**: `loadEnv` no longer logs a warning when `.env` is missing; returns empty env silently.
+- **Fixed**: Cache TTL logic, run script path validation, ConfigManager Windows root, verify chain
+  reuse, deploy saveContract single read, loadEnv key/length validation.
+- **Changed**: time utils `catch (error: unknown)`, NetworkConfig optional `chain`.
 
 See [CHANGELOG.md](./docs/en-US/CHANGELOG.md) for full history.
 

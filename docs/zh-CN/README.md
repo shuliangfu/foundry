@@ -1008,9 +1008,11 @@ await advanceTime(365); // 推进 1 年
 
 ## 变更日志
 
-**v1.8.4**（2026-03-14）
+**v1.8.5**（2026-03-14）
 
-- **修复**：`loadEnv` 在缺少 `.env` 时不再输出警告，静默返回空环境变量。
+- **修复**：缓存 TTL、run 路径校验、ConfigManager Windows 根目录、verify 复用 chain、deploy
+  单次读取、loadEnv key/行长度校验。
+- **变更**：time 工具 catch 类型、NetworkConfig 可选 `chain`。
 
 完整版本历史见 [CHANGELOG.md](./CHANGELOG.md)。
 

@@ -218,20 +218,12 @@ export interface VerifyOptions {
  * 验证合约
  */
 export async function verify(options: VerifyOptions): Promise<void> {
-  // 尝试从 web3.json 读取 chain 信息
+  // 从已加载的 web3 配置读取 chain，避免重复读 config/web3.json
   let chain: string | null = null;
   try {
     const web3Config = loadWeb3ConfigSync();
-    if (web3Config) {
-      // 尝试从配置文件读取 chain 信息
-      const configPath = join(cwd(), "config", "web3.json");
-      if (existsSync(configPath)) {
-        const configText = readTextFileSync(configPath);
-        const config = JSON.parse(configText);
-        if (config.chain) {
-          chain = config.chain;
-        }
-      }
+    if (web3Config?.chain) {
+      chain = web3Config.chain;
     }
   } catch {
     // 如果读取失败，忽略错误

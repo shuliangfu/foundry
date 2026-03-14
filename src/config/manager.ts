@@ -3,7 +3,7 @@
  * @description 统一的配置管理器
  */
 
-import { cwd, existsSync, join } from "@dreamer/runtime-adapter";
+import { cwd, existsSync, join, platform } from "@dreamer/runtime-adapter";
 import { loadWeb3ConfigSync } from "../utils/web3.ts";
 import { loadEnv } from "../utils/env.ts";
 import { ConfigurationError } from "../errors/index.ts";
@@ -121,10 +121,12 @@ export class ConfigManager {
 
   /**
    * 查找项目根目录
+   * 与 cli-utils.findProjectRoot 一致：Windows 下使用 /^[A-Z]:\\$/ 判断根目录
    */
   private findProjectRoot(startDir: string): string {
     let currentDir = startDir;
-    const root = /^\/$/;
+    const plat = platform();
+    const root = plat === "windows" ? /^[A-Z]:\\$/ : /^\/$/;
 
     while (true) {
       const denoJsonPath = join(currentDir, "deno.json");

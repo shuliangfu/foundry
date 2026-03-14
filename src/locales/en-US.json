@@ -173,6 +173,7 @@
       "runExample": "   Example: foundry run scripts/test.ts --network local",
       "projectRootNotFound": "❌ Project root not found (directory with deno.json or package.json)",
       "scriptNotExist": "❌ Script not found: {path}",
+      "scriptOutsideProject": "❌ Script path must be under project root: {path}",
       "networkLabel": "🌐 Network: {network}",
       "runScript": "🚀 Running script: {script}",
       "scriptDone": "✅ Script completed!",

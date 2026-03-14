@@ -43,6 +43,18 @@ export async function runRunCli(args: string[], options: RunCliOptions): Promise
     exit(1);
   }
 
+  // 安全：禁止执行项目根目录外的脚本（防止路径逃逸，如 ../../etc/passwd）
+  const normalizedRoot = resolve(projectRoot);
+  const normalizedFull = resolve(fullScriptPath);
+  const underRoot = normalizedFull === normalizedRoot ||
+    (normalizedFull.length > normalizedRoot.length &&
+      (normalizedFull[normalizedRoot.length] === "/" ||
+        normalizedFull[normalizedRoot.length] === "\\"));
+  if (!underRoot) {
+    logger.error($tr("foundry.run.scriptOutsideProject", { path: fullScriptPath }));
+    exit(1);
+  }
+
   const network = getNetworkName(options.network, false);
   const finalNetwork = network ?? getEnv("WEB3_ENV") ?? DEFAULT_NETWORK;
   setEnv("WEB3_ENV", finalNetwork);
