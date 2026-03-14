@@ -5,6 +5,15 @@ All notable changes to @dreamer/foundry are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.4] - 2026-03-14
+
+### Fixed
+
+- **loadEnv**: No longer log a warning when `.env` is missing; returns empty object silently (e.g.
+  in new directories or when running `foundry -v` without a project `.env`).
+
+---
+
 ## [1.8.3] - 2026-03-13
 
 ### Added

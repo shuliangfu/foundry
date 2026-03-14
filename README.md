@@ -266,10 +266,9 @@ See [docs/zh-CN/README.md](./docs/zh-CN/README.md) for full chain table and conf
 
 ## Changelog
 
-**v1.8.3** (2026-03-13)
+**v1.8.4** (2026-03-14)
 
-- **Added**: Morph network verification (Blockscout; mainnet 2818, testnet Hoodi 2910). Set
-  `chain: "morph"` in `config/web3.json` to use; no API key required for Morph.
+- **Fixed**: `loadEnv` no longer logs a warning when `.env` is missing; returns empty env silently.
 
 See [CHANGELOG.md](./docs/en-US/CHANGELOG.md) for full history.
 

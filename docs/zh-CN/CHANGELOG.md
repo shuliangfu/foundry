@@ -5,6 +5,15 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)， 版本号遵循
 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.8.4] - 2026-03-14
+
+### 修复
+
+- **loadEnv**：当缺少 `.env` 时不再输出警告，静默返回空对象（如新建目录或执行 `foundry -v` 时无需
+  项目 `.env`）。
+
+---
+
 ## [1.8.3] - 2026-03-13
 
 ### 新增

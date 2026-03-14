@@ -28,7 +28,6 @@ export { exit, getEnv, setEnv };
 export function loadEnv(envPath?: string): Record<string, string> {
   const targetPath = envPath || join(cwd(), ".env");
   if (!existsSync(targetPath)) {
-    logger.warn($tr("foundry.utils.envNotFoundEmpty"));
     return {};
   }
 
