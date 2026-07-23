@@ -1,16 +1,24 @@
 #!/usr/bin/env node
 /**
- * Node.js test runner — runs each test file individually in the main process.
+ * Node.js test runner — runs each test file in the MAIN process (no --test flag).
  *
- * Why: Node 22's test runner uses IPC (structuredClone) to pass results from
- * child processes to the parent. When a test file writes to stdout (e.g. via
- * logger.info / console.log), the IPC parser corrupts and throws
+ * 【Why 根源】Node 22's `node --test` forks a child process per file and uses the
+ * child's stdout as the TAP/IPC message channel (parsed via structuredClone). When
+ * a test file — or code under test — writes to stdout (e.g. `logger.info()` /
+ * `console.log()`), the non-TAP bytes corrupt the parent's message parser, throwing
  * "Unable to deserialize cloned data due to invalid or unsupported version."
  *
- * Running one file at a time via `node --import tsx --test <file>` executes
- * in the main process — no child process, no IPC, no serialization bug.
- * This is unnecessary on Node 23+ (--test-isolation=none exists) but required
- * for Node 22 (engines.node >= 22).
+ * `--test-isolation=none` would disable forking, but it is Node 23+ only. Our
+ * `engines.node >= 22` constraint means CI runs Node 22, where the flag is absent.
+ *
+ * 【Fix】Run each file as the entry point (`node --import tsx <file>`) WITHOUT the
+ * `--test` flag. `node:test` auto-runs registered tests IN-PROCESS when the module
+ * is the main entry — no child process, no IPC, no serialization bug. The process
+ * exit code still reflects results (0 on pass, 1 on fail). `--test-force-exit`
+ * ensures the process exits even if a test leaves dangling handles (timers etc.).
+ *
+ * 【Invariant】One file per process invocation; exit code is the single source of
+ * truth for pass/fail. CI=true set so Anvil integration tests self-skip.
  */
 import { readdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -30,7 +38,7 @@ for (const file of files) {
   console.log(`▶ ${rel}`);
   const result = spawnSync(
     process.execPath,
-    ["--import", "tsx", "--test", "--test-force-exit", file],
+    ["--import", "tsx", "--test-force-exit", file],
     {
       stdio: "inherit",
       env: { ...process.env, CI: "true" },
