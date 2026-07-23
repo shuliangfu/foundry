@@ -11,6 +11,8 @@
 
 - **Node.js 22+ 兼容**：包现可通过 `tsx` 进行 TypeScript 转译在 Node.js 22+ 上运行。
   `package.json` 声明 `engines.node >= 22`、`test:node` 脚本和 `npm:@jsr/dreamer__*` 依赖。
+  使用 `--test-isolation=none` 规避 Node 22 测试运行器 IPC/structuredClone bug
+  （"Unable to deserialize cloned data due to invalid or unsupported version"）。
 - **9 作业 CI 矩阵**：Deno 2.9 / Bun 1.3 / Node.js 22 × Linux/macOS/Windows（原为 3 个仅 Deno 作业）。
   Deno 作业传 `--minimum-dependency-age=0` 绕过 JSR 最小依赖日期约束（依赖图中存在比
   `runtime-adapter@1.2.2` 更早发布的传递依赖）。

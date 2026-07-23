@@ -18,7 +18,7 @@
   },
   "scripts": {
     "test": "bun test tests/",
-    "test:node": "CI=true tsx --tsconfig tsconfig.json --test --test-force-exit tests/*.test.ts",
+    "test:node": "CI=true tsx --tsconfig tsconfig.json --test --test-force-exit --test-isolation=none tests/*.test.ts",
     "check": "deno check src/mod.ts",
     "lint": "deno lint src/ tests/",
     "fmt": "deno fmt src/ tests/"
