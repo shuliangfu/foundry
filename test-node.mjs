@@ -24,6 +24,10 @@ import { readdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
 
+// 显式置 CI=true：使脚本自包含，不依赖 Unix shell 前缀语法（Windows 不支持
+// `CI=true node ...`）也不依赖外部环境。Anvil 集成测试据此自跳过。
+process.env.CI = "true";
+
 const testDir = resolve("tests");
 const files = readdirSync(testDir)
   .filter((f) => f.endsWith(".test.ts"))

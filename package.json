@@ -18,7 +18,7 @@
   },
   "scripts": {
     "test": "bun test tests/",
-    "test:node": "CI=true node test-node.mjs",
+    "test:node": "node test-node.mjs",
     "check": "deno check src/mod.ts",
     "lint": "deno lint src/ tests/",
     "fmt": "deno fmt src/ tests/"
