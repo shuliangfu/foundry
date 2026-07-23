@@ -1,11 +1,11 @@
 # @dreamer/foundry
 
-> A Foundry smart contract deployment and verification toolkit for Deno and Bun, with project init
-> and automated deployment.
+> A Foundry smart contract deployment and verification toolkit for Deno, Bun, and Node.js 22+, with
+> project init and automated deployment.
 
 [![JSR](https://jsr.io/badges/@dreamer/foundry)](https://jsr.io/@dreamer/foundry)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
-[![Tests](https://img.shields.io/badge/tests-261%20passed-brightgreen)](./docs/en-US/TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-253%20passed-brightgreen)](./docs/en-US/TEST_REPORT.md)
 [![Coverage](https://img.shields.io/badge/coverage-80--85%25-green)](./docs/en-US/TEST_REPORT.md)
 
 **中文文档**: [docs/zh-CN/README.md](./docs/zh-CN/README.md) · **Changelog**:
@@ -50,7 +50,11 @@ foundry test --network local
 > - The global CLI runs with Deno.
 > - For `foundry deploy` / `verify` / `run` / `test`, the CLI detects the project:
 >   - `deno.json` present → uses `deno run` / `deno test`
->   - Only `package.json` → uses `bun run` / `bun test`
+>   - Only `package.json` → uses `bun run` / `bun test` (Bun) or `node --import tsx` / `node --test`
+>     (Node.js 22+)
+> - **Node.js**: Global CLI self-install/upgrade (`foundry setup` / `foundry upgrade`) is not
+>   supported on Node (no equivalent to `deno install --global`). Install the global CLI via Deno or
+>   Bun, or use `npx` to run foundry on demand.
 
 **Uninstall**:
 
@@ -74,6 +78,12 @@ deno add jsr:@dreamer/foundry
 bunx jsr add @dreamer/foundry
 ```
 
+**Node.js 22+**:
+
+```bash
+npx jsr add @dreamer/foundry
+```
+
 Then import:
 
 ```typescript
@@ -86,9 +96,10 @@ import { deploy, verify, Web3 } from "@dreamer/foundry";
 
 | Environment | Version | Status                            |
 | ----------- | ------- | --------------------------------- |
-| **Deno**    | 2.5.0+  | ✅                                |
-| **Bun**     | 1.0.0+  | ✅ (via @dreamer/runtime-adapter) |
-| **Server**  | -       | ✅ (Deno/Bun)                     |
+| **Deno**    | 2.9.0+  | ✅                                |
+| **Bun**     | 1.3.0+  | ✅ (via @dreamer/runtime-adapter) |
+| **Node.js** | 22.0+   | ✅ (via tsx + @dreamer/runtime-adapter) |
+| **Server**  | -       | ✅ (Deno/Bun/Node)                |
 
 ---
 
@@ -99,7 +110,7 @@ import { deploy, verify, Web3 } from "@dreamer/foundry";
 - **Utilities**: Logging, env loading/validation, contract loading, Web3 client (read/write,
   balance, events), Anvil time control, address validation/formatting, unit conversion, hashing, hex
   conversion.
-- **Cross-runtime**: @dreamer/runtime-adapter for Deno/Bun; unified API and behavior.
+- **Cross-runtime**: @dreamer/runtime-adapter for Deno/Bun/Node.js 22+; unified API and behavior.
 - **Init**: Directory layout, config and template generation, sample contract and scripts.
 
 ---

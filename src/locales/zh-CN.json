@@ -203,7 +203,8 @@
       "installProgress": "升级安装中...",
       "upgradedTo": "✅ 已升级到 {version}",
       "upgradeFailed": "❌ 升级失败",
-      "upgradeError": "❌ 升级过程中发生错误:"
+      "upgradeError": "❌ 升级过程中发生错误:",
+      "nodeGlobalUpgradeUnsupported": "❌ Node.js 不支持全局自升级（没有 `deno install --global` 的等价命令）。请通过 Deno 或 Bun 升级，或在本地用 `npm install @dreamer/foundry@latest` 重新安装。"
     },
     "setup": {
       "packageInfoFallback": "⚠️  无法从 import.meta.url 或本地项目解析包信息，使用默认值",
@@ -214,6 +215,7 @@
       "denoJsonFetchFailed": "无法获取 deno.json: {message} ({status})",
       "htmlJsonParseFailed": "无法解析 HTML 中的 JSON 内容",
       "contentNotJson": "返回的内容不是 JSON，Content-Type: {contentType}",
+      "nodeGlobalInstallUnsupported": "❌ Node.js 不支持全局 CLI 安装（没有 `deno install --global` 的等价命令）。请通过 Deno（`deno run -A jsr:@dreamer/foundry/setup`）或 Bun（`bun run jsr:@dreamer/foundry/setup`）安装全局 CLI，或使用 `npx` 按需运行 foundry。",
       "installTitle": "🚀 安装 Foundry CLI 到全局",
       "installing": "正在安装...",
       "installSuccess": "✅ Foundry CLI 安装成功！",

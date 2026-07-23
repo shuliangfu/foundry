@@ -8,6 +8,7 @@ import {
   exit,
   getEnv,
   getEnvAll,
+  IS_NODE,
   join,
   setEnv,
 } from "@dreamer/runtime-adapter";
@@ -41,23 +42,34 @@ export async function runTestCli(args: string[], options: TestCliOptions): Promi
 
   const hasDeno = existsSync(join(projectRoot, "deno.json"));
   const hasPackageJson = existsSync(join(projectRoot, "package.json"));
-  const runtime = hasDeno ? "deno" : (hasPackageJson ? "bun" : "deno");
+  // deno.json 项目用 deno；仅有 package.json 时按当前运行时选择（Node 用 node + tsx，Bun 用 bun）
+  const runtime = hasDeno ? "deno" : (hasPackageJson ? (IS_NODE ? "node" : "bun") : "deno");
 
   const network = getNetworkName(options.network, false);
   const finalNetwork = network ?? getEnv("WEB3_ENV") ?? DEFAULT_NETWORK;
   setEnv("WEB3_ENV", finalNetwork);
 
-  const testArgs: string[] = ["test"];
+  // 构建测试启动参数（按运行时差异：deno/bun 用 test 子命令，node 用 --import tsx --test）
+  const testArgs: string[] = [];
   if (runtime === "deno") {
-    testArgs.push("-A");
+    testArgs.push("test", "-A");
     if (denoJsonPath) testArgs.push("--config", denoJsonPath);
     if (options.filter) testArgs.push("--filter", options.filter);
     if (options.coverage) testArgs.push("--coverage");
-  } else {
+  } else if (runtime === "bun") {
+    testArgs.push("test");
     if (options.filter) testArgs.push("--filter", options.filter);
     if (options.coverage) logger.warn($tr("foundry.test.coverageNotSupported"));
     if (options.concurrency !== undefined) {
       testArgs.push("--concurrency", String(options.concurrency));
+    }
+  } else {
+    // node：--import tsx 注册 TS 加载器，--test 启用内置测试运行器
+    // --test-name-pattern 等价于 deno/bun 的 --filter（正则匹配测试名）
+    testArgs.push("--import", "tsx", "--test");
+    if (options.filter) testArgs.push("--test-name-pattern", options.filter);
+    if (options.coverage) {
+      logger.warn($tr("foundry.test.coverageNotSupported"));
     }
   }
   if (args.length > 0) testArgs.push(...args);

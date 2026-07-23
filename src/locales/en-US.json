@@ -203,7 +203,8 @@
       "installProgress": "Upgrading...",
       "upgradedTo": "✅ Upgraded to {version}",
       "upgradeFailed": "❌ Upgrade failed",
-      "upgradeError": "❌ Error during upgrade:"
+      "upgradeError": "❌ Error during upgrade:",
+      "nodeGlobalUpgradeUnsupported": "❌ Global self-upgrade is not supported on Node.js (no equivalent to `deno install --global`). Please upgrade via Deno or Bun, or reinstall locally with `npm install @dreamer/foundry@latest`."
     },
     "setup": {
       "packageInfoFallback": "⚠️  Could not resolve package info from import.meta.url or local project, using defaults",
@@ -214,6 +215,7 @@
       "denoJsonFetchFailed": "Failed to fetch deno.json: {message} ({status})",
       "htmlJsonParseFailed": "Failed to parse JSON from HTML response",
       "contentNotJson": "Response is not JSON, Content-Type: {contentType}",
+      "nodeGlobalInstallUnsupported": "❌ Global CLI installation is not supported on Node.js (no equivalent to `deno install --global`). Install the CLI globally via Deno (`deno run -A jsr:@dreamer/foundry/setup`) or Bun (`bun run jsr:@dreamer/foundry/setup`), or use `npx` to run foundry on demand.",
       "installTitle": "🚀 Install Foundry CLI globally",
       "installing": "Installing...",
       "installSuccess": "✅ Foundry CLI installed!",

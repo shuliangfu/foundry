@@ -8,14 +8,15 @@ import {
   existsSync,
   exit,
   IS_BUN,
+  IS_NODE,
   join,
   platform,
   readTextFileSync,
 } from "@dreamer/runtime-adapter";
+import { $tr } from "../i18n.ts";
 import type { JsrDenoJson, JsrMetaData } from "../types/index.ts";
 import { getInstalledVersion, readCache, setInstalledVersion, writeCache } from "../utils/cache.ts";
 import { createLoadingProgressBar } from "../utils/cli-utils.ts";
-import { $tr } from "../i18n.ts";
 import { parseJsrPackageFromUrl, parseJsrVersionFromUrl } from "../utils/jsr.ts";
 import { logger } from "../utils/logger.ts";
 
@@ -237,6 +238,14 @@ export async function runUpgradeCli(options: UpgradeCliOptions): Promise<void> {
     const installProgressInterval = installProgressBar.start();
 
     try {
+      // 【Why Node 拒绝】deno/bun install -A --global 是 Deno/Bun 专有的全局安装机制，
+      // Node 没有等价命令（npm install -g 安装的是包而非 JSR CLI 包装器）。
+      // Node 用户应通过 Deno/Bun 升级全局 CLI，或在本地用 npm 重装。
+      if (IS_NODE) {
+        installProgressBar.stop(installProgressInterval);
+        logger.error($tr("foundry.upgrade.nodeGlobalUpgradeUnsupported"));
+        exit(1);
+      }
       const runtime = IS_BUN ? "bun" : "deno";
       const cmd = createCommand(runtime, { args, stdout: "piped", stderr: "piped" });
       const output = await cmd.output();

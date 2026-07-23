@@ -5,6 +5,48 @@ All notable changes to @dreamer/foundry are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-07-23
+
+### Added
+
+- **Node.js 22+ compatibility**: The package now runs on Node.js 22+ via `tsx` TypeScript
+  transpilation. `package.json` declares `engines.node >= 22`, a `test:node` script, and
+  `npm:@jsr/dreamer__*` dependencies.
+- **9-job CI matrix**: Deno 2.9 / Bun 1.3 / Node.js 22 × Linux/macOS/Windows (previously 3 Deno-only
+  jobs). Deno jobs pass `--minimum-dependency-age=0` to bypass the JSR minimum-dependency-date
+  constraint (a transitive dependency published before `runtime-adapter@1.2.2` exists in the graph).
+- **`tsconfig.json`**: Bundler moduleResolution + `node` types for Node tooling.
+- **`deno.json` `compilerOptions.lib`**: Added `["deno.ns", "deno.window", "esnext"]` to ensure
+  Deno-specific types (e.g. `import.meta.main`) remain available when `nodeModulesDir: "auto"`
+  loads `@types/node` (which would otherwise override `ImportMeta` and drop `.main`).
+
+### Changed
+
+- **`detectProjectRuntime()`** (`src/utils/cli-utils.ts`): Returns `"deno" | "bun" | "node"` instead
+  of `"deno" | "bun"`. A `package.json`-only project now selects `node` (via `IS_NODE`) when running
+  under Node.js; `IS_NODE` fallback also resolves to `node`.
+- **`executeCommand()`** (`src/utils/cli-utils.ts`): Three-way runtime dispatch — Deno
+  (`run -A --config`), Bun (`run`), Node (`--import tsx <script>`).
+- **`test` command** (`src/cmd/test.ts`): Node branch dispatches `node --import tsx --test` with
+  `--test-name-pattern` for `--filter` (equivalent to Deno/Bun `--filter`).
+- **`upgrade`/`setup` commands**: On Node.js, global CLI self-install/upgrade is unsupported (no
+  equivalent to `deno install --global`); a descriptive i18n error is thrown guiding users to Deno/Bun
+  or `npx`. New locale keys `nodeGlobalUpgradeUnsupported` / `nodeGlobalInstallUnsupported` added to
+  `en-US.json` and `zh-CN.json`.
+- **Dependency bumps**: `runtime-adapter` ^1.0.18 → ^1.2.2, `i18n` ^1.0.1 → ^1.1.2,
+  `web3` ^1.0.9 → ^1.2.0, `logger` ^1.0.2 → ^1.1.0, `console` ^1.0.12 → ^1.1.0,
+  `test` ^1.0.12 → ^1.2.3.
+- **Description**: Updated to mention Node.js 22+.
+
+### Notes
+
+- `tests/web3.test.ts` Anvil integration tests auto-skip in CI via
+  `it.skipIf(getEnv("CI") === "true")` — no test split needed (11 tests skipped across all runtimes).
+- `tests/init.test.ts` is already locale-locked (`setFoundryLocale("zh-CN")`); `errors.test.ts`
+  assertions are hardcoded constructor args — no locale locking needed.
+
+---
+
 ## [1.8.5] - 2026-03-14
 
 ### Fixed

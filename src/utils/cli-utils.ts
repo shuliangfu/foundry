@@ -12,6 +12,7 @@ import {
   getEnv,
   getEnvAll,
   IS_BUN,
+  IS_NODE,
   join,
   platform,
   writeStdoutSync,
@@ -238,11 +239,15 @@ export async function executeCommandWithStream(
  * - 有 deno.json → 使用 deno
  * - 只有 package.json（无 deno.json）→ 使用 bun
  * - 当前运行时是 Bun → 使用 bun
+ * - 当前运行时是 Node → 使用 node（配合 tsx 加载器运行 TS 脚本）
  * @param projectRoot - 项目根目录
  * @param denoJsonPath - deno.json 路径（可选）
- * @returns "deno" | "bun"
+ * @returns "deno" | "bun" | "node"
  */
-function detectProjectRuntime(projectRoot: string, denoJsonPath?: string): "deno" | "bun" {
+function detectProjectRuntime(
+  projectRoot: string,
+  denoJsonPath?: string,
+): "deno" | "bun" | "node" {
   // 如果提供了 denoJsonPath 且文件存在，使用 deno
   if (denoJsonPath && existsSync(denoJsonPath)) {
     return "deno";
@@ -257,13 +262,22 @@ function detectProjectRuntime(projectRoot: string, denoJsonPath?: string): "deno
   // 检查是否有 package.json（Bun/Node 项目）
   const packageJson = join(projectRoot, "package.json");
   if (existsSync(packageJson)) {
-    // 有 package.json 但没有 deno.json，优先使用 bun
+    // 有 package.json 但没有 deno.json：按当前运行时选择
+    // Node 项目用 node（+tsx），Bun 项目用 bun
+    if (IS_NODE) {
+      return "node";
+    }
     return "bun";
   }
 
   // 如果当前运行时是 Bun，使用 bun
   if (IS_BUN) {
     return "bun";
+  }
+
+  // 如果当前运行时是 Node，使用 node
+  if (IS_NODE) {
+    return "node";
   }
 
   // 默认使用 deno
@@ -292,21 +306,35 @@ export async function executeCommand(
   // 根据项目类型检测应该使用的运行时
   const runtime = detectProjectRuntime(projectRoot, denoJsonPath);
 
-  // 构建命令参数
-  const cmdArgs = runtime === "deno"
-    ? [
+  // 构建命令参数（按运行时选择不同的启动方式）
+  // - deno: deno run -A --config <deno.json> <script> [args]
+  // - bun:  bun run <script> [args]
+  // - node: node --import tsx <script> [args]（tsx 加载器在运行时转译 TS，等价于 deno/bun 的原生 TS 支持）
+  let cmdArgs: string[];
+  if (runtime === "deno") {
+    cmdArgs = [
       "run",
       "-A",
       "--config",
       denoJsonPath,
       scriptPath,
       ...args,
-    ]
-    : [
+    ];
+  } else if (runtime === "bun") {
+    cmdArgs = [
       "run",
       scriptPath,
       ...args,
     ];
+  } else {
+    // node：通过 --import tsx 注册加载器以支持直接执行 .ts 脚本
+    cmdArgs = [
+      "--import",
+      "tsx",
+      scriptPath,
+      ...args,
+    ];
+  }
 
   // 获取当前进程的所有环境变量，传递给子进程
   // 这确保了 WEB3_ENV、RPC_URL 等网络配置能正确传递给部署脚本

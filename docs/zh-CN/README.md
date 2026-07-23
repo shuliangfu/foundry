@@ -1,10 +1,10 @@
 # @dreamer/foundry
 
-> 一个 Foundry 智能合约部署和验证工具，支持 Deno 和 Bun 运行时，提供完整的项目初始化和自动化部署能力
+> 一个 Foundry 智能合约部署和验证工具，支持 Deno、Bun 和 Node.js 22+ 运行时，提供完整的项目初始化和自动化部署能力
 
 [![JSR](https://jsr.io/badges/@dreamer/foundry)](https://jsr.io/@dreamer/foundry)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](../../LICENSE)
-[![Tests](https://img.shields.io/badge/tests-261%20passed-brightgreen)](./TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-253%20passed-brightgreen)](./TEST_REPORT.md)
 [![Coverage](https://img.shields.io/badge/coverage-80--85%25-green)](./TEST_REPORT.md)
 
 **English**: [README](../README.md) · **Test report (EN)**:
@@ -50,8 +50,8 @@ foundry test --network local
 > - 全局 CLI 本身使用 Deno 运行
 > - 但执行 `foundry deploy`/`verify`/`run`/`test` 时，会**自动检测项目类型**：
 >   - 项目有 `deno.json` → 使用 `deno run`/`deno test` 执行
->   - 项目只有 `package.json` → 使用 `bun run`/`bun test` 执行
-> - 这样 Bun 项目也能正常使用全局 CLI
+>   - 项目只有 `package.json` → 使用 `bun run`/`bun test`（Bun）或 `node --import tsx`/`node --test`（Node.js 22+）执行
+> - **Node.js**：全局 CLI 自安装/升级（`foundry setup`/`foundry upgrade`）在 Node 上不支持（Node 没有 `deno install --global` 的等价命令）。请通过 Deno 或 Bun 安装全局 CLI，或使用 `npx` 按需运行 foundry。
 
 **卸载全局 CLI**：
 
@@ -79,6 +79,13 @@ deno add jsr:@dreamer/foundry
 bunx jsr add @dreamer/foundry
 ```
 
+**Node.js 22+ 项目**：
+
+```bash
+# 使用 npx jsr 添加依赖
+npx jsr add @dreamer/foundry
+```
+
 然后在代码中导入使用：
 
 ```typescript
@@ -91,9 +98,10 @@ import { deploy, verify, Web3 } from "@dreamer/foundry";
 
 | 环境       | 版本要求 | 状态                                     |
 | ---------- | -------- | ---------------------------------------- |
-| **Deno**   | 2.5.0+   | ✅ 完全支持                              |
-| **Bun**    | 1.0.0+   | ✅ 支持（通过 @dreamer/runtime-adapter） |
-| **服务端** | -        | ✅ 支持（Deno/Bun 运行时）               |
+| **Deno**   | 2.9.0+   | ✅ 完全支持                              |
+| **Bun**    | 1.3.0+   | ✅ 支持（通过 @dreamer/runtime-adapter） |
+| **Node.js** | 22.0+   | ✅ 支持（通过 tsx + @dreamer/runtime-adapter） |
+| **服务端** | -        | ✅ 支持（Deno/Bun/Node 运行时）          |
 
 ---
 
@@ -115,10 +123,10 @@ import { deploy, verify, Web3 } from "@dreamer/foundry";
   - 哈希函数（keccak256, solidityKeccak256）
   - 十六进制转换（hexToNumber, numberToHex, hexToBytes, bytesToHex）
 - **跨运行时支持**：
-  - 基于 @dreamer/runtime-adapter 实现 Deno/Bun 完全兼容
+  - 基于 @dreamer/runtime-adapter 实现 Deno/Bun/Node.js 22+ 完全兼容
   - 自动检测运行时环境，选择正确的命令执行方式
   - 统一的 API 接口，简洁高效
-  - 在 Deno 和 Bun 环境下行为一致
+  - 在 Deno、Bun 和 Node.js 环境下行为一致
 - **项目初始化**：
   - 自动创建项目目录结构
   - 生成配置文件和模板

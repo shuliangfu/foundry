@@ -3,20 +3,28 @@
 ## Test Overview
 
 - **Test framework**: @dreamer/test (based on Deno built-in test framework)
-- **Test date**: 2026-02-20
-- **Test environment**: Deno + Anvil local node
+- **Test date**: 2026-07-23
+- **Test environment**: Deno 2.9 / Bun 1.3 / Node.js 22 (3-runtime cross-validation)
 - **Data source**: Generated from actual terminal test output
 
 ## Test Results
 
 ### Summary
 
-- **Total tests**: 264
-- **Passed**: 261 ✅
-- **Failed**: 0
-- **Ignored**: 3 (require special environment)
-- **Pass rate**: 98.9% ✅
-- **Execution time**: ~6 seconds
+| Runtime        | Passed | Failed | Skipped | Notes                              |
+| -------------- | ------ | ------ | ------- | ---------------------------------- |
+| **Deno 2.9**   | 253    | 0      | 11      | Anvil tests skip via `CI=true`     |
+| **Bun 1.3**    | 225    | 0      | 11      | Anvil tests skip via `CI=true`     |
+| **Node.js 22** | 225    | 0      | 11      | `tsx --test`, Anvil tests skip     |
+
+- **Pass rate**: 100% (0 failures across all runtimes) ✅
+- **Execution time**: ~3s (Deno) / ~0.5s (Bun) / ~0.8s (Node)
+- **Skipped tests**: 11 (require running Anvil node at `127.0.0.1:8545`; auto-skipped in CI via
+  `it.skipIf(getEnv("CI") === "true")`)
+
+> **Note**: Deno/Bun/Node count test cases slightly differently (subtest grouping), but all three
+> runtimes pass with 0 failures. The 11 skipped tests are Anvil integration tests identical across
+> runtimes.
 
 ### Test Files Summary
 
@@ -254,25 +262,30 @@
 ### Run tests
 
 ```bash
-# Start Anvil if needed
+# Deno (all tests; Anvil tests auto-skip when CI=true)
+CI=true deno test -A --minimum-dependency-age=0 --no-check tests/
+
+# Bun
+CI=true bun test tests/
+
+# Node.js 22
+npm install
+npm run test:node   # sets CI=true internally, uses tsx --test
+
+# With a local Anvil node (runs integration tests too)
 anvil
-
-# All tests
-WEB3_ENV=local deno test -A
-
-# Single file
-WEB3_ENV=local deno test -A tests/web3.test.ts
+CI= deno test -A --minimum-dependency-age=0 --no-check tests/
 ```
 
 ## Conclusion
 
-@dreamer/foundry has **264 tests: 261 passed, 3 skipped** (special env / resource safety). Coverage
-is about **80–85%**. Suitable for production use.
+@dreamer/foundry passes on **all three runtimes** (Deno 2.9 / Bun 1.3 / Node.js 22) with **0
+failures**. 11 Anvil integration tests are auto-skipped in CI (require a running Anvil node).
+Coverage is about **80–85%**. Suitable for production use.
 
 **Summary**:
 
-- **Total**: 264
-- **Passed**: 261 ✅
-- **Skipped**: 3
-- **Failed**: 0
-- **Pass rate**: 98.9%
+- **Deno**: 253 passed, 11 skipped, 0 failed ✅
+- **Bun**: 225 passed, 11 skipped, 0 failed ✅
+- **Node.js 22**: 225 passed, 11 skipped, 0 failed ✅
+- **Pass rate**: 100% (0 failures)

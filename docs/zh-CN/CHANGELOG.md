@@ -5,6 +5,46 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)， 版本号遵循
 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.9.0] - 2026-07-23
+
+### 新增
+
+- **Node.js 22+ 兼容**：包现可通过 `tsx` 进行 TypeScript 转译在 Node.js 22+ 上运行。
+  `package.json` 声明 `engines.node >= 22`、`test:node` 脚本和 `npm:@jsr/dreamer__*` 依赖。
+- **9 作业 CI 矩阵**：Deno 2.9 / Bun 1.3 / Node.js 22 × Linux/macOS/Windows（原为 3 个仅 Deno 作业）。
+  Deno 作业传 `--minimum-dependency-age=0` 绕过 JSR 最小依赖日期约束（依赖图中存在比
+  `runtime-adapter@1.2.2` 更早发布的传递依赖）。
+- **`tsconfig.json`**：Bundler moduleResolution + `node` types，供 Node 工具链使用。
+- **`deno.json` `compilerOptions.lib`**：新增 `["deno.ns", "deno.window", "esnext"]`，确保
+  `nodeModulesDir: "auto"` 加载 `@types/node` 时 Deno 专有类型（如 `import.meta.main`）仍可用
+  （否则 `@types/node` 会覆盖 `ImportMeta` 并丢失 `.main` 属性）。
+
+### 变更
+
+- **`detectProjectRuntime()`**（`src/utils/cli-utils.ts`）：返回 `"deno" | "bun" | "node"`（原为
+  `"deno" | "bun"`）。仅有 `package.json` 的项目在 Node 下选 `node`（经 `IS_NODE`）；`IS_NODE`
+  兜底也解析为 `node`。
+- **`executeCommand()`**（`src/utils/cli-utils.ts`）：三路运行时分派——Deno（`run -A --config`）、
+  Bun（`run`）、Node（`--import tsx <script>`）。
+- **`test` 命令**（`src/cmd/test.ts`）：Node 分支派发 `node --import tsx --test`，`--filter` 用
+  `--test-name-pattern`（等价于 Deno/Bun 的 `--filter`）。
+- **`upgrade`/`setup` 命令**：Node.js 下全局 CLI 自安装/升级不支持（无 `deno install --global`
+  等价命令）；抛出描述性 i18n 错误，引导用户使用 Deno/Bun 或 `npx`。新增 locale 键
+  `nodeGlobalUpgradeUnsupported` / `nodeGlobalInstallUnsupported`（en-US.json 与 zh-CN.json）。
+- **依赖升级**：`runtime-adapter` ^1.0.18 → ^1.2.2、`i18n` ^1.0.1 → ^1.1.2、
+  `web3` ^1.0.9 → ^1.2.0、`logger` ^1.0.2 → ^1.1.0、`console` ^1.0.12 → ^1.1.0、
+  `test` ^1.0.12 → ^1.2.3。
+- **描述**：更新为提及 Node.js 22+。
+
+### 说明
+
+- `tests/web3.test.ts` 的 Anvil 集成测试通过 `it.skipIf(getEnv("CI") === "true")` 在 CI 自动跳过
+  ——无需拆分测试（三端均跳过 11 个测试）。
+- `tests/init.test.ts` 已锁定 locale（`setFoundryLocale("zh-CN")`）；`errors.test.ts` 断言为硬编码
+  构造参数——无需额外 locale 锁定。
+
+---
+
 ## [1.8.5] - 2026-03-14
 
 ### 修复

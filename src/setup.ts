@@ -34,6 +34,7 @@ import {
   exit,
   getEnv,
   IS_BUN,
+  IS_NODE,
   join,
   platform,
   readStdin,
@@ -335,6 +336,13 @@ async function install(): Promise<void> {
     // 使用 --import-map 指定导入映射，这样全局安装后才能找到依赖
     // 使用 --force 标志允许覆盖现有安装
     // 使用 -A 或 --allow-all 授予所有权限，确保安装后的命令可以正常运行
+    // 【Why Node 拒绝】deno/bun install -A --global 是 Deno/Bun 专有的全局安装机制，
+    // Node 没有等价命令（npm install -g 安装的是包而非 JSR CLI 包装器）。
+    // Node 用户应通过 Deno/Bun 安装全局 CLI，或使用 npx 按需运行。
+    if (IS_NODE) {
+      logger.error($tr("foundry.setup.nodeGlobalInstallUnsupported"));
+      exit(1);
+    }
     // 根据运行时环境选择正确的命令
     const runtime = IS_BUN ? "bun" : "deno";
     const cmd = createCommand(runtime, {
