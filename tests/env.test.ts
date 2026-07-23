@@ -3,9 +3,9 @@
  * @description 环境变量工具扩展测试
  */
 
+import { cwd, existsSync, join, mkdir, remove, writeTextFile } from "@dreamer/runtime-adapter";
 import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
 import { validateEnv } from "../src/utils/env.ts";
-import { cwd, existsSync, join, remove, writeTextFile } from "@dreamer/runtime-adapter";
 
 describe("环境变量工具扩展测试", () => {
   const testEnvPath = join(cwd(), "tests", "data", ".env.test");
@@ -19,9 +19,8 @@ CHAIN_ID=97
   beforeAll(async () => {
     // 创建测试环境变量文件
     const testDataDir = join(cwd(), "tests", "data");
-    if (!existsSync(testDataDir)) {
-      // 确保目录存在（实际应该使用 mkdir，但这里简化处理）
-    }
+    // 确保 tests/data 目录存在（CI 环境 tests/data 被 gitignore，需显式创建）
+    await mkdir(testDataDir, { recursive: true });
     await writeTextFile(testEnvPath, testEnvContent);
   });
 

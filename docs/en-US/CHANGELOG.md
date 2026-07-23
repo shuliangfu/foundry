@@ -11,9 +11,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - **Node.js 22+ compatibility**: The package now runs on Node.js 22+ via `tsx` TypeScript
   transpilation. `package.json` declares `engines.node >= 22`, a `test:node` script, and
-  `npm:@jsr/dreamer__*` dependencies. Uses `--test-isolation=none` to avoid a Node 22 test
-  runner IPC/structuredClone bug ("Unable to deserialize cloned data due to invalid or unsupported
-  version").
+  `npm:@jsr/dreamer__*` dependencies. Uses a custom `test-node.mjs` runner that executes each
+  test file individually in the main process, avoiding a Node 22 test runner IPC/structuredClone
+  bug ("Unable to deserialize cloned data due to invalid or unsupported version") triggered when
+  test files write to stdout (e.g. `logger.info` in `init.test.ts`).
 - **9-job CI matrix**: Deno 2.9 / Bun 1.3 / Node.js 22 × Linux/macOS/Windows (previously 3 Deno-only
   jobs). Deno jobs pass `--minimum-dependency-age=0` to bypass the JSR minimum-dependency-date
   constraint (a transitive dependency published before `runtime-adapter@1.2.2` exists in the graph).
@@ -46,6 +47,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `it.skipIf(getEnv("CI") === "true")` — no test split needed (11 tests skipped across all runtimes).
 - `tests/init.test.ts` is already locale-locked (`setFoundryLocale("zh-CN")`); `errors.test.ts`
   assertions are hardcoded constructor args — no locale locking needed.
+
+### Fixed
+
+- **`tests/env.test.ts`**: Empty `if (!existsSync(testDataDir))` block replaced with
+  `await mkdir(testDataDir, { recursive: true })`. The original code checked for `tests/data/`
+  existence but never created it, causing `writeTextFile` to fail on CI (where `tests/data/` is
+  gitignored and absent).
 
 ---
 

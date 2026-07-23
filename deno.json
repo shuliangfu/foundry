@@ -21,7 +21,8 @@
       "example/",
       ".cursor/",
       "*.test.ts",
-      "*.test.js"
+      "*.test.js",
+      "test-node.mjs"
     ]
   },
   "imports": {

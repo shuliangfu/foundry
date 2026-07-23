@@ -11,8 +11,9 @@
 
 - **Node.js 22+ 兼容**：包现可通过 `tsx` 进行 TypeScript 转译在 Node.js 22+ 上运行。
   `package.json` 声明 `engines.node >= 22`、`test:node` 脚本和 `npm:@jsr/dreamer__*` 依赖。
-  使用 `--test-isolation=none` 规避 Node 22 测试运行器 IPC/structuredClone bug
-  （"Unable to deserialize cloned data due to invalid or unsupported version"）。
+  使用自定义 `test-node.mjs` 运行器逐个在主进程中执行测试文件，规避 Node 22 测试运行器
+  IPC/structuredClone bug（"Unable to deserialize cloned data due to invalid or unsupported
+  version"，由测试文件向 stdout 写入如 `logger.info` 触发）。
 - **9 作业 CI 矩阵**：Deno 2.9 / Bun 1.3 / Node.js 22 × Linux/macOS/Windows（原为 3 个仅 Deno 作业）。
   Deno 作业传 `--minimum-dependency-age=0` 绕过 JSR 最小依赖日期约束（依赖图中存在比
   `runtime-adapter@1.2.2` 更早发布的传递依赖）。
@@ -44,6 +45,12 @@
   ——无需拆分测试（三端均跳过 11 个测试）。
 - `tests/init.test.ts` 已锁定 locale（`setFoundryLocale("zh-CN")`）；`errors.test.ts` 断言为硬编码
   构造参数——无需额外 locale 锁定。
+
+### 修复
+
+- **`tests/env.test.ts`**：空的 `if (!existsSync(testDataDir))` 代码块替换为
+  `await mkdir(testDataDir, { recursive: true })`。原代码检查 `tests/data/` 是否存在但从不创建，
+  导致 CI（`tests/data/` 被 gitignore 不存在）上 `writeTextFile` 失败。
 
 ---
 
